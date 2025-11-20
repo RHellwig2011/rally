@@ -1,0 +1,627 @@
+// Boba Fundraising Platform - Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+enum UserRole {
+  CAMPAIGN_LEADER
+  GUARDIAN
+  DONOR
+  BANK_ADMIN
+  TEAM_MEMBER
+}
+
+enum KYCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?
+  firstName     String
+  lastName      String
+  role          UserRole  @default(DONOR)
+
+  // Authentication
+  passwordHash  String
+  verificationToken String?
+  verificationTokenExpiry DateTime?
+  passwordResetToken String?
+  passwordResetTokenExpiry DateTime?
+
+  // Verification
+  emailVerified Boolean   @default(false)
+  phoneVerified Boolean   @default(false)
+  kycStatus     KYCStatus?
+
+  // Metadata
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  ledCampaigns          Campaign[]           @relation("CampaignLeader")
+  guardedCampaigns      Campaign[]           @relation("Guardians")
+  donations             Donation[]
+  campaignUpdates       CampaignUpdate[]
+  disbursementRequests  DisbursementRequest[] @relation("RequestedBy")
+  approvedDisbursements DisbursementRequest[] @relation("ApprovedBy")
+  transactions          Transaction[]
+  referrals             Referral[]
+  teamMemberships       TeamMember[]
+  refreshTokens         RefreshToken[]
+  outreachCampaigns     OutreachCampaign[]
+
+  @@index([email])
+}
+
+// ============================================================================
+// REFRESH TOKENS (ROTATING)
+// ============================================================================
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revoked      Boolean  @default(false)
+  replacedById String?
+  replacedBy   RefreshToken? @relation("replacedBy", fields: [replacedById], references: [id])
+  replacedByTokens RefreshToken[] @relation("replacedBy")
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+  createdByIp  String?
+  revokedAt    DateTime?
+  revokedByIp  String?
+  reason       String?
+
+  @@index([userId])
+}
+
+// ============================================================================
+// CAMPAIGN MANAGEMENT
+// ============================================================================
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum CampaignCategory {
+  SPORTS
+  ARTS
+  EDUCATION
+  COMMUNITY
+  OTHER
+}
+
+model Campaign {
+  id                String           @id @default(cuid())
+
+  // Basic Info
+  organizationName  String
+  teamName          String
+  slug              String           @unique
+  description       String           @db.Text
+  goalAmount        BigInt           // In cents
+  currentAmount     BigInt           @default(0) // In cents
+  platformFeePercent Float           @default(10.0)
+
+  // Customization
+  logoUrl           String?
+  bannerImageUrl    String?
+  primaryColor      String           @default("#6366F1")
+  secondaryColor    String           @default("#F59E0B")
+
+  // Dates
+  startDate         DateTime
+  endDate           DateTime?
+
+  // Status
+  status            CampaignStatus   @default(DRAFT)
+  category          CampaignCategory @default(OTHER)
+
+  // Leadership
+  primaryLeaderId   String
+  primaryLeader     User             @relation("CampaignLeader", fields: [primaryLeaderId], references: [id])
+  guardians         User[]           @relation("Guardians")
+
+  // Metadata
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  bankingAccount    BankingAccount?
+  donations         Donation[]
+  updates           CampaignUpdate[]
+  cheerMessages     CheerWallMessage[]
+  referrals         Referral[]
+  teamMembers       TeamMember[]
+  outreachCampaigns OutreachCampaign[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([primaryLeaderId])
+}
+
+// ============================================================================
+// BANKING & FINANCIAL
+// ============================================================================
+
+enum PayoutAccountType {
+  BANK_ACCOUNT
+  DEBIT_CARD
+}
+
+model BankingAccount {
+  id                      String            @id @default(cuid())
+  campaignId              String            @unique
+  campaign                Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Balances (in cents)
+  totalRaised             BigInt            @default(0)
+  platformFeesCollected   BigInt            @default(0)
+  availableBalance        BigInt            @default(0)
+  disbursedTotal          BigInt            @default(0)
+  pendingDisbursement     BigInt            @default(0)
+
+  // External account info (encrypted in production)
+  payoutAccountType       PayoutAccountType?
+  payoutAccountLast4      String?
+  payoutAccountVerified   Boolean           @default(false)
+
+  // Stripe Connect (when using real payments)
+  stripeConnectAccountId  String?
+
+  // Controls
+  dailyDisbursementLimit  BigInt?
+  requiresGuardianApproval Boolean          @default(true)
+  approvalThreshold       BigInt           @default(50000) // $500 in cents
+
+  // Metadata
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  // Relations
+  transactions            Transaction[]
+  disbursementRequests    DisbursementRequest[]
+
+  @@index([campaignId])
+}
+
+enum TransactionType {
+  DEPOSIT
+  DISBURSEMENT
+  FEE_COLLECTION
+  REFUND
+  ADJUSTMENT
+}
+
+model Transaction {
+  id                String          @id @default(cuid())
+  bankingAccountId  String
+  bankingAccount    BankingAccount  @relation(fields: [bankingAccountId], references: [id], onDelete: Cascade)
+
+  type              TransactionType
+  amount            BigInt          // In cents (positive for deposits, negative for disbursements)
+  balanceAfter      BigInt          // Running balance after this transaction
+
+  // References
+  donationId        String?
+  donation          Donation?       @relation(fields: [donationId], references: [id])
+  disbursementId    String?
+  disbursement      DisbursementRequest? @relation(fields: [disbursementId], references: [id])
+
+  description       String
+  metadata          Json?
+
+  createdAt         DateTime        @default(now())
+  createdBy         String
+  createdByUser     User            @relation(fields: [createdBy], references: [id])
+
+  @@index([bankingAccountId])
+  @@index([donationId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// DONATIONS
+// ============================================================================
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+  WALLET
+}
+
+enum PaymentProvider {
+  STRIPE
+  SIMULATED
+}
+
+model Donation {
+  id                String          @id @default(cuid())
+  campaignId        String
+  campaign          Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  donorId           String?
+  donor             User?           @relation(fields: [donorId], references: [id])
+
+  // Amounts (in cents)
+  grossAmount       BigInt          // What donor paid
+  platformFee       BigInt          // 10% of gross
+  netAmount         BigInt          // Goes to campaign
+  processingFee     BigInt          // Stripe/payment processor fee
+
+  // Donor info (encrypted in production)
+  donorEmail        String
+  donorName         String?
+  donorMessage      String?         @db.Text
+  isAnonymous       Boolean         @default(false)
+
+  // Payment details
+  paymentProvider   PaymentProvider @default(SIMULATED)
+  paymentIntentId   String?
+  paymentMethod     PaymentMethod   @default(CARD)
+  paymentMethodLast4 String?
+
+  // Referral tracking
+  referredByUserId  String?
+  referralCode      String?
+  utmSource         String?
+
+  status            DonationStatus  @default(PENDING)
+
+  // Tax receipt
+  taxReceiptUrl     String?
+  taxReceiptSentAt  DateTime?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  transactions      Transaction[]
+  cheerMessage      CheerWallMessage?
+
+  @@index([campaignId])
+  @@index([donorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// DISBURSEMENTS
+// ============================================================================
+
+enum DisbursementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+model DisbursementRequest {
+  id                  String              @id @default(cuid())
+  bankingAccountId    String
+  bankingAccount      BankingAccount      @relation(fields: [bankingAccountId], references: [id], onDelete: Cascade)
+  campaignId          String
+
+  // Request details
+  requestedAmount     BigInt              // In cents
+  purpose             String
+  receiptsUrls        String[]
+
+  // Requester
+  requestedBy         String
+  requestedByUser     User                @relation("RequestedBy", fields: [requestedBy], references: [id])
+  requestedAt         DateTime            @default(now())
+
+  // Status
+  status              DisbursementStatus  @default(PENDING)
+
+  // Approval
+  approvedBy          String?
+  approvedByUser      User?               @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  approvedAt          DateTime?
+  rejectionReason     String?             @db.Text
+
+  // Completion
+  disbursementDate    DateTime?
+  payoutTransactionId String?
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relations
+  transactions        Transaction[]
+
+  @@index([bankingAccountId])
+  @@index([status])
+  @@index([requestedBy])
+}
+
+// ============================================================================
+// CAMPAIGN CONTENT
+// ============================================================================
+
+enum UpdateStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model CampaignUpdate {
+  id              String        @id @default(cuid())
+  campaignId      String
+  campaign        Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          User          @relation(fields: [authorId], references: [id])
+
+  title           String
+  content         String        @db.Text
+  imageUrls       String[]
+
+  // Notifications
+  notifyDonors    Boolean       @default(true)
+  sentToEmails    Int           @default(0)
+  sentToSms       Int           @default(0)
+
+  publishedAt     DateTime?
+  status          UpdateStatus  @default(DRAFT)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([campaignId])
+  @@index([status])
+}
+
+model CheerWallMessage {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  donationId    String?   @unique
+  donation      Donation? @relation(fields: [donationId], references: [id])
+
+  authorName    String
+  message       String    @db.Text
+  isAnonymous   Boolean   @default(false)
+
+  // Moderation
+  isApproved    Boolean   @default(true)
+  isFlagged     Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// REFERRALS & TEAM MEMBERS
+// ============================================================================
+
+enum RewardType {
+  BADGE
+  POINTS
+  PRIZE
+}
+
+model Referral {
+  id              String      @id @default(cuid())
+  campaignId      String
+  campaign        Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  referrerId      String
+  referrer        User        @relation(fields: [referrerId], references: [id])
+  referralCode    String      @unique
+
+  // Tracking
+  clickCount      Int         @default(0)
+  donationCount   Int         @default(0)
+  totalRaised     BigInt      @default(0) // In cents
+
+  // Rewards
+  rewardType      RewardType?
+  rewardValue     BigInt?
+  rewardUnlockedAt DateTime?
+
+  createdAt       DateTime    @default(now())
+
+  @@index([campaignId])
+  @@index([referrerId])
+  @@index([referralCode])
+}
+
+model TeamMember {
+  id              String    @id @default(cuid())
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+
+  name            String
+  personalGoal    BigInt?   // In cents
+  amountRaised    BigInt    @default(0) // In cents
+
+  // Player Profile
+  profilePhotoUrl String?
+  profileVideoUrl String?
+  personalStory   String?   @db.Text
+  position        String?   // For sports teams
+  grade           String?   // For schools
+  favoriteQuote   String?
+
+  // Visibility
+  isProfilePublic Boolean   @default(true)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  contacts        Contact[]
+
+  @@unique([campaignId, userId])
+  @@index([campaignId])
+}
+
+// ============================================================================
+// CONTACTS & OUTREACH
+// ============================================================================
+
+enum ContactSource {
+  MANUAL_IMPORT
+  CSV_UPLOAD
+  ROSTER_INVITE
+  DONATION
+}
+
+model Contact {
+  id              String        @id @default(cuid())
+  teamMemberId    String
+  teamMember      TeamMember    @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  // Contact info
+  firstName       String?
+  lastName        String?
+  email           String?
+  phone           String?
+
+  // Metadata
+  source          ContactSource @default(MANUAL_IMPORT)
+  notes           String?       @db.Text
+  tags            String[]
+
+  // Tracking
+  emailsSent      Int           @default(0)
+  smsSent         Int           @default(0)
+  lastContactedAt DateTime?
+  donated         Boolean       @default(false)
+  donationAmount  BigInt?       // In cents
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  outreachLogs    OutreachLog[]
+
+  @@index([teamMemberId])
+  @@index([email])
+  @@index([phone])
+}
+
+enum OutreachType {
+  EMAIL
+  SMS
+  BOTH
+}
+
+enum OutreachStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model OutreachCampaign {
+  id              String          @id @default(cuid())
+  campaignId      String
+  campaign        Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdBy       String
+  createdByUser   User            @relation(fields: [createdBy], references: [id])
+
+  // Campaign details
+  name            String
+  type            OutreachType
+  status          OutreachStatus  @default(DRAFT)
+
+  // Content
+  emailSubject    String?
+  emailBody       String?         @db.Text
+  smsBody         String?         @db.Text
+
+  // Scheduling
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+
+  // Stats
+  totalRecipients Int             @default(0)
+  emailsSent      Int             @default(0)
+  smsSent         Int             @default(0)
+  emailsOpened    Int             @default(0)
+  linksClicked    Int             @default(0)
+  donationsReceived Int           @default(0)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  logs            OutreachLog[]
+
+  @@index([campaignId])
+  @@index([status])
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  OPENED
+  CLICKED
+}
+
+model OutreachLog {
+  id                  String            @id @default(cuid())
+  outreachCampaignId  String
+  outreachCampaign    OutreachCampaign  @relation(fields: [outreachCampaignId], references: [id], onDelete: Cascade)
+  contactId           String?
+  contact             Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  // Message details
+  type                OutreachType
+  recipientEmail      String?
+  recipientPhone      String?
+  status              MessageStatus     @default(PENDING)
+
+  // Tracking
+  sentAt              DateTime?
+  deliveredAt         DateTime?
+  openedAt            DateTime?
+  clickedAt           DateTime?
+  failureReason       String?
+
+  // External IDs
+  emailProvider       String?           // 'resend', 'sendgrid', etc.
+  smsProvider         String?           // 'twilio'
+  providerMessageId   String?
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([outreachCampaignId])
+  @@index([contactId])
+  @@index([status])
+}
