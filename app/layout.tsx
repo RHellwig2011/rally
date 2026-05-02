@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Rally - Fundraising Reimagined for Youth Teams",
+  title: "Bleacher Backers - Fundraising Reimagined for Youth Teams",
   description:
     "Next-generation fundraising platform with integrated banking, real-time tracking, and automated outreach for youth teams, clubs, and school groups.",
   keywords: [

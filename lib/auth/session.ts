@@ -47,7 +47,7 @@ export async function getSession(): Promise<SessionData | null> {
       return null;
     }
 
-    return payload as SessionData;
+    return payload as unknown as SessionData;
   } catch (error) {
     return null;
   }

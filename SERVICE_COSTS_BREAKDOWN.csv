@@ -1,0 +1,95 @@
+Service,Free Tier,Low Volume,Medium Volume,High Volume,Enterprise,Pricing Model,Notes
+Supabase (Database),$0 (500MB DB),$25/mo (8GB),$50/mo (500GB),$100/mo (unlimited),$200+/mo,Database size + compute,"Free tier good for testing, $25/mo covers ~50 campaigns"
+Stripe (Payments),$0 monthly fee,$0 monthly fee,$0 monthly fee,$0 monthly fee,$0 monthly fee,2.9% + $0.30 per transaction,"No monthly fee, only transaction fees. $1000 donations = $29 + $3 fees"
+Resend (Email),$0 (3k emails/mo),$20/mo (50k emails),$80/mo (1M emails),$Custom,$Custom,Per email sent,"3k free = ~100 campaigns with 30 emails each. Receipts, verifications, notifications count"
+Twilio (SMS),$15.50 credit,$~30/mo,$~100/mo,$~300/mo,$Custom,$0.0075 per SMS,"Optional feature. $15 credit = 2000 messages. Only for notifications if enabled"
+OpenAI (AI Messages),$0 (no free tier),$~5/mo,$~20/mo,$~50/mo,$Custom,$0.002-0.03 per request,"Optional feature. AI message generation. Can disable to save costs"
+Vercel (Hosting),$0 (hobby),$20/mo (Pro),$20/mo (Pro),$20-40/mo (Pro),$Custom,Per team/bandwidth,"Free tier works initially. Pro needed for production (analytics, support)"
+Sentry (Error Monitoring),$0 (5k events/mo),$26/mo (50k events),$80/mo (500k events),$Custom,$Custom,Per error event,"5k free events good for small scale. 1 error = 1 event"
+Upstash Redis (Cache),$0 (10k requests/day),$10/mo,$30/mo,$Custom,$Custom,Per request + storage,"Optional performance boost. Free tier sufficient for most use cases"
+
+TOTAL MONTHLY COST SCENARIOS:
+
+Scenario,Campaigns,Donations/mo,Users,Monthly Cost,Annual Cost,Notes
+Just Starting (Testing),"1-5","0-50",10-50,$0-5,$0-60,"Free tiers only, minimal usage"
+Small Scale,"5-20","50-200",50-200,$70-100,$840-1200,"Paid DB + Email, free hosting, minimal SMS"
+Medium Scale,"20-50","200-1000",200-1000,$200-300,$2400-3600,"All paid tiers, moderate usage"
+Large Scale,"50-200","1000-5000","1000-5000",$500-800,$6000-9600,"Higher tiers, need Redis, monitoring"
+Enterprise,"200+","5000+","5000+",$1000-2000+,$12000-24000+,"Custom pricing, dedicated support"
+
+PAYMENT PROCESSING FEES (Separate from Platform Costs):
+
+Donation Volume/Month,Gross Donations,Stripe Fees (2.9% + $0.30),Net to Platform,Platform Fee (10%),Campaign Gets
+$1000,$1000,"$32 ($29 + $3)",$968,$100,$868
+$5000,$5000,"$155 ($145 + $15)",$4845,$500,$4345
+$10000,$10000,"$305 ($290 + $30)",$9695,$1000,$8695
+$50000,$50000,"$1510 ($1450 + $150)",$48490,$5000,$43490
+$100000,$100000,"$3020 ($2900 + $300)",$96980,$10000,$86980
+
+BREAK-EVEN ANALYSIS:
+
+Monthly Platform Cost,Donations Needed (10% fee),Number of $50 Donations,Realistic Campaign Count
+$25,$250,5 donations,"1-2 small campaigns"
+$70,$700,14 donations,"3-5 campaigns"
+$200,$2000,40 donations,"10-15 campaigns"
+$500,$5000,100 donations,"25-40 campaigns"
+$1000,$10000,200 donations,"50-80 campaigns"
+
+KEY INSIGHTS:
+
+1. FIXED COSTS (Mandatory):
+   - Supabase: $0-25/mo (free tier workable initially)
+   - Vercel: $0-20/mo (free tier for testing)
+   - Resend: $0-20/mo (3k emails free)
+   - TOTAL: $0-65/mo baseline
+
+2. VARIABLE COSTS (Usage-based):
+   - Stripe: 2.9% + $0.30 per donation (largest cost)
+   - Twilio: Only if SMS enabled (~$0.0075 per message)
+   - OpenAI: Only if AI features used (~$0.002-0.03 per message)
+
+3. OPTIONAL SERVICES (Can skip initially):
+   - Sentry: Not needed until production
+   - Upstash Redis: Performance optimization only
+   - Twilio: SMS is optional feature
+   - OpenAI: AI message generation is optional
+
+4. RECOMMENDED STARTUP PLAN:
+   - Start with ALL FREE TIERS: $0/mo
+   - Upgrade Supabase when >500MB data: +$25/mo
+   - Upgrade Resend when >3k emails: +$20/mo
+   - Upgrade Vercel before launch: +$20/mo
+   - Total startup cost: $0-65/mo
+
+5. REVENUE MODEL:
+   - 10% platform fee on all donations
+   - Example: $10k in donations = $1k revenue
+   - Minus Stripe fees: ~$300
+   - Net platform revenue: ~$700
+   - Minus infrastructure: ~$70
+   - Profit margin: ~$630 (63% net margin)
+
+6. PROFITABILITY TIMELINE:
+   - $0/mo costs: Profitable from day 1
+   - $70/mo costs: Need $700/mo donations (14 x $50 donations)
+   - $200/mo costs: Need $2k/mo donations (40 x $50 donations)
+   - Can start free and scale costs as revenue grows
+
+COST OPTIMIZATION TIPS:
+
+1. Use free tiers while testing (saves $65/mo)
+2. Disable SMS notifications initially (saves ~$30/mo)
+3. Disable AI features initially (saves ~$20/mo)
+4. Use Supabase free tier until 500MB (saves $25/mo)
+5. Stay under 3k emails/month initially (saves $20/mo)
+6. Total savings: $160/mo while building user base
+
+SCALING TRIGGERS:
+
+When to upgrade:
+- Supabase: When database >500MB or slow queries
+- Resend: When sending >100 emails per day
+- Vercel: Before public launch for analytics
+- Sentry: After launch for error monitoring
+- Redis: When pages load >2 seconds
+- Twilio: Only if SMS is requested by users

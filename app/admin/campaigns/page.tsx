@@ -259,17 +259,17 @@ export default function AdminCampaignsPage() {
           return (
             <Card key={campaign.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   {/* Campaign Info */}
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900 truncate">
                             {campaign.organizationName} - {campaign.teamName}
                           </h3>
                           <span
-                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
+                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 self-start ${
                               statusConfig[campaign.status as keyof typeof statusConfig]
                                 .bgColor
                             } ${
@@ -281,11 +281,11 @@ export default function AdminCampaignsPage() {
                             {statusConfig[campaign.status as keyof typeof statusConfig].label}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mb-3">
                           <span>Leader: {campaign.leader.name}</span>
-                          <span>•</span>
+                          <span className="hidden sm:inline">•</span>
                           <span>{campaign.donorCount} donors</span>
-                          <span>•</span>
+                          <span className="hidden sm:inline">•</span>
                           <span>
                             {daysLeft > 0 ? `${daysLeft} days left` : "Ended"}
                           </span>
@@ -293,7 +293,7 @@ export default function AdminCampaignsPage() {
 
                         {/* Progress */}
                         <div className="space-y-2 mb-3">
-                          <div className="flex items-center justify-between text-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-sm">
                             <span className="font-semibold text-gray-900">
                               {formatCurrency(campaign.currentAmount)} raised
                             </span>
@@ -308,21 +308,21 @@ export default function AdminCampaignsPage() {
                                 style={{ width: `${Math.min(percentage, 100)}%` }}
                               />
                             </div>
-                            <span className="text-sm font-semibold text-primary">
+                            <span className="text-sm font-semibold text-primary whitespace-nowrap">
                               {percentage}%
                             </span>
                           </div>
                         </div>
 
                         {/* Financial Details */}
-                        <div className="flex flex-wrap gap-4 text-sm">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
                           <div>
                             <span className="text-gray-600">Platform Fees: </span>
                             <span className="font-semibold text-gray-900">
                               {formatCurrency(campaign.platformFees)}
                             </span>
                           </div>
-                          <span className="text-gray-300">|</span>
+                          <span className="text-gray-300 hidden sm:inline">|</span>
                           <div>
                             <span className="text-gray-600">Available: </span>
                             <span className="font-semibold text-success">
@@ -335,20 +335,20 @@ export default function AdminCampaignsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" size="sm" asChild>
+                  <div className="flex sm:flex-col gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" asChild>
                       <Link href={`/raise/${campaign.slug}`}>
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
+                        <Eye className="w-4 h-4 sm:mr-2" />
+                        <span className="hidden sm:inline">View</span>
                       </Link>
                     </Button>
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" asChild>
                       <Link href={`/dashboard/${campaign.id}`}>
-                        <TrendingUp className="w-4 h-4 mr-2" />
-                        Dashboard
+                        <TrendingUp className="w-4 h-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Dashboard</span>
                       </Link>
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="sm:w-full">
                       <MoreVertical className="w-4 h-4" />
                     </Button>
                   </div>

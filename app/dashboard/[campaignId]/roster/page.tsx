@@ -138,10 +138,66 @@ export default function RosterPage({
 
   if (isLoading && teamMembers.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading team roster...</p>
+      <div className="min-h-screen bg-gray-50">
+        <nav className="border-b bg-white sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <Link href="/" className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">R</span>
+                </div>
+                <span className="text-2xl font-bold text-gray-900">Rally</span>
+              </Link>
+            </div>
+          </div>
+        </nav>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-9 w-48 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-96 bg-gray-200 rounded animate-pulse" />
+            </div>
+            <div className="h-11 w-40 bg-gray-200 rounded animate-pulse" />
+          </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border rounded-lg p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
+                </div>
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mb-2" />
+                <div className="h-3 w-28 bg-gray-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+
+          {/* Table Skeleton */}
+          <div className="bg-white border rounded-lg p-6">
+            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-6" />
+            <div className="overflow-x-auto">
+              <div className="space-y-4">
+                {/* Table Header */}
+                <div className="flex gap-4 pb-3 border-b">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <div key={i} className="h-4 flex-1 bg-gray-200 rounded animate-pulse" />
+                  ))}
+                </div>
+                {/* Table Rows */}
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex gap-4 py-3">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((j) => (
+                      <div key={j} className="h-4 flex-1 bg-gray-200 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

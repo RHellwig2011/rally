@@ -1,106 +1,108 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Heart, Share2, Users, Calendar, DollarSign, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatRelativeTime, calculatePercentage, calculateDaysRemaining } from "@/lib/utils";
 
-// Mock data for demo - in production, this will come from Prisma
-const getCampaignData = (slug: string) => {
-  return {
-    id: "1",
-    slug,
-    organizationName: "Lincoln High School",
-    teamName: "Robotics Team",
-    description: `Our robotics team is raising funds to compete in the National FIRST Robotics Championship in Detroit. This is an incredible opportunity for our students to showcase their engineering skills and compete against the best teams in the country.
-
-Your support helps us cover competition registration, travel and lodging, robot parts and materials, and team uniforms. Every dollar brings us closer to our dream of competing at nationals and inspiring the next generation of engineers and innovators.
-
-We've been working hard all year designing and building our robot, and we're so excited to take our skills to the national stage!`,
-    goalAmount: 1200000, // $12,000 in cents
-    currentAmount: 845000, // $8,450 in cents
-    platformFeePercent: 10,
-    logoUrl: null,
-    bannerImageUrl: null,
-    primaryColor: "#6366F1",
-    secondaryColor: "#F59E0B",
-    startDate: new Date("2024-01-15"),
-    endDate: new Date("2024-03-15"),
-    status: "ACTIVE",
-    category: "EDUCATION",
-    primaryLeader: {
-      firstName: "Alex",
-      lastName: "Thompson",
-      email: "alex@lincolnrobotics.org",
-    },
-    donations: [
-      {
-        id: "1",
-        donorName: "Jennifer Martinez",
-        grossAmount: 10000,
-        donorMessage: "Go Robotics Team! So proud of you all!",
-        isAnonymous: false,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      },
-      {
-        id: "2",
-        donorName: "Anonymous",
-        grossAmount: 5000,
-        donorMessage: null,
-        isAnonymous: true,
-        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-      },
-      {
-        id: "3",
-        donorName: "David & Sarah Kim",
-        grossAmount: 7500,
-        donorMessage: "Can't wait to see you compete!",
-        isAnonymous: false,
-        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-      },
-    ],
-    cheerMessages: [
-      {
-        id: "1",
-        authorName: "Mark Thompson",
-        message: "You've got this team! Build something amazing!",
-        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      },
-      {
-        id: "2",
-        authorName: "Anonymous",
-        message: "So excited to support local STEM education!",
-        createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-      },
-    ],
-    updates: [
-      {
-        id: "1",
-        title: "We finished our robot design!",
-        publishedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      },
-      {
-        id: "2",
-        title: "Reached 50% of our goal!",
-        publishedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      },
-    ],
-    donorCount: 142,
+interface CampaignData {
+  id: string;
+  slug: string;
+  organizationName: string;
+  teamName: string;
+  description: string;
+  goalAmount: string | number;
+  currentAmount: string | number;
+  platformFeePercent: number;
+  logoUrl: string | null;
+  bannerImageUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  status: string;
+  category: string;
+  primaryLeader: {
+    firstName: string;
+    lastName: string;
+    email: string;
   };
-};
+  donations: Array<{
+    id: string;
+    donorName: string;
+    grossAmount: number | string;
+    donorMessage: string | null;
+    isAnonymous: boolean;
+    createdAt: Date | string;
+  }>;
+  cheerMessages: Array<{
+    id: string;
+    authorName: string;
+    message: string;
+    createdAt: Date | string;
+  }>;
+  updates: Array<{
+    id: string;
+    title: string;
+    publishedAt: Date | string;
+  }>;
+  stats?: {
+    donorCount: number;
+    avgDonation: number;
+  };
+  donorCount?: number;
+}
 
 export default function CampaignPage({ params }: { params: { slug: string } }) {
   const searchParams = useSearchParams();
-  const campaign = getCampaignData(params.slug);
-  const percentage = calculatePercentage(campaign.currentAmount, campaign.goalAmount);
-  const daysLeft = calculateDaysRemaining(campaign.endDate);
+  const [campaign, setCampaign] = useState<CampaignData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cheer message form state
+  const [cheerDialogOpen, setCheerDialogOpen] = useState(false);
+  const [cheerName, setCheerName] = useState("");
+  const [cheerMessage, setCheerMessage] = useState("");
+  const [cheerAnonymous, setCheerAnonymous] = useState(false);
+  const [cheerSubmitting, setCheerSubmitting] = useState(false);
+  const [cheerSuccess, setCheerSuccess] = useState(false);
+
+  // Fetch campaign data
+  useEffect(() => {
+    async function fetchCampaign() {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/campaigns/slug/${params.slug}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          setError(data.error || "Campaign not found");
+          return;
+        }
+
+        setCampaign(data.campaign);
+      } catch (err) {
+        console.error("Failed to fetch campaign:", err);
+        setError("Failed to load campaign");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchCampaign();
+  }, [params.slug]);
 
   // Track referral clicks
   useEffect(() => {
+    if (!searchParams) return;
     const refCode = searchParams.get('ref');
     if (refCode) {
       // Track the click (don't await, fire and forget)
@@ -112,6 +114,79 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
     }
   }, [searchParams]);
 
+  // Handle cheer message submission
+  const handleCheerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!campaign) return;
+
+    setCheerSubmitting(true);
+
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/cheer-messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorName: cheerAnonymous ? "Anonymous" : cheerName,
+          message: cheerMessage,
+          isAnonymous: cheerAnonymous,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCheerSuccess(true);
+        setCheerName("");
+        setCheerMessage("");
+        setCheerAnonymous(false);
+
+        // Close dialog after 2 seconds
+        setTimeout(() => {
+          setCheerDialogOpen(false);
+          setCheerSuccess(false);
+        }, 2000);
+      } else {
+        alert(data.error || "Failed to submit message");
+      }
+    } catch (err) {
+      console.error("Failed to submit cheer message:", err);
+      alert("Failed to submit message. Please try again.");
+    } finally {
+      setCheerSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading campaign...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !campaign) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
+          <p className="text-gray-600 mb-4">{error || "This campaign does not exist or has been removed."}</p>
+          <Button asChild>
+            <Link href="/">Go Home</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const goalAmount = typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount;
+  const currentAmount = typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount;
+  const percentage = calculatePercentage(currentAmount, goalAmount);
+  const daysLeft = calculateDaysRemaining(new Date(campaign.endDate));
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -119,8 +194,8 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-lg leading-none">R</span>
               </div>
               <span className="text-2xl font-bold text-gray-900">Rally</span>
             </Link>
@@ -175,7 +250,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                     <CardTitle className="text-2xl mb-1">
                       {campaign.organizationName} {campaign.teamName}
                     </CardTitle>
-                    <p className="text-gray-600">Building the Future, One Bot at a Time</p>
+                    <p className="text-gray-600">{campaign.category || 'Fundraising Campaign'}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -209,10 +284,10 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                           <p className="font-semibold text-gray-900">{donation.donorName}</p>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="font-semibold text-success">
-                              {formatCurrency(donation.grossAmount)}
+                              {formatCurrency(typeof donation.grossAmount === 'string' ? parseInt(donation.grossAmount) : donation.grossAmount)}
                             </span>
                             <span className="text-sm text-gray-500">
-                              {formatRelativeTime(donation.createdAt)}
+                              {formatRelativeTime(new Date(donation.createdAt))}
                             </span>
                           </div>
                         </div>
@@ -224,7 +299,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   ))}
                 </div>
                 <Button variant="outline" className="w-full mt-4">
-                  View All {campaign.donorCount} Donors
+                  View All {campaign.stats?.donorCount || campaign.donorCount || 0} Donors
                 </Button>
               </CardContent>
             </Card>
@@ -237,17 +312,105 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {campaign.cheerMessages.map((message) => (
-                    <div key={message.id} className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-gray-700 mb-2">💬 "{message.message}"</p>
-                      <p className="text-sm text-gray-500">- {message.authorName}</p>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4">
-                  Leave a Message
-                </Button>
+                {campaign.cheerMessages && campaign.cheerMessages.length > 0 ? (
+                  <div className="space-y-3">
+                    {campaign.cheerMessages.map((message) => (
+                      <div key={message.id} className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-gray-700 mb-2">💬 "{message.message}"</p>
+                        <p className="text-sm text-gray-500">- {message.authorName}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-4 text-gray-500">No messages yet. Be the first to cheer them on!</p>
+                )}
+
+                <Dialog open={cheerDialogOpen} onOpenChange={setCheerDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full mt-4">
+                      Leave a Message
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <form onSubmit={handleCheerSubmit}>
+                      <DialogHeader>
+                        <DialogTitle>Leave a Cheer Message</DialogTitle>
+                        <DialogDescription>
+                          Send words of encouragement to the team!
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      {cheerSuccess ? (
+                        <div className="py-8 text-center">
+                          <div className="text-4xl mb-2">🎉</div>
+                          <p className="text-green-600 font-semibold">Message submitted!</p>
+                          <p className="text-sm text-gray-600 mt-1">It will appear after approval.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="cheer-name">Your Name</Label>
+                              <Input
+                                id="cheer-name"
+                                placeholder="Enter your name"
+                                value={cheerName}
+                                onChange={(e) => setCheerName(e.target.value)}
+                                disabled={cheerAnonymous || cheerSubmitting}
+                                required={!cheerAnonymous}
+                              />
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="cheer-anonymous"
+                                checked={cheerAnonymous}
+                                onChange={(e) => setCheerAnonymous(e.target.checked)}
+                                disabled={cheerSubmitting}
+                                className="w-4 h-4"
+                              />
+                              <Label htmlFor="cheer-anonymous" className="text-sm font-normal cursor-pointer">
+                                Post anonymously
+                              </Label>
+                            </div>
+
+                            <div className="grid gap-2">
+                              <Label htmlFor="cheer-message">Message</Label>
+                              <Textarea
+                                id="cheer-message"
+                                placeholder="Write your message of support..."
+                                value={cheerMessage}
+                                onChange={(e) => setCheerMessage(e.target.value)}
+                                disabled={cheerSubmitting}
+                                required
+                                maxLength={500}
+                                rows={4}
+                              />
+                              <p className="text-xs text-gray-500 text-right">
+                                {cheerMessage.length}/500 characters
+                              </p>
+                            </div>
+                          </div>
+
+                          <DialogFooter>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setCheerDialogOpen(false)}
+                              disabled={cheerSubmitting}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={cheerSubmitting}>
+                              {cheerSubmitting ? "Submitting..." : "Submit Message"}
+                            </Button>
+                          </DialogFooter>
+                        </>
+                      )}
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
 
@@ -264,7 +427,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{update.title}</p>
                         <p className="text-sm text-gray-500">
-                          {formatRelativeTime(update.publishedAt)}
+                          {formatRelativeTime(new Date(update.publishedAt))}
                         </p>
                       </div>
                     </div>
@@ -283,23 +446,23 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   <div className="mb-6">
                     <div className="flex items-baseline justify-between mb-2">
                       <span className="text-3xl font-bold text-gray-900">
-                        {formatCurrency(campaign.currentAmount)}
+                        {formatCurrency(typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount)}
                       </span>
                       <span className="text-gray-600">
-                        of {formatCurrency(campaign.goalAmount)}
+                        of {formatCurrency(typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount)}
                       </span>
                     </div>
-                    <Progress value={campaign.currentAmount} max={campaign.goalAmount} className="mb-2" />
+                    <Progress value={typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount} max={typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount} className="mb-2" />
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span className="font-semibold text-primary">{percentage}%</span>
-                      <span>{campaign.donorCount} donors</span>
+                      <span>{campaign.stats?.donorCount || campaign.donorCount || 0} donors</span>
                     </div>
                   </div>
 
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-6">
                     <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-gray-900">{campaign.donorCount}</p>
+                      <p className="text-2xl font-bold text-gray-900">{campaign.stats?.donorCount || campaign.donorCount || 0}</p>
                       <p className="text-xs text-gray-600">Donors</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 text-center">

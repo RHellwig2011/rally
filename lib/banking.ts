@@ -116,7 +116,7 @@ export async function processDonation(params: {
         balanceAfter: updatedBankingAccount.availableBalance,
         donationId: donation.id,
         description: `Donation from ${donorName || donorEmail}`,
-        createdBy: donorId || "system",
+        ...(donorId && { createdBy: donorId }), // Only include if valid user ID
       },
     });
 
@@ -129,7 +129,7 @@ export async function processDonation(params: {
         balanceAfter: updatedBankingAccount.availableBalance,
         donationId: donation.id,
         description: `Platform fee (${campaign.platformFeePercent}%)`,
-        createdBy: "system",
+        // No createdBy for system-generated fee transactions
       },
     });
 

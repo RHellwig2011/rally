@@ -1,1 +1,19 @@
 node_modules
+
+# Next.js
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+.env*.local
+
+# Testing
+test-*.mjs
+SESSION_*.md
+STRIPE_*.md
+
+# Build artifacts
+*.log

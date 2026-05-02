@@ -32,7 +32,7 @@ function getResendClient(): Resend | null {
  * Falls back to console logging if Resend is not configured
  */
 export async function sendEmail(options: EmailOptions): Promise<{ id?: string }> {
-  const fromEmail = process.env.EMAIL_FROM || 'noreply@rally.com';
+  const fromEmail = process.env.EMAIL_FROM || 'noreply@bleacherbackers.com';
 
   // If Resend is not configured, just log to console
   const resend = getResendClient();
@@ -56,8 +56,8 @@ export async function sendEmail(options: EmailOptions): Promise<{ id?: string }>
       text: options.text,
     });
 
-    console.log('✅ Email sent successfully:', result.id);
-    return { id: result.id };
+    console.log('✅ Email sent successfully:', result);
+    return { id: (result as any).id };
   } catch (error) {
     console.error('❌ Failed to send email:', error);
     throw error;
@@ -411,6 +411,128 @@ ${verificationLink}
 This link will expire in 24 hours.
 
 If you didn't create a Rally account, you can safely ignore this email.
+
+Best,
+The Rally Team
+  `;
+
+  await sendEmail({
+    to: toEmail,
+    subject,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send campaign status change notification
+ */
+export async function sendCampaignStatusChangeNotification(params: {
+  toEmail: string;
+  toName: string;
+  campaignName: string;
+  fromStatus: string;
+  toStatus: string;
+  reason?: string;
+  changedBy: string;
+  campaignUrl: string;
+}) {
+  const { toEmail, toName, campaignName, fromStatus, toStatus, reason, changedBy, campaignUrl } = params;
+
+  const subject = `Campaign Status Updated: ${campaignName} is now ${toStatus}`;
+
+  const statusDescriptions: Record<string, string> = {
+    DRAFT: 'in draft mode',
+    ACTIVE: 'active and accepting donations',
+    PAUSED: 'temporarily paused',
+    COMPLETED: 'successfully completed',
+    ARCHIVED: 'archived',
+  };
+
+  const statusEmojis: Record<string, string> = {
+    DRAFT: '📝',
+    ACTIVE: '🚀',
+    PAUSED: '⏸️',
+    COMPLETED: '🎉',
+    ARCHIVED: '📦',
+  };
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: white; padding: 30px; border: 1px solid #e5e7eb; }
+    .status-box { background: #f0f9ff; border-left: 4px solid #6366F1; padding: 20px; margin: 20px 0; border-radius: 4px; }
+    .status-transition { font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; color: #6366F1; }
+    .reason-box { background: #f9fafb; padding: 15px; margin: 20px 0; border-radius: 4px; font-style: italic; }
+    .button { display: inline-block; background: #6366F1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${statusEmojis[toStatus]} Status Update</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${toName},</p>
+
+      <p>The campaign <strong>${campaignName}</strong> has been updated.</p>
+
+      <div class="status-transition">
+        ${statusEmojis[fromStatus]} ${fromStatus} → ${statusEmojis[toStatus]} ${toStatus}
+      </div>
+
+      <div class="status-box">
+        <p><strong>Your campaign is now ${statusDescriptions[toStatus]}.</strong></p>
+        ${toStatus === 'ACTIVE' ? '<p>🎉 Congratulations! Your campaign is now live and ready to accept donations. Share your campaign link to start fundraising!</p>' : ''}
+        ${toStatus === 'PAUSED' ? '<p>⏸️ Donations are temporarily paused. You can resume the campaign anytime from your dashboard.</p>' : ''}
+        ${toStatus === 'COMPLETED' ? '<p>🎉 Amazing work! Your campaign has been marked as complete. You can now request final disbursements.</p>' : ''}
+        ${toStatus === 'ARCHIVED' ? '<p>📦 This campaign has been archived and is no longer active.</p>' : ''}
+      </div>
+
+      ${reason ? `
+      <div class="reason-box">
+        <strong>Reason:</strong> "${reason}"
+      </div>
+      ` : ''}
+
+      <p><strong>Changed by:</strong> ${changedBy}</p>
+
+      <p style="text-align: center;">
+        <a href="${campaignUrl}" class="button">View Campaign Dashboard</a>
+      </p>
+
+      <p>If you have any questions, feel free to reach out to our support team.</p>
+
+      <p>Best,<br>The Rally Team</p>
+    </div>
+    <div class="footer">
+      <p>Rally - Fundraising Reimagined</p>
+      <p>You received this because you're a leader of ${campaignName}</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `
+Campaign Status Update: ${campaignName}
+
+${fromStatus} → ${toStatus}
+
+Your campaign is now ${statusDescriptions[toStatus]}.
+
+${reason ? `Reason: "${reason}"` : ''}
+
+Changed by: ${changedBy}
+
+View your dashboard: ${campaignUrl}
 
 Best,
 The Rally Team

@@ -26,14 +26,8 @@ const importContactsSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const body = await req.json();
     const validatedData = importContactsSchema.parse(body);
@@ -50,7 +44,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (teamMember.userId !== authResult.user.id) {
+    if (teamMember.userId !== user.id) {
       return NextResponse.json(
         { success: false, error: "You can only import contacts for yourself" },
         { status: 403 }
@@ -154,13 +148,8 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const { searchParams } = new URL(req.url);
     const teamMemberId = searchParams.get("teamMemberId");
@@ -184,7 +173,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (teamMember.userId !== authResult.user.id) {
+    if (teamMember.userId !== user.id) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 403 }

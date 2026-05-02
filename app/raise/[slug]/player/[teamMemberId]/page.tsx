@@ -76,18 +76,18 @@ export default function PlayerFundraisingPage() {
   const [showDonateForm, setShowDonateForm] = useState(false);
 
   const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/raise/${params.slug}/player/${params.teamMemberId}?ref=${data?.referralCode || ''}`
+    ? `${window.location.origin}/raise/${params?.slug}/player/${params?.teamMemberId}?ref=${data?.referralCode || ''}`
     : '';
 
   useEffect(() => {
     fetchPlayerData();
-  }, [params.teamMemberId]);
+  }, [params?.teamMemberId]);
 
   const fetchPlayerData = async () => {
     try {
       setIsLoading(true);
       const res = await fetch(
-        `/api/team-members/${params.teamMemberId}/public`
+        `/api/team-members/${params?.teamMemberId}/public`
       );
       const result = await res.json();
 
@@ -150,7 +150,7 @@ export default function PlayerFundraisingPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error || "Player not found"}</p>
-          <Button onClick={() => router.push(`/raise/${params.slug}`)}>
+          <Button onClick={() => router.push(`/raise/${params?.slug}`)}>
             Go to Campaign Page
           </Button>
         </div>
@@ -465,9 +465,7 @@ export default function PlayerFundraisingPage() {
                   </h3>
                   <DonationForm
                     campaignId={data.campaign.id}
-                    campaignSlug={data.campaign.slug}
-                    referralCode={data.referralCode}
-                    defaultMessage={`Go ${data.teamMember.name}!`}
+                    campaignName={`${data.campaign.teamName} - ${data.campaign.organizationName}`}
                   />
                 </CardContent>
               </Card>

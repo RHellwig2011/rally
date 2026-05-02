@@ -1,6 +1,6 @@
-# Getting Started with Boba Development
+# Getting Started with Bleacher Backers Development
 
-This guide will help you quickly set up your development environment and start building Boba.
+This guide will help you quickly set up your development environment and start building Bleacher Backers.
 
 ## Quick Start (5 minutes)
 
@@ -18,7 +18,7 @@ cp .env.example .env
 For **local development without a database**, you can use these minimal settings in `.env`:
 ```env
 # Minimal setup for UI development
-DATABASE_URL="postgresql://user:password@localhost:5432/boba?schema=public"
+DATABASE_URL="postgresql://user:password@localhost:5432/bleacherbackers?schema=public"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 PLATFORM_FEE_PERCENT="10"
 ```

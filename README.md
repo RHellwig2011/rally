@@ -1,8 +1,8 @@
-# Rally - Next-Generation Fundraising Platform
+# Bleacher Backers - Next-Generation Fundraising Platform
 
 Made with Hack Club Spaces 💖 (Dont remove this for YSWS)
 
-Rally is a revolutionary fundraising platform designed specifically for youth teams, clubs, and school groups. It combines intuitive campaign management with integrated banking, automated outreach, and transparent fund tracking.
+Bleacher Backers is a revolutionary fundraising platform designed specifically for youth teams, clubs, and school groups. It combines intuitive campaign management with integrated banking, automated outreach, and transparent fund tracking.
 
 ## Key Features
 
@@ -137,4 +137,4 @@ This is a solo founder project currently in the exploration/investor demo phase.
 
 **Built with ❤️ for youth teams, clubs, and school groups**
 
-*Rally - Fundraising Reimagined*
+*Bleacher Backers - Fundraising Reimagined*

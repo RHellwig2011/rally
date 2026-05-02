@@ -2,28 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-
-// Validation schema
-const createCampaignSchema = z.object({
-  organizationName: z.string().min(1, "Organization name is required"),
-  teamName: z.string().min(1, "Team name is required"),
-  slug: z.string()
-    .min(3, "Slug must be at least 3 characters")
-    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  goalAmount: z.number().positive("Goal amount must be positive"),
-  startDate: z.string(),
-  endDate: z.string().optional(),
-  category: z.enum(["SPORTS", "ARTS", "EDUCATION", "COMMUNITY", "OTHER"]),
-  primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color format").optional(),
-  secondaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color format").optional(),
-  guardianEmail: z.string().email().optional().or(z.literal("")),
-  guardianName: z.string().optional(),
-  approvalThreshold: z.number().positive().optional(),
-});
+import { createCampaignSchema, updateCampaignSchema } from "@/lib/validations/campaign";
+import {
+  checkRateLimit,
+  getRateLimitIdentifier,
+  rateLimitConfigs,
+  applyRateLimitHeaders
+} from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Get token from cookie
     const sessionToken = req.cookies.get("sessionToken")?.value;
 
@@ -42,6 +37,23 @@ export async function POST(req: NextRequest) {
         { success: false, error: "Invalid or expired token" },
         { status: 401 }
       );
+    }
+
+    // Apply rate limiting (10 campaigns per user per day)
+    const rateLimitId = getRateLimitIdentifier(req, user.id);
+    const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfigs.campaignCreate);
+
+    if (!rateLimitResult.allowed) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfter: rateLimitResult.retryAfter
+        },
+        { status: 429 }
+      );
+      applyRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
     }
 
     // Parse and validate request body

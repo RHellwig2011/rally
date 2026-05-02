@@ -2,22 +2,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import crypto from "crypto";
+import {
+  createTeamMemberSchema,
+  listTeamMembersQuerySchema
+} from "@/lib/validations/team-member";
+import {
+  generateUniqueFundraisingLinkCode,
+  checkTeamMemberLimit,
+  checkDuplicateEmail,
+  sendTeamMemberInvitation,
+  formatFundraisingLink,
+  formatTeamMemberResponse,
+} from "@/lib/utils/team-member";
+import {
+  checkRateLimit,
+  getRateLimitIdentifier,
+  rateLimitConfigs,
+  applyRateLimitHeaders
+} from "@/lib/utils/rate-limit";
 
-// Validation schema for adding team member
-const addTeamMemberSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Valid email is required"),
-  personalGoal: z.number().positive().optional(),
-});
-
+/**
+ * POST /api/campaigns/[campaignId]/team-members
+ * Add a new team member to the campaign
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
   try {
-    // Get token from cookie
+    // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
-
     if (!sessionToken) {
       return NextResponse.json(
         { success: false, error: "Not authenticated" },
@@ -25,9 +40,7 @@ export async function POST(
       );
     }
 
-    // Verify token and get user
     const user = await getUserFromToken(sessionToken);
-
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Invalid or expired token" },
@@ -35,9 +48,26 @@ export async function POST(
       );
     }
 
-    const { campaignId } = params;
+    // Apply rate limiting (100 per user per hour)
+    const rateLimitId = getRateLimitIdentifier(req, user.id);
+    const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfigs.teamMember);
 
-    // Check if campaign exists and user is authorized
+    if (!rateLimitResult.allowed) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfter: rateLimitResult.retryAfter
+        },
+        { status: 429 }
+      );
+      applyRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    const campaignId = params.campaignId;
+
+    // Verify campaign exists and user is authorized
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -66,100 +96,86 @@ export async function POST(
       );
     }
 
-    // Parse and validate request body
-    const body = await req.json();
-    const validatedData = addTeamMemberSchema.parse(body);
-
-    // Check if user exists or create invitation
-    let teamMemberUser = await prisma.user.findUnique({
-      where: { email: validatedData.email }
-    });
-
-    // If user doesn't exist, create a pending user account
-    if (!teamMemberUser) {
-      // Generate a random password (they'll reset it when they sign up)
-      const bcrypt = require('bcryptjs');
-      const tempPassword = Math.random().toString(36).slice(-8);
-      const passwordHash = await bcrypt.hash(tempPassword, 10);
-
-      teamMemberUser = await prisma.user.create({
-        data: {
-          email: validatedData.email,
-          firstName: validatedData.name.split(' ')[0],
-          lastName: validatedData.name.split(' ').slice(1).join(' ') || '',
-          role: 'TEAM_MEMBER',
-          passwordHash,
-          emailVerified: false,
-        }
-      });
-    }
-
-    // Check if already a team member
-    const existingMember = await prisma.teamMember.findFirst({
-      where: {
-        campaignId,
-        userId: teamMemberUser.id,
-      }
-    });
-
-    if (existingMember) {
+    // Check team member limit (100 per campaign)
+    const limitReached = await checkTeamMemberLimit(campaignId);
+    if (limitReached) {
       return NextResponse.json(
-        { success: false, error: "This person is already a team member" },
+        {
+          success: false,
+          error: "Campaign has reached maximum team member limit (100)"
+        },
         { status: 400 }
       );
     }
 
-    // Create team member
-    const personalGoalInCents = validatedData.personalGoal
-      ? BigInt(Math.round(validatedData.personalGoal * 100))
-      : null;
+    // Parse and validate request body
+    const body = await req.json();
+    const validatedData = createTeamMemberSchema.parse(body);
 
+    // Check for duplicate email in campaign
+    const isDuplicate = await checkDuplicateEmail(campaignId, validatedData.email);
+    if (isDuplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A team member with this email already exists in the campaign"
+        },
+        { status: 409 }
+      );
+    }
+
+    // Generate unique fundraising link code
+    const fundLinkCode = await generateUniqueFundraisingLinkCode(campaignId);
+
+    // Generate unique invitation token for onboarding
+    const invitationToken = crypto.randomBytes(32).toString('hex');
+
+    // Create team member record
     const teamMember = await prisma.teamMember.create({
       data: {
         campaignId,
-        userId: teamMemberUser.id,
         name: validatedData.name,
-        personalGoal: personalGoalInCents,
+        email: validatedData.email.toLowerCase(),
+        personalGoal: validatedData.personalGoal
+          ? BigInt(Math.round(validatedData.personalGoal * 100))
+          : null,
+        position: validatedData.position,
+        grade: validatedData.grade,
+        profilePhotoUrl: validatedData.profilePhotoUrl,
+        phoneNumber: validatedData.phoneNumber,
+        fundLinkCode,
+        invitationToken,
+        invitationStatus: "PENDING",
+        invitationSentAt: new Date(),
+        amountRaised: BigInt(0),
+        userId: null, // Will be connected when user signs up
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          }
+        campaign: {
+          select: { slug: true, teamName: true, organizationName: true }
         }
       }
     });
 
-    // Create referral code for this team member
-    const referralCode = `${campaign.slug}-${teamMemberUser.id.slice(0, 8)}`;
+    // Send invitation email with onboarding link
+    const fundraisingLink = formatFundraisingLink(campaign.slug, fundLinkCode);
+    const onboardingLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
 
-    await prisma.referral.create({
-      data: {
-        campaignId,
-        referrerId: teamMemberUser.id,
-        referralCode,
-      }
-    });
+    const emailSent = await sendTeamMemberInvitation(
+      validatedData.email,
+      validatedData.name,
+      `${campaign.teamName} - ${campaign.organizationName}`,
+      fundraisingLink,
+      validatedData.personalGoal ?? undefined,
+      onboardingLink
+    );
 
-    // Send invitation email
-    try {
-      const { sendTeamMemberInvitation } = await import('@/lib/email');
-      const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login?email=${encodeURIComponent(validatedData.email)}`;
-
-      await sendTeamMemberInvitation({
-        toEmail: validatedData.email,
-        toName: validatedData.name,
-        campaignName: campaign.teamName,
-        campaignOrg: campaign.organizationName,
-        inviterName: `${user.firstName} ${user.lastName}`,
-        inviteLink,
+    if (!emailSent) {
+      // Update status if email failed
+      await prisma.teamMember.update({
+        where: { id: teamMember.id },
+        data: { invitationStatus: "EMAIL_FAILED" }
       });
-    } catch (emailError) {
-      console.error('Failed to send invitation email:', emailError);
-      // Don't fail the request if email fails
     }
 
     return NextResponse.json(
@@ -168,25 +184,32 @@ export async function POST(
         teamMember: {
           id: teamMember.id,
           name: teamMember.name,
-          email: teamMember.user.email,
-          personalGoal: teamMember.personalGoal?.toString(),
-          amountRaised: teamMember.amountRaised.toString(),
-          referralCode,
-          needsInvitation: !teamMemberUser.emailVerified,
+          email: teamMember.email,
+          personalGoal: teamMember.personalGoal
+            ? Number(teamMember.personalGoal) / 100
+            : null,
+          amountRaised: 0,
+          fundLinkCode: teamMember.fundLinkCode,
+          fundraisingLink,
+          invitationStatus: emailSent ? "PENDING" : "EMAIL_FAILED",
+          invitationSentAt: teamMember.invitationSentAt,
         }
       },
       { status: 201 }
     );
+
   } catch (error) {
     console.error("Failed to add team member:", error);
 
-    // Handle validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
           success: false,
           error: "Validation failed",
-          details: error.errors.map(e => ({ field: e.path.join("."), message: e.message }))
+          details: error.errors.map(e => ({
+            field: e.path.join("."),
+            message: e.message
+          }))
         },
         { status: 400 }
       );
@@ -202,84 +225,169 @@ export async function POST(
   }
 }
 
-// GET all team members for a campaign
+/**
+ * GET /api/campaigns/[campaignId]/team-members
+ * List all team members for a campaign with pagination
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
   try {
-    const sessionToken = req.cookies.get("sessionToken")?.value;
+    const campaignId = params.campaignId;
+    const { searchParams } = new URL(req.url);
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { success: false, error: "Not authenticated" },
-        { status: 401 }
-      );
+    // Parse query parameters
+    const queryParams = {
+      page: searchParams.get("page") || "1",
+      limit: searchParams.get("limit") || "25",
+      sortBy: searchParams.get("sortBy") || "amountRaised",
+      sortOrder: searchParams.get("sortOrder") || "desc",
+      status: searchParams.get("status") || "all",
+      search: searchParams.get("search") || undefined,
+    };
+
+    // Validate query parameters
+    const validatedQuery = listTeamMembersQuerySchema.parse(queryParams);
+    const page = typeof validatedQuery.page === 'number' ? validatedQuery.page : parseInt(validatedQuery.page || "1");
+    const limit = typeof validatedQuery.limit === 'number' ? validatedQuery.limit : parseInt(validatedQuery.limit || "25");
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = {
+      campaignId,
+      deletedAt: null, // Exclude soft-deleted members
+    };
+
+    // Add status filter
+    if (validatedQuery.status && validatedQuery.status !== "all") {
+      where.invitationStatus = validatedQuery.status.toUpperCase();
     }
 
-    const user = await getUserFromToken(sessionToken);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Invalid or expired token" },
-        { status: 401 }
-      );
+    // Add search filter
+    if (validatedQuery.search) {
+      where.OR = [
+        { name: { contains: validatedQuery.search, mode: 'insensitive' } },
+        { email: { contains: validatedQuery.search, mode: 'insensitive' } },
+      ];
     }
 
-    const { campaignId } = params;
+    // Build orderBy
+    const orderBy: any = {};
+    switch (validatedQuery.sortBy) {
+      case "name":
+        orderBy.name = validatedQuery.sortOrder;
+        break;
+      case "personalGoal":
+        orderBy.personalGoal = validatedQuery.sortOrder;
+        break;
+      case "dateJoined":
+        orderBy.createdAt = validatedQuery.sortOrder;
+        break;
+      case "amountRaised":
+      default:
+        orderBy.amountRaised = validatedQuery.sortOrder;
+        break;
+    }
 
-    // Get team members with their referral codes
+    // Get total count for pagination
+    const totalCount = await prisma.teamMember.count({ where });
+
+    // Get team members with pagination
     const teamMembers = await prisma.teamMember.findMany({
-      where: { campaignId },
+      where,
+      skip,
+      take: limit,
+      orderBy,
       include: {
+        campaign: {
+          select: { slug: true }
+        },
         user: {
           select: {
             id: true,
-            email: true,
             firstName: true,
             lastName: true,
             emailVerified: true,
           }
+        },
+        _count: {
+          select: {
+            donations: {
+              where: { status: "COMPLETED" }
+            }
+          }
         }
-      },
-      orderBy: { amountRaised: 'desc' }
-    });
-
-    // Get referral codes
-    const referrals = await prisma.referral.findMany({
-      where: {
-        campaignId,
-        referrerId: { in: teamMembers.map(tm => tm.userId) }
       }
     });
 
-    const referralMap = new Map(referrals.map(r => [r.referrerId, r]));
+    // Format response
+    const formattedMembers = teamMembers.map(member => ({
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      personalGoal: member.personalGoal ? Number(member.personalGoal) / 100 : null,
+      amountRaised: Number(member.amountRaised) / 100,
+      position: member.position,
+      grade: member.grade,
+      profilePhotoUrl: member.profilePhotoUrl,
+      phoneNumber: member.phoneNumber,
+      invitationStatus: member.invitationStatus,
+      joinedAt: member.joinedAt,
+      fundLinkCode: member.fundLinkCode,
+      fundraisingLink: member.fundLinkCode
+        ? formatFundraisingLink(member.campaign.slug, member.fundLinkCode)
+        : null,
+      donationCount: member._count.donations,
+      user: member.user ? {
+        id: member.user.id,
+        firstName: member.user.firstName,
+        lastName: member.user.lastName,
+        emailVerified: member.user.emailVerified,
+      } : null,
+      createdAt: member.createdAt,
+      updatedAt: member.updatedAt,
+    }));
 
-    const membersWithReferrals = teamMembers.map(tm => {
-      const referral = referralMap.get(tm.userId);
-      return {
-        id: tm.id,
-        userId: tm.userId,
-        name: tm.name,
-        email: tm.user.email,
-        personalGoal: tm.personalGoal?.toString(),
-        amountRaised: tm.amountRaised.toString(),
-        emailVerified: tm.user.emailVerified,
-        referralCode: referral?.referralCode,
-        donationCount: referral?.donationCount || 0,
-        clickCount: referral?.clickCount || 0,
-        createdAt: tm.createdAt,
-      };
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return NextResponse.json({
+      success: true,
+      teamMembers: formattedMembers,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages,
+        hasNext,
+        hasPrev,
+        nextPage: hasNext ? page + 1 : null,
+        prevPage: hasPrev ? page - 1 : null,
+      }
     });
 
-    return NextResponse.json(
-      { success: true, teamMembers: membersWithReferrals },
-      { status: 200 }
-    );
   } catch (error) {
     console.error("Failed to fetch team members:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid query parameters",
+          details: error.errors
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: "Failed to fetch team members" },
+      {
+        success: false,
+        error: "Failed to fetch team members"
+      },
       { status: 500 }
     );
   }

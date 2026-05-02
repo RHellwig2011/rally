@@ -1,0 +1,36 @@
+Service/API Key,Status,Purpose,Priority,Where to Get It,Current Value,Notes
+DATABASE_URL,🔴 BROKEN,PostgreSQL database connection,CRITICAL,https://supabase.com,postgresql://postgres.nsluczmibjdsywwheden:***@aws-0-us-west-2.pooler.supabase.com:5432/postgres,"ERROR: Tenant not found - Need new Supabase project ASAP"
+STRIPE_SECRET_KEY,✅ CONFIGURED,Stripe payment processing,CRITICAL,https://dashboard.stripe.com/test/apikeys,sk_test_51SXrMrQeHzG5tp9G***,Test mode - working
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,✅ CONFIGURED,Stripe client-side payments,CRITICAL,https://dashboard.stripe.com/test/apikeys,pk_test_51SXrMrQeHzG5tp9G***,Test mode - working
+STRIPE_WEBHOOK_SECRET,✅ CONFIGURED,Stripe webhook verification,CRITICAL,https://dashboard.stripe.com/test/webhooks,whsec_89e32bace09e36a***,Configured but needs testing
+RESEND_API_KEY,🔴 MISSING,Send transactional emails,CRITICAL,https://resend.com/api-keys,re_YOUR_API_KEY_HERE,PLACEHOLDER - Must configure for email receipts
+EMAIL_FROM,⚠️ PLACEHOLDER,Email sender address,CRITICAL,Domain verified in Resend,noreply@yourdomain.com,Need real domain after Resend setup
+TWILIO_ACCOUNT_SID,✅ CONFIGURED,SMS notifications (optional),MEDIUM,https://console.twilio.com,ACc09bca3267fed3a***,Working but optional feature
+TWILIO_AUTH_TOKEN,✅ CONFIGURED,SMS authentication,MEDIUM,https://console.twilio.com,078f7b4ecbbf25f4***,Working but optional feature
+TWILIO_PHONE_NUMBER,✅ CONFIGURED,SMS sender number,MEDIUM,https://console.twilio.com,+18668905584,Working but optional feature
+OPENAI_API_KEY,⏳ OPTIONAL,AI message generation,LOW,https://platform.openai.com/api-keys,sk-placeholder-key***,Optional feature - not MVP critical
+NEXTAUTH_SECRET,⚠️ DEV ONLY,Session encryption,CRITICAL,Generate random string,dev-secret-key-change-in-production,Must change for production
+JWT_SECRET,❌ NOT SET,JWT token signing,CRITICAL,Generate random string,Not in .env file,Uses default - MUST SET for production
+PLATFORM_FEE_PERCENT,✅ CONFIGURED,Revenue model setting,MEDIUM,Business decision,10,Configurable
+NEXT_PUBLIC_APP_URL,✅ CONFIGURED,Application base URL,HIGH,Your domain,http://localhost:3000,Change to production URL on deploy
+CRON_SECRET,❌ NOT SET,Secure cron jobs,MEDIUM,Generate random string,Not configured,Optional for automation features
+UPSTASH_REDIS_URL,❌ NOT SET,Caching layer (optional),LOW,https://upstash.com,Not configured,Performance optimization
+UPSTASH_REDIS_TOKEN,❌ NOT SET,Redis authentication,LOW,https://upstash.com,Not configured,Performance optimization
+SENTRY_DSN,❌ NOT SET,Error monitoring (production),MEDIUM,https://sentry.io,Not configured,Needed for production monitoring
+NEXT_PUBLIC_SENTRY_DSN,❌ NOT SET,Client-side error tracking,MEDIUM,https://sentry.io,Not configured,Needed for production monitoring
+REFRESH_TOKEN_EXPIRES_DAYS,✅ DEFAULT,Refresh token lifetime,LOW,Code default,30 days,Default value works
+MINIMUM_DONATION_AMOUNT,✅ DEFAULT,Minimum donation limit,LOW,Platform settings,$1,Default value works
+NODE_ENV,✅ AUTO,Environment mode,CRITICAL,Automatic,development,Auto-set by Next.js
+
+IMMEDIATE PRIORITIES:
+1. DATABASE_URL - Create new Supabase project (30 min) - BLOCKING ALL TESTING
+2. RESEND_API_KEY - Sign up for Resend and configure (15 min) - BLOCKING EMAIL RECEIPTS
+3. JWT_SECRET - Add to .env with secure random string (2 min) - SECURITY RISK
+4. NEXTAUTH_SECRET - Generate production-ready secret (2 min) - SECURITY RISK
+5. STRIPE - Move from test to live keys when ready to launch - BLOCKING REAL PAYMENTS
+
+OPTIONAL BUT RECOMMENDED:
+6. SENTRY_DSN - Set up error monitoring for production
+7. CRON_SECRET - For automated campaign features
+8. OPENAI_API_KEY - For AI message suggestions
+9. UPSTASH_REDIS - For performance optimization

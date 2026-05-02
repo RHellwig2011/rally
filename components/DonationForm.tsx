@@ -157,14 +157,14 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
           {/* Amount Selection */}
           <div>
             <Label className="text-base font-semibold mb-3 block">Select Amount</Label>
-            <div className="grid grid-cols-3 gap-2 mb-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-2">
               {SUGGESTED_AMOUNTS.map((value) => (
                 <Button
                   key={value}
                   type="button"
                   variant={amount === value.toString() && !showCustom ? "default" : "outline"}
                   onClick={() => handleAmountSelect(value)}
-                  className="h-12"
+                  className="h-12 text-base font-semibold"
                 >
                   ${value}
                 </Button>
@@ -173,7 +173,7 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
                 type="button"
                 variant={showCustom ? "default" : "outline"}
                 onClick={handleCustomClick}
-                className="h-12"
+                className="h-12 text-base font-semibold"
               >
                 Custom
               </Button>
@@ -187,12 +187,13 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
                   <Input
                     id="customAmount"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="1"
                     placeholder="Enter amount"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    className="text-lg"
+                    className="text-lg h-12"
                     autoFocus
                   />
                 </div>
@@ -232,11 +233,12 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
               <Input
                 id="donorEmail"
                 type="email"
+                autoComplete="email"
                 placeholder="your@email.com"
                 value={donorEmail}
                 onChange={(e) => setDonorEmail(e.target.value)}
                 required
-                className="mt-2"
+                className="mt-2 h-12"
               />
               <p className="text-xs text-gray-500 mt-1">For donation receipt</p>
             </div>
@@ -245,10 +247,12 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
               <Label htmlFor="donorName">Your Name (Optional)</Label>
               <Input
                 id="donorName"
+                type="text"
+                autoComplete="name"
                 placeholder="John Doe"
                 value={donorName}
                 onChange={(e) => setDonorName(e.target.value)}
-                className="mt-2"
+                className="mt-2 h-12"
               />
             </div>
 
@@ -269,9 +273,9 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
                 type="checkbox"
                 checked={isAnonymous}
                 onChange={(e) => setIsAnonymous(e.target.checked)}
-                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
               />
-              <Label htmlFor="anonymous" className="ml-2 text-sm font-normal cursor-pointer">
+              <Label htmlFor="anonymous" className="ml-3 text-base font-normal cursor-pointer">
                 Make my donation anonymous
               </Label>
             </div>
@@ -313,3 +317,4 @@ export function DonationForm({ campaignId, campaignName, platformFeePercent = 10
     </Card>
   );
 }
+export default DonationForm;

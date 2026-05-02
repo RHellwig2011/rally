@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, Heart, Check, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatCurrency, calculatePercentage } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { calculateDonationFees } from "@/lib/banking";
 
 interface DonationFormData {
@@ -26,23 +25,64 @@ interface DonationFormData {
   cardZip: string;
 }
 
-// Mock campaign data - in production, fetch from API
-const getCampaignData = (slug: string) => {
-  return {
-    id: "1",
-    slug,
-    organizationName: "Lincoln High School",
-    teamName: "Robotics Team",
-    goalAmount: 1200000,
-    currentAmount: 845000,
-    platformFeePercent: 10,
-  };
-};
+interface Campaign {
+  id: string;
+  slug: string;
+  organizationName: string;
+  teamName: string;
+  goalAmount: number;
+  currentAmount: number;
+  platformFeePercent: number;
+}
 
 export default function DonatePage({ params }: { params: { slug: string } }) {
-  const router = useRouter();
-  const campaign = getCampaignData(params.slug);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [isLoadingCampaign, setIsLoadingCampaign] = useState(true);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+
+  // Fetch campaign data
+  useEffect(() => {
+    async function fetchCampaign() {
+      try {
+        setIsLoadingCampaign(true);
+        const response = await fetch(`/api/campaigns/slug/${params.slug}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          setCampaignError(data.error || "Campaign not found");
+          return;
+        }
+
+        // Convert string amounts to numbers if needed
+        const campaignData: Campaign = {
+          id: data.campaign.id,
+          slug: data.campaign.slug,
+          organizationName: data.campaign.organizationName,
+          teamName: data.campaign.teamName,
+          goalAmount: typeof data.campaign.goalAmount === 'string'
+            ? parseInt(data.campaign.goalAmount)
+            : data.campaign.goalAmount,
+          currentAmount: typeof data.campaign.currentAmount === 'string'
+            ? parseInt(data.campaign.currentAmount)
+            : data.campaign.currentAmount,
+          platformFeePercent: data.campaign.platformFeePercent || 10,
+        };
+
+        setCampaign(campaignData);
+      } catch (err) {
+        console.error("Failed to fetch campaign:", err);
+        setCampaignError("Failed to load campaign");
+      } finally {
+        setIsLoadingCampaign(false);
+      }
+    }
+
+    if (params.slug) {
+      fetchCampaign();
+    }
+  }, [params.slug]);
+
   const [formData, setFormData] = useState<DonationFormData>({
     amount: 0,
     donorName: "",
@@ -68,7 +108,7 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
   // Calculate fee breakdown
   const fees = calculateDonationFees(
     formData.amount * 100, // Convert to cents
-    campaign.platformFeePercent
+    campaign?.platformFeePercent || 10
   );
 
   const totalAmount = formData.coverFees
@@ -85,13 +125,40 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
     setStep(3);
   };
 
+  // Loading state
+  if (isLoadingCampaign) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading campaign...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (campaignError || !campaign) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
+          <p className="text-gray-600 mb-4">{campaignError || "This campaign does not exist."}</p>
+          <Button asChild>
+            <Link href="/">Go Home</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href={`/raise/${params.slug}`} className="flex items-center space-x-2">
+            <Link href={`/raise/${params?.slug}`} className="flex items-center space-x-2">
               <ArrowLeft className="w-5 h-5" />
               <span className="font-medium">Back to Campaign</span>
             </Link>
@@ -207,19 +274,19 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
                         <div className="flex justify-between">
                           <span className="text-gray-600">Your donation:</span>
                           <span className="font-semibold">
-                            {formatCurrency(fees.grossAmount)}
+                            {formatCurrency(Number(fees.grossAmount))}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Platform fee (10%):</span>
                           <span className="text-gray-600">
-                            {formatCurrency(fees.platformFee)}
+                            {formatCurrency(Number(fees.platformFee))}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Processing fee (~3%):</span>
                           <span className="text-gray-600">
-                            {formatCurrency(fees.processingFee)}
+                            {formatCurrency(Number(fees.processingFee))}
                           </span>
                         </div>
                         <div className="border-t pt-2 flex justify-between">
@@ -227,7 +294,7 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
                             To campaign:
                           </span>
                           <span className="font-bold text-success">
-                            {formatCurrency(fees.netAmount)}
+                            {formatCurrency(Number(fees.netAmount))}
                           </span>
                         </div>
                       </div>
@@ -241,7 +308,7 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
                           />
                           <span className="text-sm text-gray-700">
                             Cover processing fees (
-                            {formatCurrency(fees.processingFee)}) so 100% goes to the team
+                            {formatCurrency(Number(fees.processingFee))}) so 100% goes to the team
                           </span>
                         </label>
                       </div>
@@ -453,25 +520,25 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total charged:</span>
                         <span className="font-semibold">
-                          {formatCurrency(totalAmount)}
+                          {formatCurrency(Number(totalAmount))}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">To campaign:</span>
                         <span className="font-semibold text-success">
-                          {formatCurrency(fees.netAmount)}
+                          {formatCurrency(Number(fees.netAmount))}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Platform fee:</span>
                         <span className="text-gray-600">
-                          {formatCurrency(fees.platformFee)}
+                          {formatCurrency(Number(fees.platformFee))}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Processing fee:</span>
                         <span className="text-gray-600">
-                          {formatCurrency(fees.processingFee)}
+                          {formatCurrency(Number(fees.processingFee))}
                         </span>
                       </div>
                     </div>
@@ -500,7 +567,7 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
 
                   <div className="pt-6 space-y-3">
                     <Button asChild variant="outline" className="w-full">
-                      <Link href={`/raise/${params.slug}`}>
+                      <Link href={`/raise/${params?.slug}`}>
                         Back to Campaign
                       </Link>
                     </Button>

@@ -2,142 +2,135 @@ import { NextRequest, NextResponse } from "next/server";
 import { processDonation } from "@/lib/banking";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { checkRouteRateLimit } from "@/lib/utils/with-rate-limit";
+import { RATE_LIMITS } from "@/lib/utils/rate-limiter";
+import { checkCsrf } from "@/lib/csrf";
 
 // Validation schema for donations
 const createDonationSchema = z.object({
   campaignId: z.string().min(1, "Campaign ID is required"),
+  teamMemberId: z.string().optional(), // Team member being supported
   donorEmail: z.string().email("Valid email is required"),
   donorName: z.string().optional(),
-  donorMessage: z.string().optional(),
+  donorPhone: z.string().optional(),
+  message: z.string().optional(),
   amount: z.number().positive("Amount must be greater than 0"),
   isAnonymous: z.boolean().optional().default(false),
   referralCode: z.string().optional(),
-  paymentIntentId: z.string().optional(), // For Stripe payments
-  useStripe: z.boolean().optional().default(false), // Flag to use Stripe or simulated
 });
 
 /**
  * POST /api/donations
- * Create a new donation (Stripe or simulated payment)
+ * Create a new donation and Stripe payment intent
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
+    // Apply payment-specific rate limiting
+    const rateLimitCheck = checkRouteRateLimit(req, RATE_LIMITS.DONATION);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
+
     // Parse and validate request body
     const body = await req.json();
     const validatedData = createDonationSchema.parse(body);
 
-    // Convert dollar amount to cents (BigInt)
-    const grossAmountInCents = BigInt(Math.round(validatedData.amount * 100));
-
-    // If using Stripe, verify the payment intent
-    if (validatedData.useStripe && validatedData.paymentIntentId) {
-      const { retrievePaymentIntent } = await import('@/lib/stripe');
-
-      try {
-        const paymentIntent = await retrievePaymentIntent(validatedData.paymentIntentId);
-
-        // Verify payment was successful
-        if (paymentIntent.status !== 'succeeded') {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Payment has not been completed yet",
-            },
-            { status: 400 }
-          );
-        }
-
-        // Verify amount matches
-        if (BigInt(paymentIntent.amount) !== grossAmountInCents) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Payment amount does not match donation amount",
-            },
-            { status: 400 }
-          );
-        }
-
-        // Check if donation already exists (idempotency)
-        const existingDonation = await prisma.donation.findFirst({
-          where: { paymentIntentId: validatedData.paymentIntentId },
-        });
-
-        if (existingDonation) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "This payment has already been processed",
-            },
-            { status: 400 }
-          );
-        }
-      } catch (error) {
-        console.error("Failed to verify payment intent:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Failed to verify payment",
-          },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Process the donation using our banking logic
-    const result = await processDonation({
-      campaignId: validatedData.campaignId,
-      donorEmail: validatedData.donorEmail,
-      donorName: validatedData.donorName,
-      donorMessage: validatedData.donorMessage,
-      grossAmount: grossAmountInCents,
-      isAnonymous: validatedData.isAnonymous,
-      referralCode: validatedData.referralCode,
-      paymentIntentId: validatedData.paymentIntentId,
+    // Verify campaign exists and is active
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: validatedData.campaignId },
+      select: {
+        id: true,
+        status: true,
+        organizationName: true,
+        teamName: true,
+        platformFeePercent: true,
+      },
     });
 
-    // Send donation receipt email
-    try {
-      const { sendDonationReceipt } = await import('@/lib/email');
-      const campaign = await prisma.campaign.findUnique({
-        where: { id: validatedData.campaignId },
-        select: { organizationName: true, teamName: true },
-      });
-
-      if (campaign) {
-        await sendDonationReceipt({
-          toEmail: validatedData.donorEmail,
-          donorName: validatedData.donorName || 'Donor',
-          campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-          amount: Number(grossAmountInCents),
-          donationDate: new Date(),
-          taxDeductible: true,
-        });
-      }
-    } catch (emailError) {
-      console.error('Failed to send donation receipt:', emailError);
-      // Don't fail the request if email fails
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
     }
 
-    // Convert BigInt values to strings for JSON serialization
-    const donation = {
-      ...result.donation,
-      grossAmount: result.donation.grossAmount.toString(),
-      platformFee: result.donation.platformFee.toString(),
-      processingFee: result.donation.processingFee.toString(),
-      netAmount: result.donation.netAmount.toString(),
-    };
+    if (campaign.status !== "ACTIVE") {
+      return NextResponse.json(
+        { success: false, error: "Campaign is not currently accepting donations" },
+        { status: 400 }
+      );
+    }
+
+    // Convert dollar amount to cents
+    const grossAmountInCents = Math.round(validatedData.amount * 100);
+
+    // Calculate fees
+    const platformFeePercent = campaign.platformFeePercent || 10;
+    const platformFee = Math.round((grossAmountInCents * platformFeePercent) / 100);
+    const processingFee = Math.round(grossAmountInCents * 0.029) + 30; // Stripe: 2.9% + $0.30
+    const netAmount = grossAmountInCents - platformFee - processingFee;
+
+    // Create donation record in PENDING status
+    const donation = await prisma.donation.create({
+      data: {
+        campaignId: validatedData.campaignId,
+        donorEmail: validatedData.donorEmail,
+        donorName: validatedData.donorName,
+        donorMessage: validatedData.message,
+        grossAmount: BigInt(grossAmountInCents),
+        platformFee: BigInt(platformFee),
+        processingFee: BigInt(processingFee),
+        netAmount: BigInt(netAmount),
+        isAnonymous: validatedData.isAnonymous,
+        referralCode: validatedData.teamMemberId || validatedData.referralCode,
+        status: "PENDING",
+        paymentProvider: "STRIPE",
+      },
+    });
+
+    // Create Stripe payment intent
+    const { createPaymentIntent } = await import('@/lib/stripe');
+    const paymentIntent = await createPaymentIntent({
+      amount: grossAmountInCents,
+      campaignId: validatedData.campaignId,
+      donorEmail: validatedData.donorEmail,
+      metadata: {
+        donationId: donation.id,
+        campaignName: `${campaign.organizationName} ${campaign.teamName}`,
+        ...(validatedData.donorName && { donorName: validatedData.donorName }),
+        ...(validatedData.referralCode && { referralCode: validatedData.referralCode }),
+      },
+    });
+
+    // Update donation with payment intent ID
+    await prisma.donation.update({
+      where: { id: donation.id },
+      data: {
+        paymentIntentId: paymentIntent.id,
+      },
+    });
 
     return NextResponse.json(
       {
         success: true,
-        donation,
-        message: "Thank you for your donation!",
+        donation: {
+          id: donation.id,
+          amount: validatedData.amount,
+          campaignId: donation.campaignId,
+        },
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Donation processing error:", error);
+    console.error("Donation creation error:", error);
 
     // Handle validation errors
     if (error instanceof z.ZodError) {
@@ -158,7 +151,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to process donation",
+        error: error instanceof Error ? error.message : "Failed to create donation",
       },
       { status: 500 }
     );

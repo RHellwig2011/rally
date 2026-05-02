@@ -55,13 +55,13 @@ export async function GET(
       );
     }
 
-    // Get referral code
-    const referral = await prisma.referral.findFirst({
+    // Get referral code (only if userId exists)
+    const referral = teamMember.userId ? await prisma.referral.findFirst({
       where: {
         campaignId: teamMember.campaignId,
         referrerId: teamMember.userId,
       },
-    });
+    }) : null;
 
     // Get recent donations attributed to this player
     const recentDonations = await prisma.donation.findMany({

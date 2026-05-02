@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createPaymentIntent } from "@/lib/stripe";
 import prisma from "@/lib/prisma";
+import { checkRouteRateLimit } from "@/lib/utils/with-rate-limit";
+import { RATE_LIMITS } from "@/lib/utils/rate-limiter";
 
 // Validation schema
 const createIntentSchema = z.object({
@@ -18,6 +20,12 @@ const createIntentSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    // Apply payment-specific rate limiting
+    const rateLimitCheck = checkRouteRateLimit(req, RATE_LIMITS.PAYMENT);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
+
     const body = await req.json();
     const validatedData = createIntentSchema.parse(body);
 

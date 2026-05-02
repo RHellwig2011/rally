@@ -15,17 +15,11 @@ const payoutSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     // Only BANK_ADMIN can create payouts
-    if (authResult.user.role !== "BANK_ADMIN") {
+    if (user.role !== "BANK_ADMIN") {
       return NextResponse.json(
         { success: false, error: "Only bank admins can process payouts" },
         { status: 403 }
@@ -109,7 +103,7 @@ export async function POST(req: NextRequest) {
         balanceAfter: disbursementRequest.bankingAccount.availableBalance - disbursementRequest.requestedAmount,
         disbursementId: disbursementRequest.id,
         description: `Disbursement: ${disbursementRequest.purpose}`,
-        createdBy: authResult.user.id,
+        createdBy: user.id,
         metadata: {
           stripeTransferId: transfer.id,
         },

@@ -1,4 +1,5 @@
 // Password hashing utilities
+// @ts-expect-error - bcryptjs types not found during build
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;

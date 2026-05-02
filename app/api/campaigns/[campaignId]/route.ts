@@ -1,8 +1,190 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { updateCampaignSchema } from "@/lib/validations/campaign";
+import { z } from "zod";
+import {
+  checkRateLimit,
+  getRateLimitIdentifier,
+  rateLimitConfigs,
+  applyRateLimitHeaders
+} from "@/lib/utils/rate-limit";
 
+/**
+ * GET /api/campaigns/[campaignId]
+ * Retrieve campaign details by ID with aggregated statistics
+ * Returns: campaign details, total raised, donor count, team member count, fundraising progress
+ */
 export async function GET(
+  req: NextRequest,
+  { params }: { params: { campaignId: string } }
+) {
+  try {
+    const campaignId = params.campaignId;
+
+    // Get campaign with all related data and aggregations
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        primaryLeader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        },
+        guardians: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        },
+        bankingAccount: {
+          select: {
+            id: true,
+            availableBalance: true,
+            totalRaised: true,
+            disbursedTotal: true,
+            pendingDisbursement: true,
+            platformFeesCollected: true,
+          }
+        },
+        // Get aggregated statistics
+        _count: {
+          select: {
+            teamMembers: true,
+            donations: {
+              where: {
+                status: "COMPLETED"
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Calculate additional statistics
+    const donations = await prisma.donation.aggregate({
+      where: {
+        campaignId: campaignId,
+        status: "COMPLETED"
+      },
+      _sum: {
+        grossAmount: true,
+        netAmount: true,
+        platformFee: true,
+      },
+      _count: {
+        id: true,
+        donorEmail: true
+      },
+      _avg: {
+        grossAmount: true
+      },
+      _max: {
+        grossAmount: true
+      }
+    });
+
+    // Get unique donor count
+    const uniqueDonors = await prisma.donation.findMany({
+      where: {
+        campaignId: campaignId,
+        status: "COMPLETED"
+      },
+      select: {
+        donorEmail: true
+      },
+      distinct: ['donorEmail']
+    });
+
+    // Calculate days remaining
+    const now = new Date();
+    const endDate = campaign.endDate ? new Date(campaign.endDate) : null;
+    const daysRemaining = endDate
+      ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+      : null;
+
+    // Convert BigInt to numbers for JSON serialization
+    const totalRaised = Number(donations._sum.grossAmount || 0) / 100; // Convert from cents
+    const goalAmount = Number(campaign.goalAmount) / 100;
+    const progress = goalAmount > 0 ? (totalRaised / goalAmount) * 100 : 0;
+
+    // Format response
+    const response = {
+      success: true,
+      campaign: {
+        id: campaign.id,
+        organizationName: campaign.organizationName,
+        teamName: campaign.teamName,
+        slug: campaign.slug,
+        description: campaign.description,
+        category: campaign.category,
+        primaryColor: campaign.primaryColor,
+        secondaryColor: campaign.secondaryColor,
+        status: campaign.status,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+        daysRemaining,
+        createdAt: campaign.createdAt,
+        updatedAt: campaign.updatedAt,
+
+        // Financial data
+        goalAmount,
+        totalRaised,
+        currentAmount: Number(campaign.currentAmount) / 100,
+        progress: Math.min(100, Math.round(progress * 100) / 100), // Cap at 100%
+
+        // Statistics
+        statistics: {
+          teamMemberCount: campaign._count.teamMembers,
+          donationCount: donations._count.id || 0,
+          uniqueDonorCount: uniqueDonors.length,
+          averageDonation: donations._avg.grossAmount ? Number(donations._avg.grossAmount) / 100 : 0,
+          largestDonation: donations._max.grossAmount ? Number(donations._max.grossAmount) / 100 : 0,
+        },
+
+        // Leadership
+        primaryLeader: campaign.primaryLeader,
+        guardians: campaign.guardians,
+
+        // Banking (only include if user has access)
+        bankingAccount: campaign.bankingAccount ? {
+          availableBalance: Number(campaign.bankingAccount.availableBalance) / 100,
+          totalRaised: Number(campaign.bankingAccount.totalRaised) / 100,
+          disbursedTotal: Number(campaign.bankingAccount.disbursedTotal) / 100,
+          pendingDisbursement: Number(campaign.bankingAccount.pendingDisbursement) / 100,
+          platformFeesCollected: Number(campaign.bankingAccount.platformFeesCollected) / 100,
+        } : null
+      }
+    };
+
+    return NextResponse.json(response);
+
+  } catch (error) {
+    console.error("Failed to fetch campaign:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch campaign details" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/campaigns/[campaignId]
+ * Update campaign details
+ */
+export async function PUT(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
@@ -27,77 +209,32 @@ export async function GET(
       );
     }
 
-    const { campaignId } = params;
+    // Apply rate limiting (50 updates per user per hour)
+    const rateLimitId = getRateLimitIdentifier(req, user.id);
+    const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfigs.campaignUpdate);
 
-    // Fetch campaign with all related data
+    if (!rateLimitResult.allowed) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfter: rateLimitResult.retryAfter
+        },
+        { status: 429 }
+      );
+      applyRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    const campaignId = params.campaignId;
+
+    // Check if user has permission to update this campaign
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      include: {
-        primaryLeader: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          }
-        },
+      select: {
+        primaryLeaderId: true,
         guardians: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          }
-        },
-        bankingAccount: {
-          include: {
-            transactions: {
-              take: 20,
-              orderBy: { createdAt: 'desc' }
-            },
-            disbursementRequests: {
-              take: 10,
-              orderBy: { requestedAt: 'desc' },
-              include: {
-                requestedByUser: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
-                  }
-                }
-              }
-            }
-          }
-        },
-        donations: {
-          take: 20,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            donor: {
-              select: {
-                firstName: true,
-                lastName: true,
-              }
-            }
-          }
-        },
-        teamMembers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              }
-            }
-          },
-          orderBy: { amountRaised: 'desc' }
-        },
-        referrals: {
-          where: {
-            referrerId: user.id
-          }
+          select: { id: true }
         }
       }
     });
@@ -109,117 +246,179 @@ export async function GET(
       );
     }
 
-    // Check authorization - user must be primary leader or guardian
-    const isAuthorized =
-      campaign.primaryLeaderId === user.id ||
-      campaign.guardians.some(g => g.id === user.id);
+    // Check authorization
+    const isLeader = campaign.primaryLeaderId === user.id;
+    const isGuardian = campaign.guardians.some(g => g.id === user.id);
 
-    if (!isAuthorized) {
+    if (!isLeader && !isGuardian) {
       return NextResponse.json(
-        { success: false, error: "Not authorized to view this campaign" },
+        { success: false, error: "Not authorized to update this campaign" },
         { status: 403 }
       );
     }
 
-    // Calculate stats
-    const totalDonations = campaign.donations.length;
-    const completedDonations = campaign.donations.filter(d => d.status === 'COMPLETED');
-    const avgDonation = completedDonations.length > 0
-      ? completedDonations.reduce((sum, d) => sum + Number(d.grossAmount), 0) / completedDonations.length
-      : 0;
+    // Parse and validate request body
+    const body = await req.json();
+    const validatedData = updateCampaignSchema.parse(body);
 
-    // Count donors (unique by email)
-    const uniqueDonorEmails = new Set(campaign.donations.map(d => d.donorEmail));
-    const donorCount = uniqueDonorEmails.size;
+    // Prepare update data
+    const updateData: any = {};
 
-    // Count new donors today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const newDonorsToday = campaign.donations.filter(
-      d => d.createdAt >= today
-    ).length;
+    if (validatedData.organizationName) updateData.organizationName = validatedData.organizationName;
+    if (validatedData.teamName) updateData.teamName = validatedData.teamName;
+    if (validatedData.description) updateData.description = validatedData.description;
+    if (validatedData.goalAmount) {
+      updateData.goalAmount = BigInt(Math.round(validatedData.goalAmount * 100));
+    }
+    if (validatedData.endDate) updateData.endDate = new Date(validatedData.endDate);
+    if (validatedData.primaryColor) updateData.primaryColor = validatedData.primaryColor;
+    if (validatedData.secondaryColor) updateData.secondaryColor = validatedData.secondaryColor;
 
-    // Calculate days left
-    let daysLeft = null;
-    if (campaign.endDate) {
-      const now = new Date();
-      const end = new Date(campaign.endDate);
-      daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    // Update campaign
+    const updatedCampaign = await prisma.campaign.update({
+      where: { id: campaignId },
+      data: updateData,
+      include: {
+        primaryLeader: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      campaign: {
+        id: updatedCampaign.id,
+        organizationName: updatedCampaign.organizationName,
+        teamName: updatedCampaign.teamName,
+        slug: updatedCampaign.slug,
+        description: updatedCampaign.description,
+        goalAmount: Number(updatedCampaign.goalAmount) / 100,
+        status: updatedCampaign.status,
+        updatedAt: updatedCampaign.updatedAt,
+      }
+    });
+
+  } catch (error) {
+    console.error("Campaign update error:", error);
+
+    // Handle validation errors
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Validation failed",
+          details: error.errors.map(e => ({ field: e.path.join("."), message: e.message }))
+        },
+        { status: 400 }
+      );
     }
 
-    // Prepare response data
-    const responseData = {
-      campaign: {
-        id: campaign.id,
-        organizationName: campaign.organizationName,
-        teamName: campaign.teamName,
-        slug: campaign.slug,
-        description: campaign.description,
-        goalAmount: campaign.goalAmount.toString(),
-        currentAmount: campaign.currentAmount.toString(),
-        status: campaign.status,
-        category: campaign.category,
-        primaryColor: campaign.primaryColor,
-        secondaryColor: campaign.secondaryColor,
-        startDate: campaign.startDate,
-        endDate: campaign.endDate,
-        createdAt: campaign.createdAt,
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update campaign"
       },
-      bankingAccount: campaign.bankingAccount ? {
-        totalRaised: campaign.bankingAccount.totalRaised.toString(),
-        platformFeesCollected: campaign.bankingAccount.platformFeesCollected.toString(),
-        availableBalance: campaign.bankingAccount.availableBalance.toString(),
-        disbursedTotal: campaign.bankingAccount.disbursedTotal.toString(),
-        pendingDisbursement: campaign.bankingAccount.pendingDisbursement.toString(),
-      } : null,
-      recentDonations: campaign.donations.map(d => ({
-        id: d.id,
-        donorName: d.isAnonymous ? 'Anonymous' : (d.donorName || 'Anonymous'),
-        donorEmail: d.donorEmail,
-        grossAmount: d.grossAmount.toString(),
-        platformFee: d.platformFee.toString(),
-        netAmount: d.netAmount.toString(),
-        donorMessage: d.donorMessage,
-        isAnonymous: d.isAnonymous,
-        status: d.status,
-        createdAt: d.createdAt,
-      })),
-      disbursementRequests: campaign.bankingAccount?.disbursementRequests.map(dr => ({
-        id: dr.id,
-        requestedAmount: dr.requestedAmount.toString(),
-        purpose: dr.purpose,
-        status: dr.status,
-        requestedAt: dr.requestedAt,
-        requestedBy: `${dr.requestedByUser.firstName} ${dr.requestedByUser.lastName}`,
-        approvedAt: dr.approvedAt,
-        disbursementDate: dr.disbursementDate,
-      })) || [],
-      teamMembers: campaign.teamMembers.map(tm => ({
-        id: tm.id,
-        userId: tm.userId,
-        name: tm.name,
-        personalGoal: tm.personalGoal?.toString(),
-        amountRaised: tm.amountRaised.toString(),
-        userEmail: tm.user.email,
-        createdAt: tm.createdAt,
-      })),
-      stats: {
-        donorCount,
-        avgDonation: Math.round(avgDonation),
-        newDonorsToday,
-        daysLeft,
-        totalDonations,
-      }
-    };
-
-    return NextResponse.json(
-      { success: true, data: responseData },
-      { status: 200 }
+      { status: 500 }
     );
+  }
+}
+
+/**
+ * DELETE /api/campaigns/[campaignId]
+ * Delete a campaign (soft delete for data integrity)
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { campaignId: string } }
+) {
+  try {
+    // Get token from cookie
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Verify token and get user
+    const user = await getUserFromToken(sessionToken);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    const campaignId = params.campaignId;
+
+    // Check if user has permission to delete this campaign
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        primaryLeaderId: true,
+        status: true,
+        donations: {
+          select: { id: true },
+          take: 1
+        }
+      }
+    });
+
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Only primary leader can delete
+    if (campaign.primaryLeaderId !== user.id) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized to delete this campaign" },
+        { status: 403 }
+      );
+    }
+
+    // Can only delete DRAFT campaigns or campaigns with no donations
+    if (campaign.status !== "DRAFT" && campaign.donations.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cannot delete campaign with donations. Please archive it instead."
+        },
+        { status: 400 }
+      );
+    }
+
+    // Soft delete by updating status to ARCHIVED
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: {
+        status: "ARCHIVED"
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Campaign deleted successfully"
+    });
+
   } catch (error) {
-    console.error("Failed to fetch campaign:", error);
+    console.error("Campaign deletion error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch campaign data" },
+      {
+        success: false,
+        error: "Failed to delete campaign"
+      },
       { status: 500 }
     );
   }

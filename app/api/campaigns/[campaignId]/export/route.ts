@@ -100,7 +100,7 @@ export async function GET(
       const headers = ["Name", "Email", "Personal Goal", "Amount Raised", "Joined Date"];
       const rows = teamMembers.map(tm => [
         tm.name,
-        tm.user.email,
+        tm.user?.email || "",
         tm.personalGoal ? `$${(Number(tm.personalGoal) / 100).toFixed(2)}` : "",
         `$${(Number(tm.amountRaised) / 100).toFixed(2)}`,
         new Date(tm.createdAt).toLocaleDateString(),

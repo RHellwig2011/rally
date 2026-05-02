@@ -58,12 +58,12 @@ export default function PlayerProfileEditor() {
 
   useEffect(() => {
     fetchProfile();
-  }, [params.teamMemberId]);
+  }, [params?.teamMemberId]);
 
   const fetchProfile = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/team-members/${params.teamMemberId}`);
+      const res = await fetch(`/api/team-members/${params?.teamMemberId}`);
       const result = await res.json();
 
       if (!res.ok) {
@@ -99,7 +99,7 @@ export default function PlayerProfileEditor() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const res = await fetch(`/api/team-members/${params.teamMemberId}`, {
+      const res = await fetch(`/api/team-members/${params?.teamMemberId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

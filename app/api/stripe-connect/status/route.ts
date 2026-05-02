@@ -9,14 +9,8 @@ import prisma from "@/lib/prisma";
  */
 export async function GET(req: NextRequest) {
   try {
-    // Verify authentication
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const { searchParams } = new URL(req.url);
     const campaignId = searchParams.get("campaignId");
@@ -66,7 +60,7 @@ export async function GET(req: NextRequest) {
         chargesEnabled: account.charges_enabled,
         payoutsEnabled: account.payouts_enabled,
         detailsSubmitted: account.details_submitted,
-        requiresInfo: account.requirements?.currently_due.length ? true : false,
+        requiresInfo: account.requirements?.currently_due?.length ? true : false,
         currentlyDue: account.requirements?.currently_due || [],
       },
       { status: 200 }

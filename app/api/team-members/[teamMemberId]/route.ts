@@ -22,13 +22,8 @@ export async function GET(
   { params }: { params: { teamMemberId: string } }
 ) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const { teamMemberId } = params;
 
@@ -53,7 +48,7 @@ export async function GET(
     }
 
     // Verify ownership
-    if (teamMember.userId !== authResult.user.id) {
+    if (teamMember.userId !== user.id) {
       return NextResponse.json(
         { error: "You can only view your own profile" },
         { status: 403 }
@@ -95,13 +90,8 @@ export async function PATCH(
   { params }: { params: { teamMemberId: string } }
 ) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const { teamMemberId } = params;
 
@@ -118,7 +108,7 @@ export async function PATCH(
     }
 
     // Verify ownership
-    if (teamMember.userId !== authResult.user.id) {
+    if (teamMember.userId !== user.id) {
       return NextResponse.json(
         { error: "You can only edit your own profile" },
         { status: 403 }

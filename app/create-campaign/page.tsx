@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 // Campaign form data type
 interface CampaignFormData {
@@ -49,6 +50,7 @@ const CATEGORIES = [
 
 export default function CreateCampaignPage() {
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -116,6 +118,8 @@ export default function CreateCampaignPage() {
       }
       if (!formData.goalAmount || parseFloat(formData.goalAmount) <= 0) {
         errors.goalAmount = "Goal amount must be greater than 0";
+      } else if (parseFloat(formData.goalAmount) > 100000) {
+        errors.goalAmount = "Goal amount cannot exceed $100,000";
       }
       if (!formData.startDate) errors.startDate = "Start date is required";
       if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
@@ -154,17 +158,24 @@ export default function CreateCampaignPage() {
     setError(null);
 
     try {
+      // Convert date strings to ISO datetime format
+      const startDateTime = new Date(formData.startDate + 'T00:00:00').toISOString();
+      const endDateTime = formData.endDate ? new Date(formData.endDate + 'T23:59:59').toISOString() : undefined;
+
       const response = await fetch("/api/campaigns", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
         body: JSON.stringify({
           organizationName: formData.organizationName,
           teamName: formData.teamName,
           slug: formData.slug,
           description: formData.description,
           goalAmount: parseFloat(formData.goalAmount),
-          startDate: formData.startDate,
-          endDate: formData.endDate || undefined,
+          startDate: startDateTime,
+          endDate: endDateTime,
           category: formData.category,
           primaryColor: formData.primaryColor,
           secondaryColor: formData.secondaryColor,
@@ -302,10 +313,12 @@ export default function CreateCampaignPage() {
                   <Label htmlFor="organizationName">Organization Name *</Label>
                   <Input
                     id="organizationName"
+                    type="text"
+                    autoComplete="organization"
                     placeholder="Lincoln High School"
                     value={formData.organizationName}
                     onChange={(e) => updateFormData("organizationName", e.target.value)}
-                    className={`mt-2 ${validationErrors.organizationName ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.organizationName ? "border-red-500" : ""}`}
                   />
                   {validationErrors.organizationName && (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.organizationName}</p>
@@ -316,10 +329,11 @@ export default function CreateCampaignPage() {
                   <Label htmlFor="teamName">Team/Group Name *</Label>
                   <Input
                     id="teamName"
+                    type="text"
                     placeholder="Robotics Team"
                     value={formData.teamName}
                     onChange={(e) => updateFormData("teamName", e.target.value)}
-                    className={`mt-2 ${validationErrors.teamName ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.teamName ? "border-red-500" : ""}`}
                   />
                   {validationErrors.teamName && (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.teamName}</p>
@@ -332,7 +346,7 @@ export default function CreateCampaignPage() {
                     id="category"
                     value={formData.category}
                     onChange={(e) => updateFormData("category", e.target.value)}
-                    className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="mt-2 flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -346,10 +360,11 @@ export default function CreateCampaignPage() {
                     <span className="text-sm text-gray-600 mr-2">rally.com/raise/</span>
                     <Input
                       id="slug"
+                      type="text"
                       placeholder="lincoln-high-robotics"
                       value={formData.slug}
                       onChange={(e) => updateFormData("slug", e.target.value)}
-                      className={`flex-1 ${validationErrors.slug ? "border-red-500" : ""}`}
+                      className={`flex-1 h-12 ${validationErrors.slug ? "border-red-500" : ""}`}
                     />
                   </div>
                   {validationErrors.slug ? (
@@ -368,14 +383,20 @@ export default function CreateCampaignPage() {
                     <Input
                       id="goalAmount"
                       type="number"
+                      inputMode="numeric"
+                      min="1"
+                      max="100000"
+                      step="1"
                       placeholder="12000"
                       value={formData.goalAmount}
                       onChange={(e) => updateFormData("goalAmount", e.target.value)}
-                      className={`flex-1 ${validationErrors.goalAmount ? "border-red-500" : ""}`}
+                      className={`flex-1 h-12 ${validationErrors.goalAmount ? "border-red-500" : ""}`}
                     />
                   </div>
-                  {validationErrors.goalAmount && (
+                  {validationErrors.goalAmount ? (
                     <p className="mt-1 text-sm text-red-600">{validationErrors.goalAmount}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">Maximum: $100,000</p>
                   )}
                 </div>
 
@@ -387,7 +408,7 @@ export default function CreateCampaignPage() {
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => updateFormData("startDate", e.target.value)}
-                      className="mt-2"
+                      className="mt-2 h-12"
                     />
                   </div>
                   <div>
@@ -397,7 +418,7 @@ export default function CreateCampaignPage() {
                       type="date"
                       value={formData.endDate}
                       onChange={(e) => updateFormData("endDate", e.target.value)}
-                      className="mt-2"
+                      className="mt-2 h-12"
                     />
                   </div>
                 </div>
@@ -500,32 +521,35 @@ export default function CreateCampaignPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="guardianEmail">Guardian Email (Optional)</Label>
+                  <Label htmlFor="guardianEmail">Financial Overseer Email (Optional)</Label>
                   <Input
                     id="guardianEmail"
                     type="email"
-                    placeholder="parent@email.com"
+                    autoComplete="email"
+                    placeholder="treasurer@email.com"
                     value={formData.guardianEmail}
                     onChange={(e) => updateFormData("guardianEmail", e.target.value)}
-                    className={`mt-2 ${validationErrors.guardianEmail ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.guardianEmail ? "border-red-500" : ""}`}
                   />
                   {validationErrors.guardianEmail ? (
                     <p className="text-xs text-red-600 mt-1">{validationErrors.guardianEmail}</p>
                   ) : (
                     <p className="text-xs text-gray-500 mt-1">
-                      Guardian can approve disbursement requests
+                      Optional: Add someone who can approve disbursement requests above the threshold
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <Label htmlFor="guardianName">Guardian Name (Optional)</Label>
+                  <Label htmlFor="guardianName">Financial Overseer Name (Optional)</Label>
                   <Input
                     id="guardianName"
+                    type="text"
+                    autoComplete="name"
                     placeholder="Jane Smith"
                     value={formData.guardianName}
                     onChange={(e) => updateFormData("guardianName", e.target.value)}
-                    className="mt-2"
+                    className="mt-2 h-12"
                   />
                 </div>
 
@@ -595,10 +619,10 @@ export default function CreateCampaignPage() {
                   </div>
 
                   <div className="border-b pb-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">Guardian Oversight</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">Financial Oversight</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600">Guardian:</span>
+                        <span className="text-gray-600">Financial Overseer:</span>
                         <p className="font-medium">
                           {formData.guardianName || "Not set"}
                           {formData.guardianEmail && ` (${formData.guardianEmail})`}

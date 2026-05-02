@@ -377,7 +377,7 @@ export default function AdminTransactionsPage() {
               return (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between py-4 first:pt-0"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 py-4 first:pt-0"
                 >
                   {/* Left Side - Type & Details */}
                   <div className="flex items-start gap-4 flex-1">
@@ -386,14 +386,14 @@ export default function AdminTransactionsPage() {
                     >
                       <Icon className={`w-5 h-5 ${config.color}`} />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} font-medium`}
+                          className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} font-medium whitespace-nowrap`}
                         >
                           {config.label}
                         </span>
-                        <h4 className="font-semibold text-gray-900">
+                        <h4 className="font-semibold text-gray-900 truncate">
                           {transaction.campaign}
                         </h4>
                       </div>
@@ -430,7 +430,7 @@ export default function AdminTransactionsPage() {
                   </div>
 
                   {/* Right Side - Amount & Balance */}
-                  <div className="text-right">
+                  <div className="sm:text-right pl-14 sm:pl-0">
                     <div
                       className={`text-xl font-bold mb-1 ${
                         isNegative ? "text-blue-600" : "text-success"

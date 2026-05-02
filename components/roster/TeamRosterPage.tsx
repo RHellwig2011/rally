@@ -1,0 +1,320 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { TeamMemberCard } from './TeamMemberCard';
+import { AddTeamMemberModal } from './AddTeamMemberModal';
+import { CSVImportModal } from './CSVImportModal';
+import { RosterFilters } from './RosterFilters';
+import { EmptyRosterState } from './EmptyRosterState';
+import { RosterStats } from './RosterStats';
+import { toast } from 'react-hot-toast';
+
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  personalGoal: number | null;
+  amountRaised: number;
+  position?: string | null;
+  grade?: string | null;
+  profilePhotoUrl?: string | null;
+  fundLinkCode: string;
+  invitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REMOVED' | 'EMAIL_FAILED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TeamRosterPageProps {
+  campaignId: string;
+  campaignSlug: string;
+  isLeader: boolean;
+  isGuardian: boolean;
+}
+
+export function TeamRosterPage({
+  campaignId,
+  campaignSlug,
+  isLeader,
+  isGuardian
+}: TeamRosterPageProps) {
+  const router = useRouter();
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'amountRaised' | 'name' | 'date'>('amountRaised');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+
+  const canManage = isLeader || isGuardian;
+
+  // Fetch team members
+  const fetchMembers = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        ...(searchTerm && { search: searchTerm }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        sortBy,
+      });
+
+      const response = await fetch(`/api/campaigns/${campaignId}/team-members?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch team members');
+
+      const data = await response.json();
+      setMembers(data.members || []);
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+      toast.error('Failed to load team members');
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, searchTerm, statusFilter, sortBy]);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
+  // Handle member update
+  const handleUpdateMember = async (memberId: string, updates: Partial<TeamMember>) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) throw new Error('Failed to update member');
+
+      toast.success('Team member updated successfully');
+      fetchMembers();
+    } catch (error) {
+      console.error('Failed to update member:', error);
+      toast.error('Failed to update team member');
+    }
+  };
+
+  // Handle member deletion
+  const handleDeleteMember = async (memberId: string) => {
+    if (!confirm('Are you sure you want to remove this team member? Their donation history will be preserved.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to remove member');
+
+      toast.success('Team member removed successfully');
+      fetchMembers();
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+      toast.error('Failed to remove team member');
+    }
+  };
+
+  // Handle resend invitation
+  const handleResendInvitation = async (memberId: string) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}/resend-invite`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error(`Rate limit exceeded. You can resend in ${Math.ceil(data.retryAfter / 60)} minutes`);
+        } else {
+          throw new Error(data.error || 'Failed to resend invitation');
+        }
+        return;
+      }
+
+      toast.success('Invitation sent successfully');
+      fetchMembers();
+    } catch (error) {
+      console.error('Failed to resend invitation:', error);
+      toast.error('Failed to resend invitation');
+    }
+  };
+
+  // Handle adding a new member
+  const handleAddMember = async (memberData: any) => {
+    try {
+      const response = await fetch(`/api/campaigns/${campaignId}/team-members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(memberData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error(`Rate limit exceeded. You can add more members in ${Math.ceil(data.retryAfter / 60)} minutes`);
+        } else {
+          throw new Error(data.error || 'Failed to add member');
+        }
+        return;
+      }
+
+      toast.success('Team member added successfully');
+      setShowAddModal(false);
+      fetchMembers();
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      toast.error('Failed to add team member');
+    }
+  };
+
+  // Handle CSV import completion
+  const handleImportComplete = () => {
+    setShowImportModal(false);
+    fetchMembers();
+    toast.success('Team members imported successfully');
+  };
+
+  // Calculate statistics
+  const totalRaised = members.reduce((sum, m) => sum + m.amountRaised, 0);
+  const totalGoal = members.reduce((sum, m) => sum + (m.personalGoal || 0), 0);
+  const activeMembers = members.filter(m => m.invitationStatus === 'ACCEPTED').length;
+  const pendingInvitations = members.filter(m => m.invitationStatus === 'PENDING').length;
+
+  // Filter and sort members
+  const filteredMembers = members
+    .filter(member => {
+      if (statusFilter !== 'all' && member.invitationStatus !== statusFilter) return false;
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        return (
+          member.name.toLowerCase().includes(search) ||
+          member.email.toLowerCase().includes(search) ||
+          member.position?.toLowerCase().includes(search) ||
+          member.grade?.toLowerCase().includes(search)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'amountRaised':
+          return b.amountRaised - a.amountRaised;
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'date':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Statistics */}
+      <RosterStats
+        totalMembers={members.length}
+        activeMembers={activeMembers}
+        pendingInvitations={pendingInvitations}
+        totalRaised={totalRaised}
+        totalGoal={totalGoal}
+      />
+
+      {/* Action Buttons */}
+      {canManage && (
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Add Team Member
+          </button>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Import from CSV
+          </button>
+          <a
+            href={`/api/campaigns/${campaignId}/import-roster`}
+            download="team_roster_template.csv"
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Download CSV Template
+          </a>
+        </div>
+      )}
+
+      {/* Filters and Search */}
+      <RosterFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+      />
+
+      {/* Team Members Grid */}
+      {filteredMembers.length === 0 ? (
+        <EmptyRosterState
+          hasMembers={members.length > 0}
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          canManage={canManage}
+          onAddMember={() => setShowAddModal(true)}
+          onImportCSV={() => setShowImportModal(true)}
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredMembers.map((member) => (
+            <TeamMemberCard
+              key={member.id}
+              member={member}
+              campaignSlug={campaignSlug}
+              canManage={canManage}
+              onEdit={(member) => setSelectedMember(member as TeamMember)}
+              onDelete={handleDeleteMember}
+              onResendInvite={handleResendInvitation}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modals */}
+      {showAddModal && (
+        <AddTeamMemberModal
+          onClose={() => setShowAddModal(false)}
+          onSave={handleAddMember}
+        />
+      )}
+
+      {showImportModal && (
+        <CSVImportModal
+          campaignId={campaignId}
+          onClose={() => setShowImportModal(false)}
+          onComplete={handleImportComplete}
+        />
+      )}
+
+      {selectedMember && (
+        <AddTeamMemberModal
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+          onSave={(data) => handleUpdateMember(selectedMember.id, data)}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,4 +1,5 @@
 import prisma from "./prisma";
+// @ts-expect-error - bcryptjs types not found during build
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";

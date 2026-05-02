@@ -98,11 +98,13 @@ export default function SignupPage() {
                   id="firstName"
                   name="firstName"
                   type="text"
+                  autoComplete="given-name"
                   placeholder="John"
                   value={formData.firstName}
                   onChange={handleChange}
                   required
                   disabled={loading}
+                  className="h-12"
                 />
               </div>
 
@@ -112,11 +114,13 @@ export default function SignupPage() {
                   id="lastName"
                   name="lastName"
                   type="text"
+                  autoComplete="family-name"
                   placeholder="Doe"
                   value={formData.lastName}
                   onChange={handleChange}
                   required
                   disabled={loading}
+                  className="h-12"
                 />
               </div>
             </div>
@@ -127,11 +131,13 @@ export default function SignupPage() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="coach@example.com"
                 value={formData.email}
                 onChange={handleChange}
                 required
                 disabled={loading}
+                className="h-12"
               />
             </div>
 
@@ -141,11 +147,13 @@ export default function SignupPage() {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
                 required
                 disabled={loading}
+                className="h-12"
               />
               <p className="text-xs text-gray-500">Must be at least 8 characters</p>
             </div>
@@ -156,11 +164,13 @@ export default function SignupPage() {
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
                 disabled={loading}
+                className="h-12"
               />
             </div>
 

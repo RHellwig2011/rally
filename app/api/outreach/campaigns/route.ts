@@ -23,13 +23,8 @@ const createCampaignSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const body = await req.json();
     const validatedData = createCampaignSchema.parse(body);
@@ -54,9 +49,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if user is campaign leader or team member
-    const isLeader = campaign.primaryLeaderId === authResult.user.id;
+    const isLeader = campaign.primaryLeaderId === user.id;
     const isTeamMember = campaign.teamMembers.some(
-      (tm) => tm.userId === authResult.user.id
+      (tm) => tm.userId === user.id
     );
 
     if (!isLeader && !isTeamMember) {
@@ -104,7 +99,7 @@ export async function POST(req: NextRequest) {
     const outreachCampaign = await prisma.outreachCampaign.create({
       data: {
         campaignId: validatedData.campaignId,
-        createdBy: authResult.user.id,
+        createdBy: user.id,
         name: validatedData.name,
         type: validatedData.type,
         status: validatedData.scheduledFor ? "SCHEDULED" : "SENDING",
@@ -319,13 +314,8 @@ async function sendOutreachMessages(
  */
 export async function GET(req: NextRequest) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    // Verify authentication (throws if not authenticated)
+    const user = await verifyAuth(req);
 
     const { searchParams } = new URL(req.url);
     const campaignId = searchParams.get("campaignId");

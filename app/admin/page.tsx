@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -11,124 +12,146 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-// Mock data - will be replaced with real database queries
-const getAdminOverview = () => {
-  return {
-    platformStats: {
-      totalRaised: 5420000, // $54,200
-      totalFees: 542000, // $5,420 (10%)
-      activeCampaigns: 28,
-      totalUsers: 1847,
-      pendingDisbursements: 12,
-      totalDonations: 3284,
-    },
-    trends: {
-      raisedChange: 18.5,
-      campaignsChange: 12.3,
-      usersChange: 24.7,
-      donationsChange: 15.2,
-    },
-    recentActivity: [
-      {
-        id: "1",
-        type: "campaign_created",
-        campaign: "Lincoln High Robotics",
-        user: "Alex Thompson",
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-      },
-      {
-        id: "2",
-        type: "large_donation",
-        campaign: "West Valley Soccer",
-        amount: 50000,
-        donor: "Anonymous",
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        type: "disbursement_approved",
-        campaign: "Central Arts Program",
-        amount: 25000,
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      },
-      {
-        id: "4",
-        type: "goal_reached",
-        campaign: "East Side Band Trip",
-        amount: 800000,
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      },
-      {
-        id: "5",
-        type: "disbursement_pending",
-        campaign: "North High Tennis",
-        amount: 35000,
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-      },
-    ],
-    topCampaigns: [
-      {
-        id: "1",
-        name: "Lincoln High Robotics",
-        organization: "Lincoln High School",
-        raised: 845000,
-        goal: 1200000,
-        donors: 142,
-      },
-      {
-        id: "2",
-        name: "West Valley Soccer",
-        organization: "West Valley Middle School",
-        raised: 680000,
-        goal: 750000,
-        donors: 98,
-      },
-      {
-        id: "3",
-        name: "Central Arts Program",
-        organization: "Central Elementary",
-        raised: 520000,
-        goal: 600000,
-        donors: 187,
-      },
-    ],
-    pendingApprovals: [
-      {
-        id: "1",
-        campaign: "Lincoln High Robotics",
-        amount: 50000,
-        purpose: "Travel Deposit",
-        requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        requestedBy: "Alex Thompson",
-      },
-      {
-        id: "2",
-        campaign: "North High Tennis",
-        amount: 35000,
-        purpose: "Equipment Purchase",
-        requestedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
-        requestedBy: "Sarah Johnson",
-      },
-      {
-        id: "3",
-        campaign: "West Valley Soccer",
-        amount: 28000,
-        purpose: "Tournament Registration",
-        requestedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-        requestedBy: "Mike Davis",
-      },
-    ],
+interface AdminStats {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  totalDonations: number;
+  totalRaised: number;
+  averageDonation: number;
+  platformFees: number;
+  totalDisbursed: number;
+  pendingDisbursements: number;
+  pendingDisbursementAmount: number;
+  uniqueDonors: number;
+  totalUsers: number;
+  growth: {
+    donations: {
+      percentage: number;
+      trend: string;
+    };
+    donationCount: {
+      percentage: number;
+      trend: string;
+    };
   };
-};
+  topCampaigns: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    raised: number;
+    goal: number;
+    percentage: number;
+    donationCount: number;
+  }>;
+  recentCampaigns: Array<{
+    id: string;
+    name: string;
+    status: string;
+    progress: {
+      goal: number;
+      raised: number;
+      percentage: number;
+    };
+    createdAt: string;
+  }>;
+}
+
+interface PendingDisbursement {
+  id: string;
+  campaignId: string;
+  requestedAmount: number;
+  purpose: string;
+  requestedAt: string;
+  requestedByUser: {
+    firstName: string;
+    lastName: string;
+  };
+  bankingAccount: {
+    campaign: {
+      teamName: string;
+      organizationName: string;
+    };
+  };
+}
 
 export default function AdminOverviewPage() {
-  const data = getAdminOverview();
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [pendingDisbursements, setPendingDisbursements] = useState<PendingDisbursement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch admin stats and pending disbursements in parallel
+        const [statsRes, disbursementsRes] = await Promise.all([
+          fetch('/api/admin/stats'),
+          fetch('/api/admin/disbursements?status=PENDING&limit=3')
+        ]);
+
+        if (!statsRes.ok || !disbursementsRes.ok) {
+          throw new Error('Failed to fetch admin data');
+        }
+
+        const statsData = await statsRes.json();
+        const disbursementsData = await disbursementsRes.json();
+
+        if (statsData.success) {
+          setStats(statsData.stats);
+        }
+
+        if (disbursementsData.success) {
+          setPendingDisbursements(disbursementsData.requests || []);
+        }
+
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch admin data:', err);
+        setError('Failed to load admin dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-gray-600">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <p className="text-gray-900 font-semibold mb-2">Failed to load dashboard</p>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -151,11 +174,11 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-gray-900">
-              {formatCurrency(data.platformStats.totalRaised)}
+              {formatCurrency(stats.totalRaised * 100)}
             </div>
-            <p className="text-sm text-success mt-1 flex items-center">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              +{data.trends.raisedChange}% from last month
+            <p className={`text-sm mt-1 flex items-center ${stats.growth.donations.trend === 'up' ? 'text-success' : stats.growth.donations.trend === 'down' ? 'text-destructive' : 'text-gray-500'}`}>
+              {stats.growth.donations.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : stats.growth.donations.trend === 'down' ? <ArrowDownRight className="w-3 h-3 mr-1" /> : null}
+              {stats.growth.donations.percentage > 0 ? '+' : ''}{stats.growth.donations.percentage.toFixed(1)}% from last period
             </p>
           </CardContent>
         </Card>
@@ -169,11 +192,10 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-gray-900">
-              {data.platformStats.activeCampaigns}
+              {stats.activeCampaigns}
             </div>
-            <p className="text-sm text-success mt-1 flex items-center">
-              <ArrowUpRight className="w-3 h-3 mr-1" />
-              +{data.trends.campaignsChange}% from last month
+            <p className="text-sm text-gray-500 mt-1">
+              {stats.totalCampaigns} total campaigns
             </p>
           </CardContent>
         </Card>
@@ -187,7 +209,7 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-gray-900">
-              {formatCurrency(data.platformStats.totalFees)}
+              {formatCurrency(stats.platformFees * 100)}
             </div>
             <p className="text-sm text-gray-500 mt-1">10% of total raised</p>
           </CardContent>
@@ -202,11 +224,10 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-gray-900">
-              {data.platformStats.totalUsers.toLocaleString()}
+              {stats.totalUsers.toLocaleString()}
             </div>
-            <p className="text-sm text-success mt-1 flex items-center">
-              <ArrowUpRight className="w-3 h-3 mr-1" />
-              +{data.trends.usersChange}% from last month
+            <p className="text-sm text-gray-500 mt-1">
+              {stats.uniqueDonors} unique donors
             </p>
           </CardContent>
         </Card>
@@ -223,11 +244,11 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-gray-900">
-                {data.platformStats.totalDonations.toLocaleString()}
+                {stats.totalDonations.toLocaleString()}
               </span>
-              <span className="text-sm text-success flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                +{data.trends.donationsChange}%
+              <span className={`text-sm flex items-center ${stats.growth.donationCount.trend === 'up' ? 'text-success' : stats.growth.donationCount.trend === 'down' ? 'text-destructive' : 'text-gray-500'}`}>
+                {stats.growth.donationCount.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : stats.growth.donationCount.trend === 'down' ? <ArrowDownRight className="w-3 h-3 mr-1" /> : null}
+                {stats.growth.donationCount.percentage > 0 ? '+' : ''}{stats.growth.donationCount.percentage.toFixed(1)}%
               </span>
             </div>
           </CardContent>
@@ -243,7 +264,7 @@ export default function AdminOverviewPage() {
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-warning">
-                {data.platformStats.pendingDisbursements}
+                {stats.pendingDisbursements}
               </span>
               <Button variant="link" size="sm" asChild className="p-0 h-auto">
                 <Link href="/admin/disbursements">Review now →</Link>
@@ -255,16 +276,12 @@ export default function AdminOverviewPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Avg Campaign Size
+              Avg Donation
             </CardTitle>
           </CardHeader>
           <CardContent>
             <span className="text-2xl font-bold text-gray-900">
-              {formatCurrency(
-                Math.floor(
-                  data.platformStats.totalRaised / data.platformStats.activeCampaigns
-                )
-              )}
+              {formatCurrency(stats.averageDonation * 100)}
             </span>
           </CardContent>
         </Card>
@@ -273,117 +290,63 @@ export default function AdminOverviewPage() {
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Left Column - Activity & Top Campaigns */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Recent Activity */}
+          {/* Recent Campaigns */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5" />
-                Recent Platform Activity
+                Recent Campaigns
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {data.recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0"
-                  >
-                    <div className="flex-shrink-0 mt-1">
-                      {activity.type === "campaign_created" && (
+                {stats.recentCampaigns && stats.recentCampaigns.length > 0 ? (
+                  stats.recentCampaigns.map((campaign) => (
+                    <div
+                      key={campaign.id}
+                      className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0"
+                    >
+                      <div className="flex-shrink-0 mt-1">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                           <TrendingUp className="w-4 h-4 text-primary" />
                         </div>
-                      )}
-                      {activity.type === "large_donation" && (
-                        <div className="w-8 h-8 rounded-full bg-success-100 flex items-center justify-center">
-                          <DollarSign className="w-4 h-4 text-success" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {campaign.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                            campaign.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
+                            campaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {campaign.status}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {campaign.progress.percentage}% of goal
+                          </span>
                         </div>
-                      )}
-                      {activity.type === "disbursement_approved" && (
-                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        </div>
-                      )}
-                      {activity.type === "goal_reached" && (
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                          <Activity className="w-4 h-4 text-purple-600" />
-                        </div>
-                      )}
-                      {activity.type === "disbursement_pending" && (
-                        <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                          <Clock className="w-4 h-4 text-warning" />
-                        </div>
-                      )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {formatRelativeTime(new Date(campaign.createdAt))}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(campaign.progress.raised * 100)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          of {formatCurrency(campaign.progress.goal * 100)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      {activity.type === "campaign_created" && (
-                        <>
-                          <p className="text-sm text-gray-900">
-                            <span className="font-semibold">{activity.user}</span>{" "}
-                            created a new campaign
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {activity.campaign}
-                          </p>
-                        </>
-                      )}
-                      {activity.type === "large_donation" && (
-                        <>
-                          <p className="text-sm text-gray-900">
-                            <span className="font-semibold">{activity.donor}</span>{" "}
-                            donated{" "}
-                            <span className="font-semibold text-success">
-                              {formatCurrency(activity.amount)}
-                            </span>
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            to {activity.campaign}
-                          </p>
-                        </>
-                      )}
-                      {activity.type === "disbursement_approved" && (
-                        <>
-                          <p className="text-sm text-gray-900">
-                            Disbursement approved for{" "}
-                            <span className="font-semibold">
-                              {formatCurrency(activity.amount)}
-                            </span>
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {activity.campaign}
-                          </p>
-                        </>
-                      )}
-                      {activity.type === "goal_reached" && (
-                        <>
-                          <p className="text-sm text-gray-900">
-                            <span className="font-semibold">{activity.campaign}</span>{" "}
-                            reached their goal!
-                          </p>
-                          <p className="text-sm text-success mt-1">
-                            {formatCurrency(activity.amount)} raised
-                          </p>
-                        </>
-                      )}
-                      {activity.type === "disbursement_pending" && (
-                        <>
-                          <p className="text-sm text-gray-900">
-                            Disbursement pending approval{" "}
-                            <span className="font-semibold">
-                              {formatCurrency(activity.amount)}
-                            </span>
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {activity.campaign}
-                          </p>
-                        </>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatRelativeTime(activity.timestamp)}
-                      </p>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No recent campaigns
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
@@ -403,49 +366,52 @@ export default function AdminOverviewPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {data.topCampaigns.map((campaign, index) => {
-                  const percentage = Math.round(
-                    (campaign.raised / campaign.goal) * 100
-                  );
-                  return (
-                    <div key={campaign.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg font-bold text-gray-400">
-                            #{index + 1}
-                          </span>
-                          <div>
+                {stats.topCampaigns && stats.topCampaigns.length > 0 ? (
+                  stats.topCampaigns.slice(0, 5).map((campaign, index) => {
+                    return (
+                      <div key={campaign.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-bold text-gray-400">
+                              #{index + 1}
+                            </span>
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {campaign.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {campaign.donationCount} donations
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
                             <p className="font-semibold text-gray-900">
-                              {campaign.name}
+                              {formatCurrency(campaign.raised * 100)}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {campaign.organization}
+                              of {formatCurrency(campaign.goal * 100)}
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">
-                            {formatCurrency(campaign.raised)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {campaign.donors} donors
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-primary rounded-full h-2 transition-all"
+                              style={{ width: `${Math.min(campaign.percentage, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-semibold text-primary">
+                            {campaign.percentage}%
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-primary rounded-full h-2 transition-all"
-                            style={{ width: `${Math.min(percentage, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-semibold text-primary">
-                          {percentage}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No active campaigns
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -462,37 +428,38 @@ export default function AdminOverviewPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {data.pendingApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <p className="font-semibold text-gray-900">
-                        {formatCurrency(approval.amount)}
+                {pendingDisbursements.length > 0 ? (
+                  pendingDisbursements.map((disbursement) => (
+                    <div
+                      key={disbursement.id}
+                      className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <p className="font-semibold text-gray-900">
+                          {formatCurrency(Number(disbursement.requestedAmount) * 100)}
+                        </p>
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                          Pending
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        {disbursement.bankingAccount.campaign.teamName} - {disbursement.bankingAccount.campaign.organizationName}
                       </p>
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                        Pending
-                      </span>
+                      <p className="text-sm text-gray-600 mb-2">{disbursement.purpose}</p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p>Requested by: {disbursement.requestedByUser.firstName} {disbursement.requestedByUser.lastName}</p>
+                        <p>{formatRelativeTime(new Date(disbursement.requestedAt))}</p>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Button size="sm" className="flex-1" asChild>
+                          <Link href={`/admin/disbursements?id=${disbursement.id}`}>
+                            Review
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">
-                      {approval.campaign}
-                    </p>
-                    <p className="text-sm text-gray-600 mb-2">{approval.purpose}</p>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>Requested by: {approval.requestedBy}</p>
-                      <p>{formatRelativeTime(approval.requestedAt)}</p>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <Button size="sm" className="flex-1" asChild>
-                        <Link href={`/admin/disbursements?id=${approval.id}`}>
-                          Review
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {data.pendingApprovals.length === 0 && (
+                  ))
+                ) : (
                   <div className="text-center py-8">
                     <CheckCircle className="w-12 h-12 text-success mx-auto mb-3" />
                     <p className="text-sm text-gray-600">
