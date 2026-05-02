@@ -17,3 +17,6 @@ STRIPE_*.md
 
 # Build artifacts
 *.log
+
+  .next/
+  boba.zip
