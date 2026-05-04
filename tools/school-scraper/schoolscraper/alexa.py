@@ -6,6 +6,8 @@ from typing import Any
 
 from .cache import Cache
 from .models import Assignment, AssessmentType
+from .quiz import QuizStore
+from .timeutil import now as tz_now, relative_phrase
 from .users import UserStore
 
 log = logging.getLogger(__name__)
@@ -13,18 +15,27 @@ log = logging.getLogger(__name__)
 
 # ---------- response builders ----------
 
-def _speak(text: str, end: bool = True) -> dict[str, Any]:
-    return {
+def _speak(
+    text: str, end: bool = True, attrs: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    resp: dict[str, Any] = {
         "version": "1.0",
         "response": {
             "outputSpeech": {"type": "PlainText", "text": text},
             "shouldEndSession": end,
         },
     }
+    if attrs is not None:
+        resp["sessionAttributes"] = attrs
+    return resp
 
 
-def _ask(prompt: str, reprompt: str | None = None) -> dict[str, Any]:
-    resp = _speak(prompt, end=False)
+def _ask(
+    prompt: str,
+    reprompt: str | None = None,
+    attrs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    resp = _speak(prompt, end=False, attrs=attrs)
     if reprompt:
         resp["response"]["reprompt"] = {
             "outputSpeech": {"type": "PlainText", "text": reprompt}
@@ -50,7 +61,6 @@ def _resolve_user(slot_value: str | None, store: UserStore) -> Any:
     user = store.get(candidate)
     if user:
         return user
-    # Allow matching by display_name (e.g., "Bob" -> bob)
     for u in store.list():
         if u.display_name.lower() == candidate or u.name == candidate:
             return u
@@ -58,18 +68,7 @@ def _resolve_user(slot_value: str | None, store: UserStore) -> Any:
 
 
 def _format_due(due: datetime | None, now: datetime) -> str:
-    if not due:
-        return "no due date"
-    delta_days = (due.date() - now.date()).days
-    if delta_days == 0:
-        return "today"
-    if delta_days == 1:
-        return "tomorrow"
-    if delta_days < 0:
-        return "past due"
-    if delta_days < 7:
-        return due.strftime("%A")
-    return due.strftime("%A, %B %d")
+    return relative_phrase(due, now)
 
 
 def _summarize(items: list[Assignment], now: datetime, limit: int = 5) -> str:
@@ -90,6 +89,8 @@ def handle_request(
     store: UserStore,
     cache: Cache,
     expected_skill_id: str = "",
+    timezone: str = "America/New_York",
+    quizzes: QuizStore | None = None,
 ) -> dict[str, Any]:
     """Parse an Alexa Skills Kit request envelope and produce a response."""
     session = body.get("session") or {}
@@ -113,21 +114,40 @@ def handle_request(
 
     intent = request.get("intent") or {}
     name = intent.get("name", "")
-    return _dispatch_intent(name, intent, store=store, cache=cache)
+    session_attrs = body.get("session", {}).get("attributes", {}) or {}
+    return _dispatch_intent(
+        name, intent, store=store, cache=cache,
+        timezone=timezone, session_attrs=session_attrs, quizzes=quizzes,
+    )
 
 
 def _dispatch_intent(
-    name: str, intent: dict[str, Any], *, store: UserStore, cache: Cache
+    name: str,
+    intent: dict[str, Any],
+    *,
+    store: UserStore,
+    cache: Cache,
+    timezone: str,
+    session_attrs: dict[str, Any],
+    quizzes: QuizStore | None,
 ) -> dict[str, Any]:
-    now = datetime.utcnow()
+    now = tz_now(timezone)
+    in_quiz = bool(session_attrs.get("quiz_active"))
+
+    if in_quiz and name in ("AMAZON.YesIntent", "AMAZON.NoIntent"):
+        return _quiz_advance(session_attrs, got_it=(name == "AMAZON.YesIntent"))
+
     if name == "AMAZON.HelpIntent":
         return _ask(
             "You can ask: what's due this week, do I have any tests tomorrow, "
-            "or what should I study tonight. If multiple students are set up, "
-            "include the name, like, what's due for Bob.",
+            "what should I study tonight, or quiz me on my next test.",
             "What would you like to know?",
         )
     if name in ("AMAZON.StopIntent", "AMAZON.CancelIntent"):
+        if in_quiz:
+            score = session_attrs.get("quiz_score", 0)
+            total = session_attrs.get("quiz_index", 0)
+            return _speak(f"Quiz ended. You got {score} out of {total}.")
         return _speak("Okay.")
     if name == "AMAZON.FallbackIntent":
         return _ask("Sorry, I didn't get that. Try asking what's due this week.")
@@ -136,6 +156,10 @@ def _dispatch_intent(
         return _intent_upcoming(intent, store, cache, now)
     if name == "NextStudyIntent":
         return _intent_next_study(intent, store, cache, now)
+    if name == "QuizMeIntent":
+        if quizzes is None:
+            return _speak("Quiz mode is not configured on this server.")
+        return _intent_quiz_me(intent, store, quizzes)
 
     log.info("Unknown intent %s", name)
     return _ask("I'm not sure how to help with that. Ask what's due this week?")
@@ -164,6 +188,78 @@ def _intent_upcoming(
     return _speak(intro + _summarize(items, now))
 
 
+def _intent_quiz_me(
+    intent: dict[str, Any], store: UserStore, quizzes: QuizStore
+) -> dict[str, Any]:
+    user = _resolve_user(_get_slot(intent, "Student"), store)
+    if user is None:
+        return _ask("Which student should I quiz?")
+    latest = quizzes.latest_for_user(user.name)
+    if not latest:
+        return _speak(
+            f"No quiz prepared for {user.display_name} yet. "
+            "Ask the server to prepare one, then try again."
+        )
+    title, course, cards = latest
+    if not cards:
+        return _speak(f"The quiz set for {user.display_name} is empty.")
+    first = cards[0]
+    attrs = {
+        "quiz_active": True,
+        "quiz_user": user.name,
+        "quiz_title": title,
+        "quiz_index": 1,
+        "quiz_total": len(cards),
+        "quiz_score": 0,
+        "quiz_pending_answer": first.answer,
+        "quiz_remaining": [
+            {"question": c.question, "answer": c.answer} for c in cards[1:]
+        ],
+    }
+    return _ask(
+        f"Quizzing {user.display_name} on {title} from {course}. "
+        f"Question 1 of {len(cards)}: {first.question} "
+        "Say your answer out loud, then say yes if you got it right, or no if not.",
+        "Did you get it right? Say yes or no.",
+        attrs=attrs,
+    )
+
+
+def _quiz_advance(attrs: dict[str, Any], *, got_it: bool) -> dict[str, Any]:
+    pending_answer = attrs.get("quiz_pending_answer", "")
+    score = int(attrs.get("quiz_score", 0)) + (1 if got_it else 0)
+    remaining = list(attrs.get("quiz_remaining", []))
+    index = int(attrs.get("quiz_index", 1))
+    total = int(attrs.get("quiz_total", 0))
+
+    feedback = ("Nice work! " if got_it else "No worries. ")
+    feedback += f"The full answer was: {pending_answer}"
+
+    if not remaining:
+        final = f" You finished with {score} out of {total}. "
+        if score == total:
+            final += "Perfect score."
+        elif score >= total * 0.7:
+            final += "Solid review."
+        else:
+            final += "Worth another pass before the test."
+        return _speak(feedback + final, attrs={})
+
+    nxt = remaining.pop(0)
+    new_attrs = dict(attrs)
+    new_attrs.update(
+        quiz_score=score,
+        quiz_index=index + 1,
+        quiz_pending_answer=nxt["answer"],
+        quiz_remaining=remaining,
+    )
+    return _ask(
+        f"{feedback} Question {index + 1} of {total}: {nxt['question']}",
+        "Say your answer, then say yes or no.",
+        attrs=new_attrs,
+    )
+
+
 def _intent_next_study(
     intent: dict[str, Any], store: UserStore, cache: Cache, now: datetime
 ) -> dict[str, Any]:
@@ -181,15 +277,6 @@ def _intent_next_study(
 
 
 def _parse_days_slot(value: str | None) -> int | None:
-    """Accept ISO-8601 duration / week-keyword from Alexa's AMAZON.DURATION
-    or AMAZON.DATE slot values.
-
-    Examples:
-      'P7D'   -> 7
-      'P1W'   -> 7
-      'today' -> 1
-      'tomorrow' -> 2
-    """
     if not value:
         return None
     v = value.lower().strip()
@@ -207,7 +294,7 @@ def _parse_days_slot(value: str | None) -> int | None:
             return int(v[1:-1])
         except ValueError:
             return None
-    if v.endswith("-w"):  # e.g., "2026-W18"
+    if v.endswith("-w"):
         return 7
     return None
 
