@@ -15,11 +15,12 @@ exposes them to **Alexa** so you can ask "what's due this week".
 - **CLI** for local sync, listing, and study-pack generation.
 - **Multi-user** profiles with per-user Schoology/PowerSchool credentials,
   encrypted at rest with a master key.
-- **Pi service** — a FastAPI app running under systemd that auto-syncs every
-  hour and exposes a small REST API.
-- **Alexa Skill** — custom skill that hits the Pi over Cloudflare Tunnel and
-  answers natural-language questions about upcoming work, plus an
-  interactive flashcard **quiz mode**.
+- **Host service** — a FastAPI app that auto-syncs every hour and exposes
+  a small REST API. Runs as a systemd service on Linux/Pi or a Task
+  Scheduler entry on Windows.
+- **Alexa Skill** — custom skill that hits your host over Cloudflare
+  Tunnel and answers natural-language questions about upcoming work, plus
+  an interactive flashcard **quiz mode**.
 - **Claude-powered study packs** — concept summaries, flashcards, and
   practice questions for any assessment.
 - **iCal feed** per user (subscribe phone/Google Calendar to it).
@@ -31,10 +32,13 @@ exposes them to **Alexa** so you can ask "what's due this week".
 
 ## Quick start (laptop, single user)
 
+On macOS / Linux:
+
 ```bash
 cd tools/school-scraper
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 playwright install chromium
 
 cp .env.example .env
@@ -43,6 +47,8 @@ schoolscraper sync
 schoolscraper list --days 14
 schoolscraper study --upcoming 1
 ```
+
+On Windows: see [Run on a Windows PC](#run-on-a-windows-pc) below.
 
 ---
 
@@ -68,7 +74,7 @@ Sync everyone:
 
 ```bash
 schoolscraper sync --all
-schoolscraper status                         # last sync per user, errors
+schoolscraper status
 schoolscraper list --user bob --days 7
 schoolscraper study --user bob --upcoming 1
 ```
@@ -80,8 +86,8 @@ master key means re-entering credentials.
 
 ## Run on a Raspberry Pi
 
-Tested on Raspberry Pi 4 / 5 with Raspberry Pi OS (64-bit). For 32-bit OSes
-adjust the cloudflared download URL.
+Tested on Raspberry Pi 4 / 5 with Raspberry Pi OS (64-bit). For 32-bit
+OSes adjust the cloudflared download URL.
 
 ```bash
 # On the Pi:
@@ -99,8 +105,74 @@ The installer:
 - Installs and enables the `schoolscraper.service` systemd unit.
 
 The service auto-syncs every `SCHOOLSCRAPER_SYNC_MINUTES` (default 60).
-If `NOTIFY_ME_ACCESS_CODE` is set it also pushes a daily digest at
-`SCHOOLSCRAPER_DIGEST_HOUR` (default 7am, in `SCHOOLSCRAPER_TIMEZONE`).
+
+## Run on a Windows PC
+
+Fully supported — host the service on your normal Windows machine instead
+of a Pi. Open PowerShell:
+
+```powershell
+cd $HOME
+git clone https://github.com/RHellwig2011/rally.git
+cd rally
+git checkout claude/school-scraper-study-tool-Uv1QN
+cd tools\school-scraper
+
+# One-time: allow local PowerShell scripts to run
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+# Install (creates venv, installs deps, generates a master key)
+.\deploy\windows-install.ps1
+```
+
+Edit `.env` (it'll open in Notepad with `notepad .env`) and add:
+
+- `ANTHROPIC_API_KEY=sk-ant-...` (from <https://console.anthropic.com/settings/keys>)
+- Optionally `ALEXA_SKILL_ID` (after you create the skill)
+- Optionally `NOTIFY_ME_ACCESS_CODE` (for daily Alexa announcements)
+
+Then add a student and try a sync:
+
+```powershell
+.\.venv\Scripts\schoolscraper.exe users add bob
+.\.venv\Scripts\schoolscraper.exe sync --user bob
+.\.venv\Scripts\schoolscraper.exe list --user bob
+.\.venv\Scripts\schoolscraper.exe study --user bob --upcoming 1
+```
+
+To run the server (so the iCal feed and Alexa endpoint work):
+
+```powershell
+.\.venv\Scripts\schoolscraper.exe serve
+```
+
+### Auto-start at logon
+
+To have the server start whenever you sign in, re-run the installer with
+`-RegisterTask`:
+
+```powershell
+.\deploy\windows-install.ps1 -RegisterTask
+Start-ScheduledTask -TaskName schoolscraper
+```
+
+This registers a Task Scheduler entry. To stop or remove it:
+
+```powershell
+Stop-ScheduledTask -TaskName schoolscraper
+Unregister-ScheduledTask -TaskName schoolscraper -Confirm:$false
+```
+
+> **Note**: A Task Scheduler entry runs as your Windows user when you're
+> logged in. If you want it to keep running even when you're signed out
+> (or before any user signs in), use the **NSSM** (Non-Sucking Service
+> Manager) approach instead — see <https://nssm.cc/>.
+
+### Cloudflare Tunnel on Windows
+
+For Alexa to reach your PC, set up a Cloudflare Tunnel. See
+[`deploy/CLOUDFLARE_TUNNEL.md`](deploy/CLOUDFLARE_TUNNEL.md) — it has a
+Windows section.
 
 ### REST API
 
@@ -132,14 +204,15 @@ put it behind Cloudflare Access if you need it locked down.
                                      |
                             Cloudflare Tunnel
                                      |
-                                  [ Pi:8765 ]
+                          [ Pi or Windows PC :8765 ]
 ```
 
-1. Set up a Cloudflare Tunnel to your Pi — see
+1. Set up a Cloudflare Tunnel to your host — see
    [`deploy/CLOUDFLARE_TUNNEL.md`](deploy/CLOUDFLARE_TUNNEL.md).
 2. Create the skill in the Alexa Developer Console — see
    [`alexa-skill/README.md`](alexa-skill/README.md).
-3. Paste the skill ID into `/etc/schoolscraper/schoolscraper.env` and restart.
+3. Paste the skill ID into your `.env` (or `/etc/schoolscraper/schoolscraper.env`
+   on Linux) and restart the service.
 
 Try it:
 
@@ -167,7 +240,7 @@ it tracks your score across the deck.
 ### Daily morning digest
 
 If you set `NOTIFY_ME_ACCESS_CODE` (free skill, register at
-<https://www.thomptronics.com/notify-me>), the Pi pushes a once-a-day
+<https://www.thomptronics.com/notify-me>), the host pushes a once-a-day
 digest to Alexa at `SCHOOLSCRAPER_DIGEST_HOUR`:
 
 > "Good morning, Bob! Heads up: you have a test today — Cell Bio Test in
@@ -201,6 +274,7 @@ Or export to a file: `schoolscraper ical --user bob -o bob.ics`.
 
 - **Submit answers to graded assignments.** That's cheating, full stop.
 - **Bypass test lockdown browsers** or proctoring software.
+- **"Humanize" AI output to defeat detection.** Same reason.
 - **Pull material a student doesn't already have access to** — it logs in
   as them, so it sees only what they'd see in a browser.
 
