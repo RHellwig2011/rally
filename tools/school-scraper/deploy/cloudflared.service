@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Tunnel for schoolscraper
+After=network-online.target schoolscraper.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cloudflared
+Group=cloudflared
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+EnvironmentFile=/etc/schoolscraper/cloudflared.env
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

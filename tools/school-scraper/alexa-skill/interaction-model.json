@@ -1,0 +1,61 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "study buddy",
+      "intents": [
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        {
+          "name": "UpcomingWorkIntent",
+          "slots": [
+            { "name": "Student", "type": "StudentName" },
+            { "name": "DateRange", "type": "AMAZON.DURATION" },
+            { "name": "WorkType", "type": "WorkType" }
+          ],
+          "samples": [
+            "what's due",
+            "what's due this week",
+            "what's due for {Student}",
+            "what's due for {Student} this week",
+            "what {WorkType} does {Student} have",
+            "do I have any {WorkType} tomorrow",
+            "what tests does {Student} have this week",
+            "what's coming up in the next {DateRange}"
+          ]
+        },
+        {
+          "name": "NextStudyIntent",
+          "slots": [
+            { "name": "Student", "type": "StudentName" }
+          ],
+          "samples": [
+            "what should I study",
+            "what should {Student} study",
+            "what's the next test",
+            "what's {Student}'s next test"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "StudentName",
+          "values": [
+            { "name": { "value": "Bob", "synonyms": ["bob"] } },
+            { "name": { "value": "Alice", "synonyms": ["alice"] } }
+          ]
+        },
+        {
+          "name": "WorkType",
+          "values": [
+            { "name": { "value": "test", "synonyms": ["exam", "tests", "exams"] } },
+            { "name": { "value": "quiz", "synonyms": ["quizzes"] } },
+            { "name": { "value": "assignment", "synonyms": ["homework", "assignments"] } },
+            { "name": { "value": "project", "synonyms": ["projects"] } }
+          ]
+        }
+      ]
+    }
+  }
+}
