@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
@@ -9,16 +10,21 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .aggregator import merge
-from .cache import Cache
+from .cache import DEFAULT_USER, Cache
 from .config import load_config
+from .crypto import Vault
 from .models import Assignment, AssessmentType
 from .study import StudyHelper
+from .sync_runner import sync_user
+from .users import UserStore
 
 app = typer.Typer(
     add_completion=False,
     help="Scrape Schoology and PowerSchool, see what's due, and generate study material.",
 )
+users_app = typer.Typer(help="Manage student profiles for multi-user mode.")
+app.add_typer(users_app, name="users")
+
 console = Console()
 log = logging.getLogger("schoolscraper")
 
@@ -31,18 +37,49 @@ def _root(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
     )
 
 
+def _open_user_store() -> UserStore | None:
+    cfg = load_config()
+    if not cfg.master_key:
+        return None
+    return UserStore(cfg.cache_path, Vault(cfg.master_key))
+
+
+# ---------------- single-user / fallback commands ----------------
+
 @app.command()
 def sync(
-    schoology_only: bool = typer.Option(False, "--schoology-only"),
-    powerschool_only: bool = typer.Option(False, "--powerschool-only"),
+    user: Optional[str] = typer.Option(None, "--user", "-u", help="Sync only this user"),
+    all_users: bool = typer.Option(False, "--all", help="Sync every registered user"),
     headed: bool = typer.Option(False, "--headed", help="Show the browser for PowerSchool"),
 ) -> None:
-    """Pull the latest assignments from configured sources into the local cache."""
+    """Pull the latest assignments. Defaults to env-based single-user mode
+    unless --user or --all is given."""
     cfg = load_config()
     cache = Cache(cfg.cache_path)
-    fetched: list[Assignment] = []
+    store = _open_user_store()
 
-    if not powerschool_only and cfg.schoology.configured:
+    if all_users or user:
+        if store is None:
+            console.print("[red]SCHOOLSCRAPER_MASTER_KEY required for multi-user sync.[/red]")
+            raise typer.Exit(1)
+        targets = [u for u in store.list() if not user or u.name == user]
+        if not targets:
+            console.print("[yellow]No matching users.[/yellow]")
+            raise typer.Exit(0)
+        for u in targets:
+            console.print(f"[cyan]Syncing[/cyan] {u.display_name}...")
+            r = sync_user(u, cache, headless=not headed)
+            color = "green" if not r.errors else "yellow"
+            console.print(f"  [{color}]fetched={r.fetched} deduped={r.deduped} errors={len(r.errors)}[/{color}]")
+            for err in r.errors:
+                console.print(f"    [red]{err}[/red]")
+        return
+
+    # Single-user fallback (uses .env)
+    from .aggregator import merge as _merge
+
+    fetched: list[Assignment] = []
+    if cfg.schoology.configured:
         from .sources.schoology import SchoologyClient
 
         console.print("[cyan]Fetching Schoology...[/cyan]")
@@ -50,10 +87,7 @@ def sync(
             fetched.extend(SchoologyClient(cfg.schoology).fetch())
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]Schoology fetch failed:[/red] {e}")
-    elif not powerschool_only:
-        console.print("[yellow]Schoology not configured; skipping.[/yellow]")
-
-    if not schoology_only and cfg.powerschool.configured:
+    if cfg.powerschool.configured:
         from .sources.powerschool import PowerSchoolClient
 
         console.print("[cyan]Fetching PowerSchool...[/cyan]")
@@ -61,17 +95,16 @@ def sync(
             fetched.extend(PowerSchoolClient(cfg.powerschool, headless=not headed).fetch())
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]PowerSchool fetch failed:[/red] {e}")
-    elif not schoology_only:
-        console.print("[yellow]PowerSchool not configured; skipping.[/yellow]")
 
-    merged = merge(fetched)
-    n = cache.upsert_many(merged)
+    merged = _merge(fetched)
+    n = cache.upsert_many(merged, user=DEFAULT_USER)
     console.print(f"[green]Synced {n} assignments[/green] ({len(fetched)} raw -> {len(merged)} after dedup).")
 
 
 @app.command("list")
 def list_cmd(
-    days: int = typer.Option(14, "--days", "-d", help="Show items due within this many days."),
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    days: int = typer.Option(14, "--days", "-d"),
     type_filter: Optional[str] = typer.Option(None, "--type", "-t", help="test|quiz|assignment|project"),
     include_past: bool = typer.Option(False, "--include-past"),
 ) -> None:
@@ -80,23 +113,27 @@ def list_cmd(
     cache = Cache(cfg.cache_path)
     type_arg = AssessmentType(type_filter) if type_filter else None
     now = datetime.utcnow()
+    target = user or DEFAULT_USER
     items = cache.list(
+        user=target,
         type_filter=type_arg,
         since=None if include_past else now - timedelta(hours=12),
         until=now + timedelta(days=days),
     )
     if not items:
-        console.print("[yellow]Nothing in cache for that window. Try `schoolscraper sync` first.[/yellow]")
+        console.print(
+            f"[yellow]Nothing in cache for user '{target}' in that window. "
+            "Try `schoolscraper sync` first.[/yellow]"
+        )
         raise typer.Exit(0)
     _print_table(items, now)
 
 
 @app.command()
 def study(
-    assignment: Optional[str] = typer.Argument(
-        None, help="Dedup key (first column of `list`) of a specific assignment."
-    ),
-    upcoming: int = typer.Option(0, "--upcoming", "-n", help="Generate packs for the next N items."),
+    assignment: Optional[str] = typer.Argument(None),
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    upcoming: int = typer.Option(0, "--upcoming", "-n"),
 ) -> None:
     """Generate a study pack: summary, flashcards, and practice questions."""
     cfg = load_config()
@@ -105,20 +142,21 @@ def study(
         raise typer.Exit(1)
     cache = Cache(cfg.cache_path)
     helper = StudyHelper(cfg.study)
+    target = user or DEFAULT_USER
 
     targets: list[Assignment]
     if assignment:
-        a = cache.get(assignment)
+        a = cache.get(assignment, user=target)
         if not a:
-            console.print(f"[red]No assignment with key {assignment}.[/red]")
+            console.print(f"[red]No assignment with key {assignment} for user {target}.[/red]")
             raise typer.Exit(1)
         targets = [a]
     else:
         n = max(upcoming, 1)
-        items = cache.list(since=datetime.utcnow() - timedelta(hours=12))
+        items = cache.list(user=target, since=datetime.utcnow() - timedelta(hours=12))
         targets = items[:n]
         if not targets:
-            console.print("[yellow]Nothing upcoming in cache.[/yellow]")
+            console.print(f"[yellow]Nothing upcoming in cache for {target}.[/yellow]")
             raise typer.Exit(0)
 
     for a in targets:
@@ -129,6 +167,179 @@ def study(
         console.print(Panel(pack.flashcards, title="Flashcards", border_style="green"))
         console.print(Panel(pack.practice_questions, title="Practice Questions", border_style="magenta"))
 
+
+# ---------------- multi-user commands ----------------
+
+@users_app.command("add")
+def users_add(
+    name: str = typer.Argument(..., help="Short name used by Alexa, e.g. 'bob'"),
+    display_name: str = typer.Option("", "--display-name"),
+    schoology_key: str = typer.Option("", "--schoology-key", help="Consumer key"),
+    schoology_secret: str = typer.Option("", "--schoology-secret", help="Consumer secret"),
+    schoology_domain: str = typer.Option("https://app.schoology.com", "--schoology-domain"),
+    schoology_uid: str = typer.Option("me", "--schoology-uid"),
+    powerschool_url: str = typer.Option("", "--powerschool-url"),
+    powerschool_user: str = typer.Option("", "--powerschool-user"),
+    powerschool_pass: str = typer.Option("", "--powerschool-pass"),
+    powerschool_login: str = typer.Option("form", "--powerschool-login", help="form|sso_google"),
+    interactive: bool = typer.Option(True, "--interactive/--no-interactive"),
+) -> None:
+    """Register a new student profile. Credentials are encrypted at rest."""
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY must be set in .env first.[/red]")
+        raise typer.Exit(1)
+
+    if interactive:
+        display_name = display_name or typer.prompt("Display name (spoken by Alexa)", default=name.title())
+        if not schoology_key:
+            schoology_key = typer.prompt("Schoology consumer key (blank to skip)", default="", show_default=False)
+        if schoology_key and not schoology_secret:
+            schoology_secret = typer.prompt("Schoology consumer secret", hide_input=True)
+        if not powerschool_url:
+            powerschool_url = typer.prompt("PowerSchool URL (blank to skip)", default="", show_default=False)
+        if powerschool_url and not powerschool_user:
+            powerschool_user = typer.prompt("PowerSchool username")
+        if powerschool_url and not powerschool_pass:
+            powerschool_pass = typer.prompt("PowerSchool password", hide_input=True)
+
+    store.upsert(
+        name=name,
+        display_name=display_name or name.title(),
+        schoology_consumer_key=schoology_key,
+        schoology_consumer_secret=schoology_secret,
+        schoology_domain=schoology_domain,
+        schoology_user_id=schoology_uid,
+        powerschool_url=powerschool_url,
+        powerschool_username=powerschool_user,
+        powerschool_password=powerschool_pass,
+        powerschool_login_mode=powerschool_login,
+    )
+    console.print(f"[green]Saved user {name}.[/green]")
+
+
+@users_app.command("list")
+def users_list() -> None:
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    users = store.list()
+    if not users:
+        console.print("[yellow]No users registered yet. Run `schoolscraper users add <name>`.[/yellow]")
+        return
+    table = Table(header_style="bold")
+    table.add_column("name")
+    table.add_column("display name")
+    table.add_column("schoology")
+    table.add_column("powerschool")
+    for u in users:
+        table.add_row(
+            u.name,
+            u.display_name,
+            "yes" if u.schoology_config().configured else "—",
+            "yes" if u.powerschool_config().configured else "—",
+        )
+    console.print(table)
+
+
+@users_app.command("remove")
+def users_remove(name: str = typer.Argument(...)) -> None:
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    if store.remove(name):
+        console.print(f"[green]Removed {name}.[/green]")
+    else:
+        console.print(f"[yellow]No user named {name}.[/yellow]")
+
+
+# ---------------- server / Alexa ----------------
+
+@app.command()
+def serve() -> None:
+    """Run the FastAPI service (used by the Pi systemd unit)."""
+    from .server import run
+
+    cfg = load_config()
+    run(cfg)
+
+
+@app.command("alexa-model")
+def alexa_model() -> None:
+    """Print the Alexa interaction model JSON, with the {Student} slot type
+    populated from the registered users. Paste into the Alexa Developer
+    Console -> JSON Editor."""
+    store = _open_user_store()
+    user_values: list[dict] = []
+    if store is not None:
+        for u in store.list():
+            user_values.append(
+                {
+                    "name": {"value": u.display_name, "synonyms": [u.name]},
+                }
+            )
+    if not user_values:
+        user_values = [{"name": {"value": "Student"}}]
+
+    model = {
+        "interactionModel": {
+            "languageModel": {
+                "invocationName": "study buddy",
+                "intents": [
+                    {"name": "AMAZON.HelpIntent", "samples": []},
+                    {"name": "AMAZON.StopIntent", "samples": []},
+                    {"name": "AMAZON.CancelIntent", "samples": []},
+                    {"name": "AMAZON.FallbackIntent", "samples": []},
+                    {
+                        "name": "UpcomingWorkIntent",
+                        "slots": [
+                            {"name": "Student", "type": "StudentName"},
+                            {"name": "DateRange", "type": "AMAZON.DURATION"},
+                            {"name": "WorkType", "type": "WorkType"},
+                        ],
+                        "samples": [
+                            "what's due",
+                            "what's due this week",
+                            "what's due for {Student}",
+                            "what's due for {Student} this week",
+                            "what {WorkType} does {Student} have",
+                            "do I have any {WorkType} tomorrow",
+                            "what tests does {Student} have this week",
+                            "what's coming up in the next {DateRange}",
+                        ],
+                    },
+                    {
+                        "name": "NextStudyIntent",
+                        "slots": [{"name": "Student", "type": "StudentName"}],
+                        "samples": [
+                            "what should I study",
+                            "what should {Student} study",
+                            "what's the next test",
+                            "what's {Student}'s next test",
+                        ],
+                    },
+                ],
+                "types": [
+                    {"name": "StudentName", "values": user_values},
+                    {
+                        "name": "WorkType",
+                        "values": [
+                            {"name": {"value": "test", "synonyms": ["exam", "tests", "exams"]}},
+                            {"name": {"value": "quiz", "synonyms": ["quizzes"]}},
+                            {"name": {"value": "assignment", "synonyms": ["homework", "assignments"]}},
+                            {"name": {"value": "project", "synonyms": ["projects"]}},
+                        ],
+                    },
+                ],
+            }
+        }
+    }
+    typer.echo(json.dumps(model, indent=2))
+
+
+# ---------------- helpers ----------------
 
 def _print_table(items: list[Assignment], now: datetime) -> None:
     table = Table(show_lines=False, header_style="bold")
