@@ -42,11 +42,22 @@ class StudyConfig:
 
 
 @dataclass(frozen=True)
+class ServerConfig:
+    host: str
+    port: int
+    sync_interval_minutes: int
+    alexa_skill_id: str
+    api_token: str  # shared secret for non-Alexa REST calls
+
+
+@dataclass(frozen=True)
 class AppConfig:
     schoology: SchoologyConfig
     powerschool: PowerSchoolConfig
     study: StudyConfig
+    server: ServerConfig
     cache_path: str
+    master_key: str
 
 
 def load_config(env_file: Optional[str] = None) -> AppConfig:
@@ -68,5 +79,13 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
             api_key=os.getenv("ANTHROPIC_API_KEY", ""),
             model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
         ),
+        server=ServerConfig(
+            host=os.getenv("SCHOOLSCRAPER_HOST", "0.0.0.0"),
+            port=int(os.getenv("SCHOOLSCRAPER_PORT", "8765")),
+            sync_interval_minutes=int(os.getenv("SCHOOLSCRAPER_SYNC_MINUTES", "60")),
+            alexa_skill_id=os.getenv("ALEXA_SKILL_ID", ""),
+            api_token=os.getenv("SCHOOLSCRAPER_API_TOKEN", ""),
+        ),
         cache_path=os.getenv("SCHOOLSCRAPER_CACHE_PATH", ".schoolscraper.db"),
+        master_key=os.getenv("SCHOOLSCRAPER_MASTER_KEY", ""),
     )

@@ -6,12 +6,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Iterable, Iterator
 
-from .models import Assignment, AssessmentType, Source
+from .models import Assignment, AssessmentType
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS assignments (
-    dedup_key   TEXT PRIMARY KEY,
+    user        TEXT NOT NULL,
+    dedup_key   TEXT NOT NULL,
     id          TEXT NOT NULL,
     source      TEXT NOT NULL,
     title       TEXT NOT NULL,
@@ -22,11 +23,14 @@ CREATE TABLE IF NOT EXISTS assignments (
     url         TEXT,
     points      REAL,
     fetched_at  TEXT NOT NULL,
-    raw         TEXT
+    raw         TEXT,
+    PRIMARY KEY (user, dedup_key)
 );
-CREATE INDEX IF NOT EXISTS idx_due ON assignments(due);
-CREATE INDEX IF NOT EXISTS idx_type ON assignments(type);
+CREATE INDEX IF NOT EXISTS idx_user_due ON assignments(user, due);
+CREATE INDEX IF NOT EXISTS idx_user_type ON assignments(user, type);
 """
+
+DEFAULT_USER = "_default"
 
 
 class Cache:
@@ -45,9 +49,10 @@ class Cache:
         finally:
             conn.close()
 
-    def upsert_many(self, assignments: Iterable[Assignment]) -> int:
+    def upsert_many(self, assignments: Iterable[Assignment], *, user: str = DEFAULT_USER) -> int:
         rows = [
             (
+                user,
                 a.dedup_key(),
                 a.id,
                 a.source.value,
@@ -69,10 +74,10 @@ class Cache:
             c.executemany(
                 """
                 INSERT INTO assignments
-                    (dedup_key, id, source, title, course, type, due,
+                    (user, dedup_key, id, source, title, course, type, due,
                      description, url, points, fetched_at, raw)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(dedup_key) DO UPDATE SET
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user, dedup_key) DO UPDATE SET
                     id=excluded.id,
                     source=excluded.source,
                     title=excluded.title,
@@ -89,15 +94,22 @@ class Cache:
             )
         return len(rows)
 
+    def replace_for_user(self, user: str, assignments: Iterable[Assignment]) -> int:
+        """Replace the cache for a single user atomically."""
+        with self._conn() as c:
+            c.execute("DELETE FROM assignments WHERE user = ?", (user,))
+        return self.upsert_many(assignments, user=user)
+
     def list(
         self,
         *,
+        user: str = DEFAULT_USER,
         type_filter: AssessmentType | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
     ) -> list[Assignment]:
-        sql = "SELECT raw FROM assignments WHERE 1=1"
-        params: list[object] = []
+        sql = "SELECT raw FROM assignments WHERE user = ?"
+        params: list[object] = [user]
         if type_filter is not None:
             sql += " AND type = ?"
             params.append(type_filter.value)
@@ -112,9 +124,10 @@ class Cache:
             rows = c.execute(sql, params).fetchall()
         return [Assignment.model_validate_json(r["raw"]) for r in rows]
 
-    def get(self, dedup_key: str) -> Assignment | None:
+    def get(self, dedup_key: str, *, user: str = DEFAULT_USER) -> Assignment | None:
         with self._conn() as c:
             row = c.execute(
-                "SELECT raw FROM assignments WHERE dedup_key = ?", (dedup_key,)
+                "SELECT raw FROM assignments WHERE user = ? AND dedup_key = ?",
+                (user, dedup_key),
             ).fetchone()
         return Assignment.model_validate_json(row["raw"]) if row else None
