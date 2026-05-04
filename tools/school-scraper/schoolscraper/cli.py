@@ -13,7 +13,10 @@ from rich.table import Table
 from .cache import DEFAULT_USER, Cache
 from .config import load_config
 from .crypto import Vault
+from .history import History
+from .ical import render as ical_render
 from .models import Assignment, AssessmentType
+from .quiz import QuizStore, prepare_quiz as _prepare_quiz
 from .study import StudyHelper
 from .sync_runner import sync_user
 from .users import UserStore
@@ -44,8 +47,6 @@ def _open_user_store() -> UserStore | None:
     return UserStore(cfg.cache_path, Vault(cfg.master_key))
 
 
-# ---------------- single-user / fallback commands ----------------
-
 @app.command()
 def sync(
     user: Optional[str] = typer.Option(None, "--user", "-u", help="Sync only this user"),
@@ -56,6 +57,7 @@ def sync(
     unless --user or --all is given."""
     cfg = load_config()
     cache = Cache(cfg.cache_path)
+    history = History(cfg.cache_path)
     store = _open_user_store()
 
     if all_users or user:
@@ -68,14 +70,13 @@ def sync(
             raise typer.Exit(0)
         for u in targets:
             console.print(f"[cyan]Syncing[/cyan] {u.display_name}...")
-            r = sync_user(u, cache, headless=not headed)
+            r = sync_user(u, cache, headless=not headed, history=history)
             color = "green" if not r.errors else "yellow"
             console.print(f"  [{color}]fetched={r.fetched} deduped={r.deduped} errors={len(r.errors)}[/{color}]")
             for err in r.errors:
                 console.print(f"    [red]{err}[/red]")
         return
 
-    # Single-user fallback (uses .env)
     from .aggregator import merge as _merge
 
     fetched: list[Assignment] = []
@@ -168,8 +169,6 @@ def study(
         console.print(Panel(pack.practice_questions, title="Practice Questions", border_style="magenta"))
 
 
-# ---------------- multi-user commands ----------------
-
 @users_app.command("add")
 def users_add(
     name: str = typer.Argument(..., help="Short name used by Alexa, e.g. 'bob'"),
@@ -243,6 +242,43 @@ def users_list() -> None:
     console.print(table)
 
 
+@users_app.command("update")
+def users_update(
+    name: str = typer.Argument(...),
+    display_name: str = typer.Option("", "--display-name"),
+    schoology_key: str = typer.Option("", "--schoology-key"),
+    schoology_secret: str = typer.Option("", "--schoology-secret"),
+    schoology_domain: str = typer.Option("", "--schoology-domain"),
+    schoology_uid: str = typer.Option("", "--schoology-uid"),
+    powerschool_url: str = typer.Option("", "--powerschool-url"),
+    powerschool_user: str = typer.Option("", "--powerschool-user"),
+    powerschool_pass: str = typer.Option("", "--powerschool-pass"),
+    powerschool_login: str = typer.Option("", "--powerschool-login"),
+) -> None:
+    """Update only the fields you pass; everything else stays as-is."""
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    existing = store.get(name)
+    if existing is None:
+        console.print(f"[red]No user named {name}.[/red]")
+        raise typer.Exit(1)
+    store.upsert(
+        name=existing.name,
+        display_name=display_name or existing.display_name,
+        schoology_consumer_key=schoology_key or existing.schoology_consumer_key,
+        schoology_consumer_secret=schoology_secret or existing.schoology_consumer_secret,
+        schoology_domain=schoology_domain or existing.schoology_domain,
+        schoology_user_id=schoology_uid or existing.schoology_user_id,
+        powerschool_url=powerschool_url or existing.powerschool_url,
+        powerschool_username=powerschool_user or existing.powerschool_username,
+        powerschool_password=powerschool_pass or existing.powerschool_password,
+        powerschool_login_mode=powerschool_login or existing.powerschool_login_mode,
+    )
+    console.print(f"[green]Updated {existing.name}.[/green]")
+
+
 @users_app.command("remove")
 def users_remove(name: str = typer.Argument(...)) -> None:
     store = _open_user_store()
@@ -255,7 +291,121 @@ def users_remove(name: str = typer.Argument(...)) -> None:
         console.print(f"[yellow]No user named {name}.[/yellow]")
 
 
-# ---------------- server / Alexa ----------------
+@app.command()
+def status() -> None:
+    """Show last sync time, item count, and any errors per user."""
+    cfg = load_config()
+    history = History(cfg.cache_path)
+    cache = Cache(cfg.cache_path)
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    latest = history.latest_per_user()
+    table = Table(header_style="bold")
+    table.add_column("user")
+    table.add_column("last sync")
+    table.add_column("ok")
+    table.add_column("items")
+    table.add_column("errors")
+    for u in store.list():
+        ev = latest.get(u.name)
+        items = len(cache.list(user=u.name))
+        if ev is None:
+            table.add_row(u.name, "—", "—", str(items), "")
+            continue
+        ok = "[green]yes[/green]" if ev.ok else "[red]no[/red]"
+        errs = "; ".join(ev.errors) if ev.errors else ""
+        table.add_row(
+            u.name,
+            ev.finished_at.strftime("%Y-%m-%d %H:%M"),
+            ok, str(items), errs,
+        )
+    console.print(table)
+
+
+@app.command()
+def ical(
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Write to file instead of stdout"),
+) -> None:
+    """Export upcoming work as an iCalendar (.ics) feed."""
+    cfg = load_config()
+    cache = Cache(cfg.cache_path)
+    target = user or DEFAULT_USER
+    items = cache.list(user=target)
+    label = target if target != DEFAULT_USER else "School"
+    ics = ical_render(items, user=target, calendar_name=f"School ({label})")
+    if output:
+        from pathlib import Path
+
+        Path(output).write_text(ics, encoding="utf-8")
+        console.print(f"[green]Wrote {len(items)} events to {output}[/green]")
+    else:
+        typer.echo(ics)
+
+
+@app.command("prepare-quiz")
+def prepare_quiz_cmd(
+    assignment: str = typer.Argument(..., help="Dedup key from `list`"),
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+) -> None:
+    """Pre-generate flashcards for an assessment so Alexa can quiz on it."""
+    cfg = load_config()
+    if not cfg.study.configured:
+        console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+        raise typer.Exit(1)
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    user_obj = store.get(user) if user else None
+    if user_obj is None:
+        console.print(f"[red]Unknown user {user}.[/red]")
+        raise typer.Exit(1)
+    helper = StudyHelper(cfg.study)
+    cache = Cache(cfg.cache_path)
+    quizzes = QuizStore(cfg.cache_path)
+    with console.status("Generating flashcards..."):
+        n = _prepare_quiz(
+            user=user_obj, dedup_key=assignment,
+            assignments=cache, quizzes=quizzes, helper=helper,
+        )
+    console.print(f"[green]Cached {n} flashcards for {user_obj.display_name}.[/green]")
+
+
+@app.command()
+def digest(
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    dry_run: bool = typer.Option(True, "--dry-run/--send", help="Preview text without sending"),
+) -> None:
+    """Build today's Notify Me digest. Use --send to actually push to Alexa."""
+    from .notify import send_daily_digest
+
+    cfg = load_config()
+    cache = Cache(cfg.cache_path)
+    store = _open_user_store()
+    if store is None:
+        console.print("[red]SCHOOLSCRAPER_MASTER_KEY not set.[/red]")
+        raise typer.Exit(1)
+    if not dry_run and not cfg.server.notify_me_access_code:
+        console.print("[red]NOTIFY_ME_ACCESS_CODE required to actually send.[/red]")
+        raise typer.Exit(1)
+
+    targets = [store.get(user)] if user else store.list()
+    targets = [u for u in targets if u]
+    if not targets:
+        console.print("[yellow]No users.[/yellow]")
+        raise typer.Exit(0)
+    for u in targets:
+        text = send_daily_digest(
+            user=u, cache=cache,
+            timezone=cfg.server.timezone,
+            access_code=cfg.server.notify_me_access_code,
+            dry_run=dry_run,
+        )
+        console.print(f"[bold]{u.display_name}:[/bold] {text or '(empty digest, skipped)'}")
+
 
 @app.command()
 def serve() -> None:
@@ -276,9 +426,7 @@ def alexa_model() -> None:
     if store is not None:
         for u in store.list():
             user_values.append(
-                {
-                    "name": {"value": u.display_name, "synonyms": [u.name]},
-                }
+                {"name": {"value": u.display_name, "synonyms": [u.name]}}
             )
     if not user_values:
         user_values = [{"name": {"value": "Student"}}]
@@ -292,6 +440,17 @@ def alexa_model() -> None:
                     {"name": "AMAZON.StopIntent", "samples": []},
                     {"name": "AMAZON.CancelIntent", "samples": []},
                     {"name": "AMAZON.FallbackIntent", "samples": []},
+                    {"name": "AMAZON.YesIntent", "samples": []},
+                    {"name": "AMAZON.NoIntent", "samples": []},
+                    {
+                        "name": "QuizMeIntent",
+                        "slots": [{"name": "Student", "type": "StudentName"}],
+                        "samples": [
+                            "quiz me", "quiz {Student}",
+                            "quiz me on my next test", "start a quiz",
+                            "start a quiz for {Student}", "test me",
+                        ],
+                    },
                     {
                         "name": "UpcomingWorkIntent",
                         "slots": [
@@ -300,8 +459,7 @@ def alexa_model() -> None:
                             {"name": "WorkType", "type": "WorkType"},
                         ],
                         "samples": [
-                            "what's due",
-                            "what's due this week",
+                            "what's due", "what's due this week",
                             "what's due for {Student}",
                             "what's due for {Student} this week",
                             "what {WorkType} does {Student} have",
@@ -339,8 +497,6 @@ def alexa_model() -> None:
     typer.echo(json.dumps(model, indent=2))
 
 
-# ---------------- helpers ----------------
-
 def _print_table(items: list[Assignment], now: datetime) -> None:
     table = Table(show_lines=False, header_style="bold")
     table.add_column("key", style="dim", no_wrap=True)
@@ -354,9 +510,7 @@ def _print_table(items: list[Assignment], now: datetime) -> None:
         table.add_row(
             a.dedup_key(),
             f"[{urgency}]{due_str}[/{urgency}]",
-            a.type.value,
-            a.course,
-            a.title,
+            a.type.value, a.course, a.title,
         )
     console.print(table)
 

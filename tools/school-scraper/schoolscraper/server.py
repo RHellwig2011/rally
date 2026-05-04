@@ -5,12 +5,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import PlainTextResponse, Response
 
 from . import alexa as alexa_handler
+from . import ical as ical_renderer
 from .cache import Cache
 from .config import AppConfig
 from .crypto import Vault
+from .history import History
 from .models import AssessmentType
+from .quiz import QuizStore, prepare_quiz
 from .scheduler import start_scheduler
 from .study import StudyHelper
 from .sync_runner import sync_user
@@ -20,36 +24,33 @@ log = logging.getLogger(__name__)
 
 
 def _verify_alexa_request(request: Request, body: bytes) -> None:
-    """Verify an Alexa-signed request.
-
-    Uses ask-sdk-webservice-support's verifiers when available. Falls back to
-    skill-id and timestamp checks only (acceptable when the Pi is behind
-    Cloudflare Access restricted to Alexa's IP space).
-    """
+    """Verify an Alexa-signed request when ask-sdk-webservice-support is
+    available; otherwise rely on the in-app skill-id check."""
     try:
         from ask_sdk_webservice_support.verifier import (
-            RequestVerifier,
-            TimestampVerifier,
+            RequestVerifier, TimestampVerifier,
         )
     except Exception:
-        return  # library not installed; skip strict verification
+        return
 
     sig_chain = request.headers.get("SignatureCertChainUrl") or request.headers.get(
         "signaturecertchainurl"
     )
     sig = request.headers.get("Signature") or request.headers.get("signature")
     if not sig_chain or not sig:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Alexa signature headers")
-
-    headers = {
-        "SignatureCertChainUrl": sig_chain,
-        "Signature": sig,
-    }
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing Alexa signature headers",
+        )
+    headers = {"SignatureCertChainUrl": sig_chain, "Signature": sig}
     try:
         TimestampVerifier().verify(body.decode(), headers)
         RequestVerifier().verify(body.decode(), headers)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Alexa verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Alexa verification failed: {e}",
+        )
 
 
 def create_app(config: AppConfig) -> FastAPI:
@@ -61,17 +62,25 @@ def create_app(config: AppConfig) -> FastAPI:
     vault = Vault(config.master_key)
     user_store = UserStore(config.cache_path, vault)
     cache = Cache(config.cache_path)
+    history = History(config.cache_path)
+    quizzes = QuizStore(config.cache_path)
 
-    app = FastAPI(title="schoolscraper", version="0.2.0")
+    app = FastAPI(title="schoolscraper", version="0.3.0")
     app.state.config = config
     app.state.user_store = user_store
     app.state.cache = cache
+    app.state.history = history
+    app.state.quizzes = quizzes
     app.state.sched = None
 
     @app.on_event("startup")
     def _startup() -> None:
         app.state.sched = start_scheduler(
-            user_store, cache, interval_minutes=config.server.sync_interval_minutes
+            user_store, cache, history,
+            interval_minutes=config.server.sync_interval_minutes,
+            timezone=config.server.timezone,
+            digest_hour=config.server.daily_digest_hour,
+            notify_me_access_code=config.server.notify_me_access_code,
         )
 
     @app.on_event("shutdown")
@@ -82,14 +91,31 @@ def create_app(config: AppConfig) -> FastAPI:
 
     def _require_token(authorization: str | None) -> None:
         if not config.server.api_token:
-            return  # token not configured; allow (intended for local-only)
+            return
         expected = f"Bearer {config.server.api_token}"
         if authorization != expected:
             raise HTTPException(status_code=401, detail="Invalid API token")
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        return {"ok": True, "version": "0.2.0"}
+        return {"ok": True, "version": "0.3.0"}
+
+    @app.get("/api/status")
+    def status_endpoint(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _require_token(authorization)
+        latest = history.latest_per_user()
+        out = []
+        for u in user_store.list():
+            ev = latest.get(u.name)
+            out.append({
+                "user": u.name,
+                "display_name": u.display_name,
+                "last_sync": ev.finished_at.isoformat() if ev else None,
+                "ok": ev.ok if ev else None,
+                "fetched": ev.fetched if ev else 0,
+                "errors": ev.errors if ev else [],
+            })
+        return {"users": out, "scheduler_running": app.state.sched is not None}
 
     @app.get("/api/users")
     def list_users(authorization: str | None = Header(default=None)) -> list[dict[str, Any]]:
@@ -98,9 +124,7 @@ def create_app(config: AppConfig) -> FastAPI:
 
     @app.get("/api/users/{name}/upcoming")
     def upcoming(
-        name: str,
-        days: int = 7,
-        type: str | None = None,
+        name: str, days: int = 7, type: str | None = None,
         authorization: str | None = Header(default=None),
     ) -> list[dict[str, Any]]:
         _require_token(authorization)
@@ -110,8 +134,7 @@ def create_app(config: AppConfig) -> FastAPI:
         type_filter = AssessmentType(type) if type else None
         now = datetime.utcnow()
         items = cache.list(
-            user=u.name,
-            type_filter=type_filter,
+            user=u.name, type_filter=type_filter,
             since=now - timedelta(hours=12),
             until=now + timedelta(days=days),
         )
@@ -125,21 +148,20 @@ def create_app(config: AppConfig) -> FastAPI:
         u = user_store.get(name)
         if not u:
             raise HTTPException(404, f"unknown user {name}")
-        result = sync_user(u, cache)
+        result = sync_user(u, cache, history=history)
         return {
-            "user": result.user,
-            "fetched": result.fetched,
-            "deduped": result.deduped,
-            "errors": result.errors,
+            "user": result.user, "fetched": result.fetched,
+            "deduped": result.deduped, "errors": result.errors,
         }
 
     @app.post("/api/users/{name}/study/{dedup_key}")
     def study(
-        name: str, dedup_key: str, authorization: str | None = Header(default=None)
+        name: str, dedup_key: str,
+        authorization: str | None = Header(default=None),
     ) -> dict[str, str]:
         _require_token(authorization)
         if not config.study.configured:
-            raise HTTPException(503, "Study helper not configured (ANTHROPIC_API_KEY missing)")
+            raise HTTPException(503, "Study helper not configured")
         u = user_store.get(name)
         if not u:
             raise HTTPException(404, f"unknown user {name}")
@@ -154,6 +176,40 @@ def create_app(config: AppConfig) -> FastAPI:
             "practice_questions": pack.practice_questions,
         }
 
+    @app.get("/api/users/{name}/calendar.ics")
+    def calendar(name: str) -> Response:
+        u = user_store.get(name)
+        if not u:
+            raise HTTPException(404, f"unknown user {name}")
+        items = cache.list(user=u.name)
+        ics = ical_renderer.render(
+            items, user=u.name,
+            calendar_name=f"School ({u.display_name})",
+        )
+        return PlainTextResponse(
+            ics,
+            media_type="text/calendar; charset=utf-8",
+            headers={"Content-Disposition": f'inline; filename="{u.name}.ics"'},
+        )
+
+    @app.post("/api/users/{name}/quiz/prepare/{dedup_key}")
+    def prepare_quiz_endpoint(
+        name: str, dedup_key: str,
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _require_token(authorization)
+        if not config.study.configured:
+            raise HTTPException(503, "Study helper not configured")
+        u = user_store.get(name)
+        if not u:
+            raise HTTPException(404, f"unknown user {name}")
+        helper = StudyHelper(config.study)
+        n = prepare_quiz(
+            user=u, dedup_key=dedup_key,
+            assignments=cache, quizzes=quizzes, helper=helper,
+        )
+        return {"user": u.name, "dedup_key": dedup_key, "cards": n}
+
     @app.post("/alexa")
     async def alexa(request: Request) -> dict[str, Any]:
         body_bytes = await request.body()
@@ -163,10 +219,10 @@ def create_app(config: AppConfig) -> FastAPI:
         except Exception:
             raise HTTPException(400, "invalid JSON")
         return alexa_handler.handle_request(
-            body,
-            store=user_store,
-            cache=cache,
+            body, store=user_store, cache=cache,
             expected_skill_id=config.server.alexa_skill_id,
+            timezone=config.server.timezone,
+            quizzes=quizzes,
         )
 
     return app
@@ -176,9 +232,4 @@ def run(config: AppConfig) -> None:
     import uvicorn
 
     app = create_app(config)
-    uvicorn.run(
-        app,
-        host=config.server.host,
-        port=config.server.port,
-        log_level="info",
-    )
+    uvicorn.run(app, host=config.server.host, port=config.server.port, log_level="info")

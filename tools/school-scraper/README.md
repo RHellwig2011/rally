@@ -18,9 +18,14 @@ exposes them to **Alexa** so you can ask "what's due this week".
 - **Pi service** — a FastAPI app running under systemd that auto-syncs every
   hour and exposes a small REST API.
 - **Alexa Skill** — custom skill that hits the Pi over Cloudflare Tunnel and
-  answers natural-language questions about upcoming work.
+  answers natural-language questions about upcoming work, plus an
+  interactive flashcard **quiz mode**.
 - **Claude-powered study packs** — concept summaries, flashcards, and
   practice questions for any assessment.
+- **iCal feed** per user (subscribe phone/Google Calendar to it).
+- **Daily morning digest** to Echo via Notify Me ("you have a math test
+  tomorrow"), in your local timezone.
+- **`status` command** so you can see last sync time and any errors at a glance.
 
 ---
 
@@ -54,16 +59,16 @@ Add a student:
 
 ```bash
 schoolscraper users add bob --display-name Bob
-# (will prompt for Schoology key/secret and PowerSchool credentials)
-
 schoolscraper users add alice --display-name Alice
 schoolscraper users list
+schoolscraper users update bob --schoology-secret <new-secret>
 ```
 
 Sync everyone:
 
 ```bash
 schoolscraper sync --all
+schoolscraper status                         # last sync per user, errors
 schoolscraper list --user bob --days 7
 schoolscraper study --user bob --upcoming 1
 ```
@@ -93,17 +98,9 @@ The installer:
 - Generates a master key and API token in `/etc/schoolscraper/schoolscraper.env`.
 - Installs and enables the `schoolscraper.service` systemd unit.
 
-Then:
-
-```bash
-# Edit /etc/schoolscraper/schoolscraper.env to add ANTHROPIC_API_KEY (and
-# ALEXA_SKILL_ID after you create the skill).
-sudo -u schoolscraper /opt/schoolscraper/.venv/bin/schoolscraper users add bob
-sudo systemctl start schoolscraper
-curl http://localhost:8765/health
-```
-
 The service auto-syncs every `SCHOOLSCRAPER_SYNC_MINUTES` (default 60).
+If `NOTIFY_ME_ACCESS_CODE` is set it also pushes a daily digest at
+`SCHOOLSCRAPER_DIGEST_HOUR` (default 7am, in `SCHOOLSCRAPER_TIMEZONE`).
 
 ### REST API
 
@@ -112,14 +109,19 @@ With `SCHOOLSCRAPER_API_TOKEN` set, requests need
 
 ```
 GET  /health
+GET  /api/status                                  # last sync per user, errors
 GET  /api/users
 GET  /api/users/{name}/upcoming?days=7&type=test
+GET  /api/users/{name}/calendar.ics               # subscribe from a calendar app
 POST /api/users/{name}/sync
 POST /api/users/{name}/study/{dedup_key}
+POST /api/users/{name}/quiz/prepare/{dedup_key}   # cache flashcards for Alexa
 ```
 
 The `/alexa` endpoint does not use the bearer token; it validates Alexa's
-own signature and the configured `ALEXA_SKILL_ID`.
+own signature and the configured `ALEXA_SKILL_ID`. The `/calendar.ics`
+endpoint is unauthenticated by default for easy calendar subscription —
+put it behind Cloudflare Access if you need it locked down.
 
 ---
 
@@ -144,21 +146,42 @@ Try it:
 > "Alexa, ask Study Buddy what's due for Bob this week."
 > "Alexa, ask Study Buddy what tests Alice has tomorrow."
 > "Alexa, ask Study Buddy what should Bob study."
+> "Alexa, ask Study Buddy to quiz Bob."
 
-If only one student is registered, you can drop the name:
+If only one student is registered you can drop the name.
 
-> "Alexa, ask Study Buddy what's due this week."
+### Quiz mode
 
-### Why a custom skill instead of "Notify Me"?
+To use the interactive flashcard quiz, first cache flashcards for an
+upcoming assessment (one Claude call per assessment):
 
-- A custom skill answers questions on demand. "Notify Me" is one-way only
-  (it announces; it doesn't respond to questions).
-- The custom skill supports the multi-student `{Student}` slot so each kid
-  gets their own answers.
+```bash
+schoolscraper list --user bob              # find the dedup key
+schoolscraper prepare-quiz <key> --user bob
+```
 
-If you'd rather have one-way announcements (e.g. "you have a math test
-tomorrow"), it's straightforward to add a `notify` cron that POSTs to the
-Notify Me skill's webhook — file an issue and I'll add it.
+Then on Alexa: *"Alexa, ask Study Buddy to quiz Bob."* The skill reads each
+question, you answer aloud, then say **yes** or **no** to self-grade, and
+it tracks your score across the deck.
+
+### Daily morning digest
+
+If you set `NOTIFY_ME_ACCESS_CODE` (free skill, register at
+<https://www.thomptronics.com/notify-me>), the Pi pushes a once-a-day
+digest to Alexa at `SCHOOLSCRAPER_DIGEST_HOUR`:
+
+> "Good morning, Bob! Heads up: you have a test today — Cell Bio Test in
+> Biology. Tomorrow: assignment in Algebra II, HW 4."
+
+Preview without sending: `schoolscraper digest --user bob`.
+
+### Calendar subscription
+
+```
+https://study.your-domain.com/api/users/bob/calendar.ics
+```
+
+Or export to a file: `schoolscraper ical --user bob -o bob.ics`.
 
 ---
 
@@ -178,46 +201,22 @@ Notify Me skill's webhook — file an issue and I'll add it.
 
 - **Submit answers to graded assignments.** That's cheating, full stop.
 - **Bypass test lockdown browsers** or proctoring software.
-- **Pull material a student doesn't already have access to** — it logs in as
-  them, so it sees only what they'd see in a browser.
+- **Pull material a student doesn't already have access to** — it logs in
+  as them, so it sees only what they'd see in a browser.
 
 The study helper is explicitly prompted to generate *practice* material
-("here's how a strong answer is structured" / "here's a flashcard set on
-this topic") and never produces text that should be pasted into a live
-assessment.
+and never produces text that should be pasted into a live assessment.
 
 ---
 
-## Layout
+## Tests
 
+```bash
+pip install pytest
+pytest tests/ -v
 ```
-tools/school-scraper/
-├── README.md                       # this file
-├── pyproject.toml / requirements.txt
-├── .env.example
-├── schoolscraper/
-│   ├── cli.py                       # Typer CLI: sync, list, study, users, serve, alexa-model
-│   ├── server.py                    # FastAPI app
-│   ├── alexa.py                     # Alexa intent dispatch
-│   ├── scheduler.py                 # APScheduler hourly sync
-│   ├── sync_runner.py               # per-user sync orchestrator
-│   ├── users.py                     # UserStore + User dataclass
-│   ├── crypto.py                    # Fernet vault
-│   ├── cache.py                     # user-scoped SQLite store
-│   ├── models.py                    # Assignment / classify_type
-│   ├── aggregator.py                # cross-source dedup
-│   ├── study.py                     # Claude-powered study pack
-│   └── sources/
-│       ├── schoology.py
-│       └── powerschool.py
-├── deploy/
-│   ├── pi-install.sh
-│   ├── schoolscraper.service
-│   ├── cloudflared.service
-│   └── CLOUDFLARE_TUNNEL.md
-├── alexa-skill/
-│   ├── skill-manifest.json
-│   ├── interaction-model.json
-│   └── README.md
-└── tests/
-```
+
+48 tests cover dedup, type classification, encryption, user store CRUD,
+timezone math, sync history, iCal rendering, Notify Me digest text
+building, flashcard parsing/storage, and the full Alexa intent dispatch
+including the multi-turn quiz flow.
