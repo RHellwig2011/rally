@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from .aggregator import merge
 from .cache import Cache
+from .history import History
 from .models import Assignment
 from .users import User
 
@@ -19,9 +21,16 @@ class SyncResult:
     errors: list[str]
 
 
-def sync_user(user: User, cache: Cache, *, headless: bool = True) -> SyncResult:
+def sync_user(
+    user: User,
+    cache: Cache,
+    *,
+    headless: bool = True,
+    history: History | None = None,
+) -> SyncResult:
     """Fetch from Schoology + PowerSchool for a single user and replace
     that user's cache atomically."""
+    started = datetime.now(timezone.utc)
     fetched: list[Assignment] = []
     errors: list[str] = []
 
@@ -47,4 +56,12 @@ def sync_user(user: User, cache: Cache, *, headless: bool = True) -> SyncResult:
 
     merged = merge(fetched)
     cache.replace_for_user(user.name, merged)
+    if history is not None:
+        history.record(
+            user=user.name,
+            started_at=started,
+            fetched=len(fetched),
+            deduped=len(merged),
+            errors=errors,
+        )
     return SyncResult(user=user.name, fetched=len(fetched), deduped=len(merged), errors=errors)

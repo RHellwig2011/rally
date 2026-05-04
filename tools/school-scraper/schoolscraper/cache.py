@@ -3,10 +3,17 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, Iterator
 
 from .models import Assignment, AssessmentType
+
+
+def _to_utc_iso(dt: datetime) -> str:
+    """Coerce any datetime (naive or aware) to a comparable UTC ISO string."""
+    if dt.tzinfo is None:
+        return dt.isoformat()
+    return dt.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
 
 
 SCHEMA = """
@@ -59,7 +66,7 @@ class Cache:
                 a.title,
                 a.course,
                 a.type.value,
-                a.due.isoformat() if a.due else None,
+                _to_utc_iso(a.due) if a.due else None,
                 a.description,
                 a.url,
                 a.points,
@@ -115,10 +122,10 @@ class Cache:
             params.append(type_filter.value)
         if since is not None:
             sql += " AND (due IS NULL OR due >= ?)"
-            params.append(since.isoformat())
+            params.append(_to_utc_iso(since))
         if until is not None:
             sql += " AND due <= ?"
-            params.append(until.isoformat())
+            params.append(_to_utc_iso(until))
         sql += " ORDER BY due IS NULL, due ASC"
         with self._conn() as c:
             rows = c.execute(sql, params).fetchall()

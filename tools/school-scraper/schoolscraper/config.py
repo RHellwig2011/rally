@@ -48,6 +48,9 @@ class ServerConfig:
     sync_interval_minutes: int
     alexa_skill_id: str
     api_token: str  # shared secret for non-Alexa REST calls
+    timezone: str
+    notify_me_access_code: str
+    daily_digest_hour: int  # 0-23 in the configured timezone
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,9 @@ def load_config(env_file: Optional[str] = None) -> AppConfig:
             sync_interval_minutes=int(os.getenv("SCHOOLSCRAPER_SYNC_MINUTES", "60")),
             alexa_skill_id=os.getenv("ALEXA_SKILL_ID", ""),
             api_token=os.getenv("SCHOOLSCRAPER_API_TOKEN", ""),
+            timezone=os.getenv("SCHOOLSCRAPER_TIMEZONE", "America/New_York"),
+            notify_me_access_code=os.getenv("NOTIFY_ME_ACCESS_CODE", ""),
+            daily_digest_hour=int(os.getenv("SCHOOLSCRAPER_DIGEST_HOUR", "7")),
         ),
         cache_path=os.getenv("SCHOOLSCRAPER_CACHE_PATH", ".schoolscraper.db"),
         master_key=os.getenv("SCHOOLSCRAPER_MASTER_KEY", ""),
