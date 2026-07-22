@@ -193,7 +193,7 @@ export default function TeamMemberOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -246,22 +246,22 @@ export default function TeamMemberOnboardingPage() {
                 </ul>
               </div>
 
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h3 className="font-semibold text-purple-900 mb-2">What We Need From You</h3>
-                <p className="text-sm text-purple-800 mb-3">
+              <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4">
+                <h3 className="font-semibold text-secondary-900 mb-2">What We Need From You</h3>
+                <p className="text-sm text-secondary-800 mb-3">
                   To get started, we need to collect some contact information:
                 </p>
-                <ul className="space-y-2 text-sm text-purple-800">
+                <ul className="space-y-2 text-sm text-secondary-800">
                   <li className="flex items-start gap-2">
-                    <Mail className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <Mail className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
                     <span><strong>Your email</strong> (optional) - So we can send you updates</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Phone className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <Phone className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
                     <span><strong>Your phone</strong> (optional) - For text notifications</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Users className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <Users className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
                     <span><strong>Your parent(s) contact info</strong> (required) - So they can stay informed</span>
                   </li>
                 </ul>

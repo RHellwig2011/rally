@@ -102,6 +102,14 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      // Type system from the design system. font-sans stays the default body
+      // face; font-display is the geometric heading face; font-quote is used
+      // only for pull quotes.
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-inter)", "sans-serif"],
+        quote: ["var(--font-quote)", "Georgia", "serif"],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -128,6 +136,12 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },
         },
+        // Sport-name ticker on the marketing page. The track renders its items
+        // twice, so translating exactly -50% loops seamlessly.
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -135,6 +149,7 @@ const config: Config = {
         "slide-in-right": "slide-in-right 0.3s ease-out",
         "fade-in": "fade-in 0.2s ease-in",
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        marquee: "marquee 34s linear infinite",
       },
     },
   },

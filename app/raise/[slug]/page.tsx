@@ -197,7 +197,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg leading-none">R</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <Button asChild>
               <Link href="/">Start Your Campaign</Link>

@@ -67,7 +67,8 @@
       "Bash(grep -vE '^\\\\s*#|^\\\\s*$' /workspaces/rally/.env)",
       "Bash(sed -E 's/=\\(.{0,8}\\).*/=\\\\1.../')",
       "Bash(grep -vE '^\\\\s*#|^\\\\s*$' /workspaces/rally/.env.new)",
-      "Bash(timeout 30 npx prisma db execute --stdin <<< \"SELECT 1;\")"
+      "Bash(timeout 30 npx prisma db execute --stdin <<< \"SELECT 1;\")",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

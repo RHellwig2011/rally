@@ -9,7 +9,7 @@ export default function AboutPage() {
       <Navigation />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 via-primary-700 to-purple-800 text-white py-20">
+      <section className="bg-primary text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
@@ -267,7 +267,7 @@ export default function AboutPage() {
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-gradient-to-r from-primary-600 to-purple-700 rounded-3xl p-12 text-center text-white">
+        <div className="bg-primary rounded-3xl p-12 text-center text-white">
           <h2 className="text-4xl font-bold mb-4">Ready to Transform Your Fundraising?</h2>
           <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
             Join hundreds of teams that are raising more money in less time with Bleacher Backers

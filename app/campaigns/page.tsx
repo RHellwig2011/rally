@@ -239,7 +239,7 @@ export default function CampaignsPage() {
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg leading-none">R</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <div className="flex items-center gap-4">
               <Button variant="outline" asChild>
@@ -254,18 +254,22 @@ export default function CampaignsPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary-600 to-purple-700 text-white py-16">
+      <section className="bg-primary text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Discover Amazing Campaigns
+          <div className="max-w-3xl">
+            <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary-200">
+              Browse
+            </p>
+            <h1 className="mt-3 font-display text-[clamp(34px,5.5vw,60px)] font-semibold leading-[1.02] tracking-[-0.02em]">
+              Find a team worth backing
             </h1>
-            <p className="text-xl text-primary-100 mb-8">
-              Support youth teams, clubs, and school groups making their dreams come true
+            <p className="mt-4 mb-8 max-w-[46ch] text-lg text-primary-100">
+              Every campaign here is a real roster with a real goal — and a ledger
+              you can check before you give.
             </p>
 
             {/* Search Bar */}
-            <div className="relative max-w-2xl mx-auto">
+            <div className="relative max-w-2xl">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
               <Input
                 type="text"
@@ -368,13 +372,13 @@ export default function CampaignsPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-primary-600 to-purple-700 py-16">
+      <section className="bg-primary py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Start Your Own Campaign?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Join hundreds of teams already fundraising with Rally
+            Join hundreds of teams already fundraising with Bleacher Backers
           </p>
           <Button size="lg" variant="secondary" asChild>
             <Link href="/create-campaign" className="text-lg px-8 py-6">
@@ -389,7 +393,7 @@ export default function CampaignsPage() {
       <footer className="border-t bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Rally. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -1,667 +1,462 @@
 import Link from "next/link";
-import { ArrowRight, Target, CreditCard, BarChart3, Wallet, Sparkles, Mail, MessageSquare, Zap, Users, CheckCircle } from "lucide-react";
-import { Navigation } from "@/components/Navigation";
+
+/**
+ * Marketing home page.
+ *
+ * Follows the "Kinetic Site" direction from the Bleacher Backers UI design
+ * system: Space Grotesk display type set tight and large, a left-anchored hero
+ * rather than a centered stack, an uppercase tracked eyebrow in the green
+ * accent, hairline-divided stat rows, numbered rules instead of icon chips, and
+ * full-bleed navy/green bands to break the page into movements.
+ */
+
+const SPORTS = [
+  "BASKETBALL",
+  "TRACK & FIELD",
+  "SOCCER",
+  "SWIM",
+  "VOLLEYBALL",
+  "WRESTLING",
+  "BASEBALL",
+  "LACROSSE",
+  "CROSS COUNTRY",
+  "SOFTBALL",
+];
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Set the goal",
+    body: "Add your roster, set a target, and go live on a page that looks like your program — colors, logo, and all.",
+  },
+  {
+    n: "02",
+    title: "Let it do the asking",
+    body: "Every player gets their own link. Write once and the platform personalizes the email and texts to every contact.",
+  },
+  {
+    n: "03",
+    title: "Spend it when you need it",
+    body: "Funds land in an account the whole booster board can see. Every dollar in and out is on the ledger.",
+  },
+];
+
+const CAPABILITIES = [
+  {
+    label: "Outreach",
+    title: "Messages that sound like a person",
+    body: "Draft one note and send it to every contact on the roster, personalized per player, over email and SMS together.",
+  },
+  {
+    label: "Banking",
+    title: "A ledger parents can audit",
+    body: "Integrated accounts with a running balance, disbursement approvals, and a transaction history nobody has to take on faith.",
+  },
+  {
+    label: "Attribution",
+    title: "Credit to the right player",
+    body: "Every donation traces to the player who earned it, so leaderboards and season totals are never guesswork.",
+  },
+  {
+    label: "Payouts",
+    title: "Money out in one click",
+    body: "Request a disbursement, get it approved, and move funds to the program's account without a treasurer's spreadsheet.",
+  },
+];
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      {/* Navigation */}
-      <Navigation />
+    <div className="min-h-screen bg-[#F5F7FA] text-[#101A2C] antialiased">
+      {/* ---------------------------------------------------------------- Nav */}
+      <header className="sticky top-0 z-50 border-b border-[#E4E8EF] bg-[#F5F7FA]/85 backdrop-blur">
+        <div className="mx-auto flex h-[66px] max-w-[1180px] items-center gap-8 px-5 sm:px-8 lg:px-16">
+          <Link
+            href="/"
+            className="font-display text-[18px] font-bold tracking-[-0.01em] text-primary"
+          >
+            Bleacher&nbsp;Backers
+          </Link>
+          <nav className="ml-2 hidden gap-7 md:flex">
+            <a href="#how" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+              How it works
+            </a>
+            <Link href="/campaigns" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+              Campaigns
+            </Link>
+            <a href="#platform" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+              Platform
+            </a>
+            <a href="#pricing" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+              Pricing
+            </a>
+          </nav>
+          <div className="flex-1" />
+          <Link
+            href="/login"
+            className="whitespace-nowrap text-[15px] font-semibold text-[#5B6575] transition-colors hover:text-primary"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
+            className="whitespace-nowrap rounded-lg bg-primary px-[18px] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
+          >
+            Start a campaign
+          </Link>
+        </div>
+      </header>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center max-w-4xl mx-auto">
-          <div className="inline-block mb-6 px-4 py-2 bg-primary-50 rounded-full">
-            <span className="text-primary font-semibold text-sm">🚀 Fundraising Made Simple</span>
+      {/* -------------------------------------------------------------- Hero */}
+      <section className="mx-auto max-w-[1180px] px-5 pb-8 pt-14 sm:px-8 md:pt-24 lg:px-16 lg:pt-[120px]">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+          <div>
+            <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
+              Youth sports fundraising
+            </p>
+            <h1 className="mt-[18px] font-display text-[clamp(46px,7.5vw,96px)] font-semibold leading-[0.96] tracking-[-0.03em] text-primary">
+              Fund the
+              <br />
+              <span className="text-secondary">season.</span>
+            </h1>
+            <p className="mt-7 max-w-[46ch] text-[19px] leading-relaxed text-[#5B6575]">
+              One place to run the whole drive — personalized outreach to every
+              contact on the roster, a ledger the booster board can audit, and
+              payouts the week the team actually needs them.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <Link
+                href="/signup"
+                className="rounded-[10px] bg-secondary px-7 py-4 text-[15px] font-semibold text-white transition-transform hover:-translate-y-0.5"
+              >
+                Start a campaign
+              </Link>
+              <a
+                href="#how"
+                className="border-b-[1.5px] border-primary-100 pb-1 text-[15px] font-semibold text-primary"
+              >
+                See how it works →
+              </a>
+            </div>
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
-            Fundraising Reimagined for
-            <span className="text-primary block mt-2 bg-gradient-to-r from-primary to-primary-700 bg-clip-text text-transparent">
-              Youth Teams, Clubs, and School Groups
+
+          {/*
+            Product visualization: a campaign page reduced to the three things
+            that actually matter to a donor — who is asking, how far along they
+            are, and where the money goes. Static by design; this is marketing
+            chrome, not live data.
+          */}
+          <div className="relative lg:pl-4">
+            <div
+              aria-hidden
+              className="absolute -inset-x-4 -inset-y-6 rounded-[28px] bg-[repeating-linear-gradient(135deg,rgba(35,76,147,0.05)_0_1px,transparent_1px_14px)]"
+            />
+            <div className="relative rounded-[20px] border border-[#E4E8EF] bg-white p-6 shadow-[0_30px_60px_-30px_rgba(16,24,40,0.28)]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <span className="rounded-full bg-secondary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-secondary">
+                    Basketball
+                  </span>
+                  <h2 className="mt-3 font-display text-[20px] font-semibold text-primary">
+                    Lincoln High Varsity
+                  </h2>
+                  <p className="mt-1 text-sm text-[#5B6575]">
+                    Spring tournament travel &amp; new uniforms
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-baseline justify-between">
+                <span className="font-display text-[30px] font-bold tabular-nums text-[#101A2C]">
+                  $6,240
+                </span>
+                <span className="text-[13px] text-[#5B6575]">of $10,000</span>
+              </div>
+              <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-[#EAEDF2]">
+                <div className="h-full w-[62%] rounded-full bg-secondary" />
+              </div>
+
+              <div className="mt-6 space-y-3 border-t border-[#E4E8EF] pt-5">
+                {[
+                  { n: "Marcus R.", a: "$250", t: "2m ago" },
+                  { n: "The Delgado family", a: "$100", t: "18m ago" },
+                  { n: "Anonymous", a: "$45", t: "1h ago" },
+                ].map((d) => (
+                  <div key={d.n} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-50 font-display text-[11px] font-bold text-primary">
+                        {d.n.charAt(0)}
+                      </span>
+                      <span className="text-[#101A2C]">{d.n}</span>
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="font-semibold tabular-nums text-[#101A2C]">
+                        {d.a}
+                      </span>
+                      <span className="w-14 text-right text-xs text-[#5B6575]">
+                        {d.t}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hero stat row — hairline dividers, tabular figures */}
+        <dl className="mt-14 grid grid-cols-3 divide-x divide-[#E4E8EF]">
+          {[
+            { v: "$2.5M", l: "raised for teams", accent: false },
+            { v: "500+", l: "active programs", accent: false },
+            { v: "98%", l: "reach their goal", accent: true },
+          ].map((s, i) => (
+            <div key={s.l} className={i === 0 ? "pr-5 sm:pr-10" : "px-5 sm:px-10"}>
+              <dt className="sr-only">{s.l}</dt>
+              <dd
+                className={`font-display text-[clamp(22px,5vw,28px)] font-bold tabular-nums ${
+                  s.accent ? "text-secondary" : "text-primary"
+                }`}
+              >
+                {s.v}
+              </dd>
+              <p className="mt-1 text-[13px] leading-snug text-[#5B6575]">{s.l}</p>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* ----------------------------------------------------------- Marquee */}
+      <div className="overflow-hidden border-y border-[#E4E8EF] py-[15px]">
+        <div className="flex w-max animate-marquee gap-[34px] font-display text-[15px] font-semibold tracking-[0.02em] text-[#5B6575] motion-reduce:animate-none">
+          {[...SPORTS, ...SPORTS].map((s, i) => (
+            <span key={i} className="flex items-center gap-[34px] whitespace-nowrap">
+              {s}
+              <span className="text-secondary" aria-hidden>
+                ●
+              </span>
             </span>
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-            Integrated banking • Real-time tracking • Automated outreach
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/create-campaign"
-              className="bg-primary text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
-            >
-              Start Your Campaign
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              href="#how-it-works"
-              className="border-2 border-primary text-primary px-8 py-4 rounded-lg text-lg font-semibold hover:bg-primary-50 transition-colors"
-            >
-              See How It Works
-            </Link>
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      {/* How It Works Section */}
-      <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 bg-white">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Fundraising Made <span className="text-primary">Ridiculously Easy</span>
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            From setup to success in minutes, not weeks. Watch your campaign soar with AI-powered outreach.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
-          {/* Step 1 */}
-          <div className="relative">
-            <div className="absolute -top-4 -left-4 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-              1
-            </div>
-            <div className="bg-gradient-to-br from-primary-50 to-white p-8 rounded-2xl border-2 border-primary-100 h-full">
-              <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center mb-4">
-                <Zap className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-3">Create in 5 Minutes</h3>
-              <p className="text-foreground mb-4">
-                Set your goal, add team details, and upload your logo. Our smart setup wizard handles the rest.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Customizable campaign page</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Team roster import (CSV or manual)</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Instant fundraising links</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="relative">
-            <div className="absolute -top-4 -left-4 w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-              2
-            </div>
-            <div className="bg-gradient-to-br from-secondary-50 to-white p-8 rounded-2xl border-2 border-secondary-100 h-full">
-              <div className="w-16 h-16 bg-secondary rounded-xl flex items-center justify-center mb-4">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-3">AI Does the Outreach</h3>
-              <p className="text-foreground mb-4">
-                Let AI write heartfelt messages. Send mass emails & texts with one click. No marketing skills needed.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>AI-generated personalized messages</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Bulk email & SMS to hundreds</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Track who clicks & donates</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="relative">
-            <div className="absolute -top-4 -left-4 w-12 h-12 bg-success rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-              3
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-white p-8 rounded-2xl border-2 border-success h-full">
-              <div className="w-16 h-16 bg-success rounded-xl flex items-center justify-center mb-4">
-                <BarChart3 className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-3">Watch It Grow</h3>
-              <p className="text-foreground mb-4">
-                Real-time dashboard shows every donation. Built-in banking keeps funds secure until you need them.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Live donation notifications</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>Individual player tracking</span>
-                </li>
-                <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <span>One-click payouts to your account</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center">
-          <Link
-            href="/create-campaign"
-            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
-          >
-            Start Your Free Campaign
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-          <p className="text-sm text-muted-foreground mt-4">No credit card required • Takes 5 minutes</p>
-        </div>
-      </section>
-
-      {/* AI Features Showcase */}
-      <section className="bg-gradient-to-br from-indigo-600 to-purple-700 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
-              <Sparkles className="w-5 h-5 text-yellow-300" />
-              <span className="text-white font-semibold">Powered by AI</span>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Your AI Fundraising Assistant
+      {/* --------------------------------------------------------- How it works */}
+      <section id="how" className="bg-white">
+        <div className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+          <div className="flex flex-wrap items-baseline justify-between gap-4">
+            <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
+              Live in an afternoon.
+              <br />
+              Funded all season.
             </h2>
-            <p className="text-xl text-primary-100 max-w-3xl mx-auto">
-              Stop staring at blank screens. Let AI write compelling messages that actually get responses.
+            <p className="max-w-[34ch] text-base text-[#5B6575]">
+              No setup fees and no contracts — just a clean way to rally a
+              community around a roster.
             </p>
           </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Feature 1: AI Message Generation */}
-            <div className="bg-white rounded-2xl p-8 shadow-2xl">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground mb-2">AI-Generated Messages</h3>
-                  <p className="text-muted-foreground">Click once, get perfect messages instantly</p>
-                </div>
-              </div>
-
-              <div className="bg-muted rounded-xl p-6 mb-4 border-2 border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Generated Email</span>
-                  <Sparkles className="w-4 h-4 text-yellow-500" />
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Subject:</p>
-                    <p className="font-semibold text-foreground">Help Sarah Reach Her Soccer Dreams! ⚽</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Message:</p>
-                    <p className="text-sm text-foreground italic leading-relaxed">
-                      "Hi! I'm Sarah and I'm raising money for our soccer team's tournament trip.
-                      We've already raised $450 of our $1,000 goal! Every donation helps us compete
-                      and grow as a team. Would you consider supporting us?"
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <ul className="space-y-3">
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Choose tone: Friendly, Enthusiastic, or Heartfelt</span>
-                </li>
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Auto-includes campaign stats & fundraising link</span>
-                </li>
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Edit and personalize before sending</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Feature 2: Mass Outreach */}
-            <div className="bg-white rounded-2xl p-8 shadow-2xl">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-secondary to-secondary-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-foreground mb-2">Mass Email & SMS</h3>
-                  <p className="text-muted-foreground">Reach hundreds with one click</p>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-secondary-50 to-purple-50 rounded-xl p-6 mb-4 border-2 border-secondary-200">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Outreach Dashboard</span>
-                  <span className="text-xs bg-success-light text-success px-2 py-1 rounded-full font-semibold">Ready to Send</span>
-                </div>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="bg-white rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-primary">245</p>
-                    <p className="text-xs text-muted-foreground">Contacts</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-secondary">89%</p>
-                    <p className="text-xs text-muted-foreground">Open Rate</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-success">$3.2K</p>
-                    <p className="text-xs text-muted-foreground">Raised</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="flex-1 bg-primary text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    Send Email
-                  </button>
-                  <button className="flex-1 bg-secondary text-white py-2 px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    Send SMS
-                  </button>
-                </div>
-              </div>
-
-              <ul className="space-y-3">
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Import contacts from CSV or add manually</span>
-                </li>
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Personalize each message with names</span>
-                </li>
-                <li className="flex items-center gap-3 text-foreground">
-                  <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <span>Track opens, clicks, and donations</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="text-center mt-12">
-            <p className="text-primary-100 text-lg mb-4">
-              <strong className="text-white">Pro tip:</strong> Most campaigns see 3x more donations with AI-powered outreach
-            </p>
-          </div>
+          <ol className="mt-12 grid gap-[22px] md:grid-cols-3">
+            {STEPS.map((s) => (
+              <li key={s.n} className="border-t-2 border-secondary pt-[22px]">
+                <span className="font-display text-[15px] font-bold text-secondary">
+                  {s.n}
+                </span>
+                <h3 className="mt-3.5 font-display text-[22px] font-semibold text-primary">
+                  {s.title}
+                </h3>
+                <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
+                  {s.body}
+                </p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* Shareable Content Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Share Anywhere, Anytime
+      {/* -------------------------------------------------------- Capabilities */}
+      <section id="platform" className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold tracking-[-0.02em] text-primary">
+            Everything the drive needs
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Beautiful shareable posters and social media graphics—generated automatically for your campaign
-          </p>
+          <Link
+            href="/about"
+            className="border-b-[1.5px] border-primary-100 pb-1 text-[15px] font-semibold text-primary"
+          >
+            Why we built it →
+          </Link>
         </div>
-
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: Preview */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary-200 to-secondary-200 rounded-3xl transform rotate-3"></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl p-8 border-4 border-primary-100">
-              {/* Mock Poster */}
-              <div className="bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl p-8 text-white text-center">
-                <div className="w-20 h-20 bg-white rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-4xl">⚽</span>
-                </div>
-                <h3 className="text-3xl font-bold mb-2">Support Our Team!</h3>
-                <p className="text-lg mb-4 text-primary-100">Lincoln High Soccer</p>
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 mb-4">
-                  <p className="text-4xl font-bold mb-1">$4,250</p>
-                  <p className="text-sm text-primary-100">raised of $10,000 goal</p>
-                  <div className="w-full bg-white/30 rounded-full h-2 mt-3">
-                    <div className="bg-white rounded-full h-2" style={{width: '42%'}}></div>
-                  </div>
-                </div>
-                <p className="text-sm mb-4">Help us get to the state championship!</p>
-                <div className="bg-white text-primary-700 py-2 px-4 rounded-lg font-bold inline-block">
-                  bleacherbackers.com/lincoln-soccer
-                </div>
-              </div>
-              <div className="mt-4 flex gap-2 justify-center">
-                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">fb</span>
-                </div>
-                <div className="w-10 h-10 bg-sky-400 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">tw</span>
-                </div>
-                <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">ig</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Features */}
-          <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-foreground mb-2">Auto-Generated Posters</h3>
-                <p className="text-muted-foreground">
-                  Beautiful campaign posters created automatically with your team colors, logo, and real-time stats.
-                  Download and share in seconds.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Users className="w-6 h-6 text-secondary" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-foreground mb-2">Player Spotlight Cards</h3>
-                <p className="text-muted-foreground">
-                  Each player gets their own personalized fundraising card with their photo, stats, and unique link.
-                  Perfect for social media.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-success-light rounded-lg flex items-center justify-center flex-shrink-0">
-                <Mail className="w-6 h-6 text-success" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-foreground mb-2">Email-Ready Graphics</h3>
-                <p className="text-muted-foreground">
-                  Optimized images for email campaigns that look great on mobile and desktop. Copy and paste into any email.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-50 to-primary-50 rounded-xl p-6 border-2 border-primary-100">
-              <p className="text-foreground font-semibold mb-2">
-                ✨ All graphics update automatically
-              </p>
-              <p className="text-sm text-muted-foreground">
-                As donations come in, your posters and graphics update in real-time with the latest totals.
-                Always fresh, always accurate.
-              </p>
-            </div>
-
-            <Link
-              href="/create-campaign"
-              className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-colors"
+        <div className="mt-11 grid gap-[22px] sm:grid-cols-2">
+          {CAPABILITIES.map((c) => (
+            <div
+              key={c.label}
+              className="rounded-[18px] border border-[#E4E8EF] bg-white p-7 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_26px_50px_-26px_rgba(16,24,40,0.3)]"
             >
-              Try It Free
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </div>
+              <span className="font-display text-[12px] font-bold uppercase tracking-[0.14em] text-secondary">
+                {c.label}
+              </span>
+              <h3 className="mt-3 font-display text-[21px] font-semibold text-primary">
+                {c.title}
+              </h3>
+              <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
+                {c.body}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Everything You Need to Succeed
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            From launch to goal completion, Bleacher Backers provides all the tools your team needs
+      {/* ---------------------------------------------------------- Pull quote */}
+      <section className="bg-primary text-white">
+        <div className="mx-auto max-w-[1000px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
+          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-secondary-300">
+            From the sideline
           </p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div className="group bg-white p-6 rounded-xl shadow-sm border border-border hover:shadow-lg hover:border-primary-200 transition-all duration-300 cursor-pointer">
-            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
-              <Target className="w-6 h-6 text-primary group-hover:text-white transition-colors duration-300" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Set Goal</h3>
-            <p className="text-muted-foreground">
-              Create your campaign in minutes with customizable branding and goals
+          <blockquote className="mt-7">
+            <p className="font-quote text-[clamp(28px,4.6vw,52px)] leading-[1.16] text-white">
+              “We raised $15K in three weeks. The part that actually won people
+              over was letting every parent see exactly where the money went.”
             </p>
-          </div>
-
-          <div className="group bg-white p-6 rounded-xl shadow-sm border border-border hover:shadow-lg hover:border-secondary-200 transition-all duration-300 cursor-pointer">
-            <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary group-hover:scale-110 transition-all duration-300">
-              <CreditCard className="w-6 h-6 text-secondary group-hover:text-white transition-colors duration-300" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Raise</h3>
-            <p className="text-muted-foreground">
-              Automated outreach and referral links boost donor engagement
-            </p>
-          </div>
-
-          <div className="group bg-white p-6 rounded-xl shadow-sm border border-border hover:shadow-lg hover:border-success/30 transition-all duration-300 cursor-pointer">
-            <div className="w-12 h-12 bg-success-light rounded-lg flex items-center justify-center mb-4 group-hover:bg-success group-hover:scale-110 transition-all duration-300">
-              <BarChart3 className="w-6 h-6 text-success group-hover:text-white transition-colors duration-300" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Track</h3>
-            <p className="text-muted-foreground">
-              Real-time dashboard with transparent reporting and analytics
-            </p>
-          </div>
-
-          <div className="group bg-white p-6 rounded-xl shadow-sm border border-border hover:shadow-lg hover:border-primary-200 transition-all duration-300 cursor-pointer">
-            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
-              <Wallet className="w-6 h-6 text-primary group-hover:text-white transition-colors duration-300" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Spend</h3>
-            <p className="text-muted-foreground">
-              Built-in banking for secure fund storage and easy payouts
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-white rounded-2xl shadow-lg p-12 border border-border">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">$2.5M+</div>
-              <div className="text-muted-foreground font-medium">Total Raised</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">500+</div>
-              <div className="text-muted-foreground font-medium">Active Teams</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">15K+</div>
-              <div className="text-muted-foreground font-medium">Donors</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-primary mb-2">98%</div>
-              <div className="text-muted-foreground font-medium">Success Rate</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonial */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl p-12 text-center text-white shadow-xl">
-          <h2 className="text-3xl font-bold mb-4">Why Teams Choose Bleacher Backers</h2>
-          <blockquote className="text-xl italic mb-4">
-            "Raised $15K in 3 weeks. The banking dashboard made spending transparent for parents."
           </blockquote>
-          <p className="text-primary-100">- Sarah T., Volleyball Coach</p>
-        </div>
-      </section>
-
-      {/* Transparent Pricing */}
-      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-foreground mb-4">
-            Transparent Pricing
-          </h2>
-          <p className="text-xl text-muted-foreground">
-            Simple, honest pricing with no hidden fees
+          <p className="mt-7 font-mono text-xs tracking-[0.1em] text-white/60">
+            — SARAH T. · VOLLEYBALL COACH
           </p>
         </div>
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8 border border-border">
-          <div className="text-center mb-6">
-            <div className="text-5xl font-bold text-primary mb-2">10%</div>
-            <p className="text-muted-foreground">Platform Fee</p>
-          </div>
-          <div className="space-y-4 mb-8">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-foreground">Secure banking infrastructure</span>
+      </section>
+
+      {/* ------------------------------------------------------------- Pricing */}
+      <section id="pricing" className="bg-white">
+        <div className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+          <div className="grid gap-12 md:grid-cols-[0.9fr_1.1fr] md:items-center">
+            <div>
+              <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
+                Pricing
+              </p>
+              <h2 className="mt-3.5 font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
+                Ten percent.
+                <br />
+                That's the whole page.
+              </h2>
+              <p className="mt-5 max-w-[40ch] text-base leading-relaxed text-[#5B6575]">
+                No setup fee, no monthly minimum, no per-seat charge. The
+                platform fee and card processing are the only two lines, and
+                both are shown to every donor before they give.
+              </p>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-foreground">Unlimited campaign updates</span>
+
+            <div className="rounded-[18px] border border-[#E4E8EF] bg-[#F5F7FA] p-7 sm:p-9">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#5B6575]">
+                On a $100 donation
+              </p>
+              <dl className="mt-5 space-y-3 text-[15px] tabular-nums">
+                <div className="flex justify-between">
+                  <dt className="text-[#5B6575]">Donor gives</dt>
+                  <dd className="font-semibold text-[#101A2C]">$100.00</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[#5B6575]">Platform fee (10%)</dt>
+                  <dd className="text-[#5B6575]">−$10.00</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[#5B6575]">Card processing (2.9% + 30¢)</dt>
+                  <dd className="text-[#5B6575]">−$3.20</dd>
+                </div>
+                <div className="flex justify-between border-t border-[#E4E8EF] pt-3.5">
+                  <dt className="font-display font-semibold text-primary">
+                    Your team keeps
+                  </dt>
+                  <dd className="font-display text-[22px] font-bold text-secondary">
+                    $86.80
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-5 text-[13px] leading-relaxed text-[#5B6575]">
+                Larger gifts keep a larger share — processing is a flat 30¢ plus
+                a percentage, so a $500 donation nets 88%.
+              </p>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-foreground">Automated email & SMS outreach</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-foreground">24/7 support for campaigns</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-success rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <span className="text-foreground">Real-time analytics dashboard</span>
-            </div>
-          </div>
-          <div className="bg-muted rounded-lg p-4">
-            <h4 className="font-semibold text-foreground mb-2">Example Breakdown:</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Donor contributes:</span>
-                <span className="font-semibold">$100.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Platform fee (10%):</span>
-                <span className="text-muted-foreground">$10.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Processing fee (2.9% + $0.30):</span>
-                <span className="text-muted-foreground">$3.20</span>
-              </div>
-              <div className="border-t pt-2 flex justify-between">
-                <span className="text-foreground font-semibold">To your campaign:</span>
-                <span className="text-success font-bold">$86.80</span>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm mt-4 pt-4 border-t">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Donor contributes:</span>
-                <span className="font-semibold">$25.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Platform fee (10%):</span>
-                <span className="text-muted-foreground">$2.50</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Processing fee (2.9% + $0.30):</span>
-                <span className="text-muted-foreground">$1.03</span>
-              </div>
-              <div className="border-t pt-2 flex justify-between">
-                <span className="text-foreground font-semibold">To your campaign:</span>
-                <span className="text-success font-bold">$21.47</span>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              The flat $0.30 makes processing cost a larger share of smaller gifts
-              (4.1% on a $25 donation). Donors see the exact amount at checkout and
-              can choose to cover the processing fee.
-            </p>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-foreground rounded-2xl p-12 text-center text-white">
-          <h2 className="text-4xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-xl text-muted-foreground mb-8">
-            Join hundreds of teams already fundraising smarter with Bleacher Backers
+      {/* ----------------------------------------------------------------- CTA */}
+      <section className="bg-secondary">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
+          <h2 className="font-display text-[clamp(40px,7vw,92px)] font-semibold leading-[0.98] tracking-[-0.03em] text-white">
+            Back a team.
+            <br />
+            Change a season.
+          </h2>
+          <p className="mx-auto mt-6 max-w-[44ch] text-lg leading-relaxed text-white/80">
+            Every season funded is a promise kept to a kid who just wants to
+            play.
           </p>
           <Link
-            href="/create-campaign"
-            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-primary-600 transition-colors"
+            href="/signup"
+            className="mt-9 inline-block rounded-full bg-white px-9 py-4 text-base font-bold text-secondary transition-transform hover:-translate-y-0.5"
           >
-            Create Your Campaign
-            <ArrowRight className="w-5 h-5" />
+            Start a campaign
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
+      {/* -------------------------------------------------------------- Footer */}
+      <footer className="bg-[#0A101E] text-[#9AA7BC]">
+        <div className="mx-auto max-w-[1180px] px-5 pb-10 pt-12 sm:px-8 md:pt-16 lg:px-16 lg:pt-20">
+          <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">BB</span>
-                </div>
-                <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
-              </div>
-              <p className="text-muted-foreground text-sm">
-                Fundraising reimagined for youth teams, clubs, and school groups.
+              <p className="font-display text-[18px] font-bold text-[#F2F6FC]">
+                Bleacher&nbsp;Backers
+              </p>
+              <p className="mt-3.5 max-w-[30ch] text-sm leading-relaxed">
+                Fundraising built for boosters, coaches, and the whole town.
               </p>
             </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#features">Features</Link></li>
-                <li><Link href="#pricing">Pricing</Link></li>
-                <li><Link href="/campaigns">Browse Campaigns</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/about">About</Link></li>
-                <li><Link href="/privacy">Privacy Policy</Link></li>
-                <li><Link href="/terms">Terms of Service</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Support</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/help">Help Center</Link></li>
-                <li><Link href="/help">Contact Us</Link></li>
-              </ul>
-            </div>
+            {[
+              {
+                head: "Product",
+                links: [
+                  { label: "How it works", href: "#how" },
+                  { label: "Pricing", href: "#pricing" },
+                  { label: "Browse campaigns", href: "/campaigns" },
+                ],
+              },
+              {
+                head: "Company",
+                links: [
+                  { label: "About", href: "/about" },
+                  { label: "Privacy Policy", href: "/privacy" },
+                  { label: "Terms of Service", href: "/terms" },
+                ],
+              },
+              {
+                head: "Support",
+                links: [
+                  { label: "Help Center", href: "/help" },
+                  { label: "Contact us", href: "/help" },
+                ],
+              },
+            ].map((col) => (
+              <div key={col.head}>
+                <p className="text-xs uppercase tracking-[0.14em] text-[#66738A]">
+                  {col.head}
+                </p>
+                <ul className="mt-4 flex flex-col gap-2.5">
+                  {col.links.map((l) => (
+                    <li key={l.label}>
+                      <Link
+                        href={l.href}
+                        className="text-sm transition-colors hover:text-white"
+                      >
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved. We never sell or share your data.</p>
+          <div className="mt-11 flex flex-wrap justify-between gap-3 border-t border-white/10 pt-5 text-[13px] text-[#66738A]">
+            <span>© 2026 Bleacher Backers. All rights reserved.</span>
+            <span>We never sell or share your data.</span>
           </div>
         </div>
       </footer>

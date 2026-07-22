@@ -147,7 +147,7 @@ export default function PublicLeaderboardPage({
                   R
                 </span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <Button asChild>
               <Link href={`/raise/${params.slug}/donate`}>

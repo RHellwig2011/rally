@@ -174,7 +174,7 @@ export default function PlayerFundraisingPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <Button
               onClick={() => setShowDonateForm(true)}
@@ -503,7 +503,7 @@ export default function PlayerFundraisingPage() {
       <footer className="bg-foreground text-white py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-muted-foreground">
-            Powered by <span className="font-bold text-white">Rally</span> - Fundraising Reimagined
+            Powered by <span className="font-bold text-white">Bleacher Backers</span> - Fundraising Reimagined
           </p>
         </div>
       </footer>

@@ -178,13 +178,13 @@ export default function HelpPage() {
           <div className="lg:col-span-2">
             <Card className="h-[600px] flex flex-col">
               {/* Chat Header */}
-              <div className="p-4 border-b bg-gradient-to-r from-primary-600 to-purple-700 text-white rounded-t-lg">
+              <div className="p-4 border-b bg-primary text-white rounded-t-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
                     <Bot className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Rally AI Assistant</h3>
+                    <h3 className="font-semibold">Bleacher Backers Assistant</h3>
                     <p className="text-sm text-primary-100">Always here to help</p>
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export default function HelpPage() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         message.role === "user"
                           ? "bg-primary text-white"
-                          : "bg-gradient-to-br from-primary-600 to-purple-700 text-white"
+                          : "bg-primary text-white"
                       }`}
                     >
                       {message.role === "user" ? (
@@ -244,7 +244,7 @@ export default function HelpPage() {
                 {/* Typing Indicator */}
                 {isLoading && (
                   <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-purple-700 text-white flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
                       <Bot className="w-5 h-5" />
                     </div>
                     <div className="bg-white border border-border rounded-2xl px-4 py-3">
@@ -330,7 +330,7 @@ export default function HelpPage() {
       <footer className="border-t bg-white mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Rally. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -151,7 +151,7 @@ export default function PlayerDashboard() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">
