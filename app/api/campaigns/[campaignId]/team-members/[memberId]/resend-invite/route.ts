@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import crypto from "crypto";
 import {
   sendTeamMemberInvitation,
   formatFundraisingLink,
@@ -10,6 +11,7 @@ import {
   getRateLimitIdentifier,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 /**
  * POST /api/campaigns/[campaignId]/team-members/[memberId]/resend-invite
@@ -21,6 +23,12 @@ export async function POST(
   { params }: { params: { campaignId: string; memberId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -149,13 +157,27 @@ export async function POST(
       );
     }
 
+    // Ensure the member has an invitation token (regenerate if missing) so we
+    // can build the onboarding link the same way the original invite does
+    let invitationToken = teamMember.invitationToken;
+    if (!invitationToken) {
+      invitationToken = crypto.randomBytes(32).toString("hex");
+      await prisma.teamMember.update({
+        where: { id: memberId },
+        data: { invitationToken },
+      });
+    }
+
     const fundraisingLink = formatFundraisingLink(campaign.slug, teamMember.fundLinkCode);
+    const onboardingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
+
     const emailSent = await sendTeamMemberInvitation(
       teamMember.email!, // Non-null assertion safe because query filters for non-null emails
       teamMember.name,
       `${campaign.teamName} - ${campaign.organizationName}`,
       fundraisingLink,
-      teamMember.personalGoal ? Number(teamMember.personalGoal) / 100 : undefined
+      teamMember.personalGoal ? Number(teamMember.personalGoal) / 100 : undefined,
+      onboardingLink
     );
 
     if (!emailSent) {

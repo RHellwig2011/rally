@@ -121,10 +121,10 @@ export default function PlayerDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -132,9 +132,9 @@ export default function PlayerDashboard() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'Failed to load data'}</p>
+          <p className="text-warning mb-4">{error || 'Failed to load data'}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
@@ -142,7 +142,7 @@ export default function PlayerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -151,10 +151,10 @@ export default function PlayerDashboard() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 {data.user.firstName} {data.user.lastName}
               </span>
             </div>
@@ -165,87 +165,87 @@ export default function PlayerDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             Welcome back, {data.user.firstName}! 👋
           </h1>
-          <p className="text-gray-600">Track your fundraising progress and share your links</p>
+          <p className="text-muted-foreground">Track your fundraising progress and share your links</p>
         </div>
 
         {/* Overall Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Total Raised
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-foreground">
                 {formatCurrency(data.stats.totalRaised)}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Across all campaigns</p>
+              <p className="text-sm text-muted-foreground mt-1">Across all campaigns</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Donations
               </CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-foreground">
                 {data.stats.totalDonations}
               </div>
-              <p className="text-sm text-gray-500 mt-1">People supported you</p>
+              <p className="text-sm text-muted-foreground mt-1">People supported you</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Link Clicks
               </CardTitle>
               <MousePointer className="w-5 h-5 text-secondary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-foreground">
                 {data.stats.totalClicks}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Total engagement</p>
+              <p className="text-sm text-muted-foreground mt-1">Total engagement</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Active Campaigns
               </CardTitle>
               <Trophy className="w-5 h-5 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-foreground">
                 {data.stats.campaignCount}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Teams you're on</p>
+              <p className="text-sm text-muted-foreground mt-1">Teams you're on</p>
             </CardContent>
           </Card>
         </div>
 
         {/* My Campaigns */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">My Campaigns</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-4">My Campaigns</h2>
 
           {data.memberships.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
                   No campaigns yet
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   You'll see your fundraising campaigns here once you're added to a team
                 </p>
               </CardContent>
@@ -268,7 +268,7 @@ export default function PlayerDashboard() {
                           <CardTitle className="text-xl mb-1">
                             {membership.campaign.organizationName} {membership.campaign.teamName}
                           </CardTitle>
-                          <p className="text-sm text-gray-600">Your role: {membership.name}</p>
+                          <p className="text-sm text-muted-foreground">Your role: {membership.name}</p>
                         </div>
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/raise/${membership.campaign.slug}`} target="_blank">
@@ -283,20 +283,20 @@ export default function PlayerDashboard() {
                         {/* Personal Progress */}
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">
+                            <span className="text-sm font-medium text-foreground">
                               Your Progress
                             </span>
                             <span className="text-sm font-semibold text-primary">
                               {formatCurrency(parseInt(membership.amountRaised))}
                               {membership.personalGoal && (
-                                <span className="text-gray-600 font-normal">
+                                <span className="text-muted-foreground font-normal">
                                   {' '}/ {formatCurrency(parseInt(membership.personalGoal))}
                                 </span>
                               )}
                             </span>
                           </div>
                           {membership.personalGoal && (
-                            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                            <div className="w-full bg-accent rounded-full h-2 mb-1">
                               <div
                                 className="bg-primary rounded-full h-2 transition-all"
                                 style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -307,19 +307,19 @@ export default function PlayerDashboard() {
 
                         {/* Referral Stats */}
                         {membership.referral && (
-                          <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="bg-muted rounded-lg p-4">
                             <div className="grid grid-cols-3 gap-4 mb-4">
                               <div className="text-center">
-                                <p className="text-2xl font-bold text-gray-900">
+                                <p className="text-2xl font-bold text-foreground">
                                   {membership.referral.clickCount}
                                 </p>
-                                <p className="text-xs text-gray-600">Clicks</p>
+                                <p className="text-xs text-muted-foreground">Clicks</p>
                               </div>
                               <div className="text-center">
                                 <p className="text-2xl font-bold text-success">
                                   {membership.referral.donationCount}
                                 </p>
-                                <p className="text-xs text-gray-600">Donations</p>
+                                <p className="text-xs text-muted-foreground">Donations</p>
                               </div>
                               <div className="text-center">
                                 <p className="text-2xl font-bold text-primary">
@@ -327,7 +327,7 @@ export default function PlayerDashboard() {
                                     ? ((membership.referral.donationCount / membership.referral.clickCount) * 100).toFixed(1)
                                     : 0}%
                                 </p>
-                                <p className="text-xs text-gray-600">Conversion</p>
+                                <p className="text-xs text-muted-foreground">Conversion</p>
                               </div>
                             </div>
 
@@ -338,7 +338,7 @@ export default function PlayerDashboard() {
                                   type="text"
                                   readOnly
                                   value={`${window.location.origin}/raise/${membership.campaign.slug}?ref=${membership.referral.code}`}
-                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+                                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-white"
                                 />
                                 <Button
                                   size="sm"

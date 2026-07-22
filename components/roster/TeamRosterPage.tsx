@@ -9,6 +9,7 @@ import { RosterFilters } from './RosterFilters';
 import { EmptyRosterState } from './EmptyRosterState';
 import { RosterStats } from './RosterStats';
 import { toast } from 'react-hot-toast';
+import { useCsrfToken } from '@/hooks/useCsrfToken';
 
 interface TeamMember {
   id: string;
@@ -39,6 +40,7 @@ export function TeamRosterPage({
   isGuardian
 }: TeamRosterPageProps) {
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,13 +62,25 @@ export function TeamRosterPage({
       });
 
       const response = await fetch(`/api/campaigns/${campaignId}/team-members?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch team members');
-
       const data = await response.json();
-      setMembers(data.members || []);
+
+      // Gate on the payload, not just the HTTP status, and read the key the
+      // endpoint actually returns (`teamMembers`). Reading a missing key and
+      // defaulting to [] renders a full roster as an empty one with no error —
+      // silence is the worst possible failure mode here.
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch team members');
+      }
+      if (!Array.isArray(data.teamMembers)) {
+        throw new Error('Unexpected response from the team members endpoint');
+      }
+
+      setMembers(data.teamMembers);
     } catch (error) {
       console.error('Failed to fetch team members:', error);
-      toast.error('Failed to load team members');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to load team members'
+      );
     } finally {
       setLoading(false);
     }
@@ -81,7 +95,10 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify(updates),
       });
 
@@ -104,6 +121,7 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
         method: 'DELETE',
+        headers: { 'x-csrf-token': csrfToken },
       });
 
       if (!response.ok) throw new Error('Failed to remove member');
@@ -121,6 +139,7 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}/resend-invite`, {
         method: 'POST',
+        headers: { 'x-csrf-token': csrfToken },
       });
 
       const data = await response.json();
@@ -147,7 +166,10 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify(memberData),
       });
 
@@ -242,14 +264,14 @@ export function TeamRosterPage({
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="px-4 py-2 bg-success text-white rounded-lg hover:bg-success transition-colors"
           >
             Import from CSV
           </button>
           <a
             href={`/api/campaigns/${campaignId}/import-roster`}
             download="team_roster_template.csv"
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
           >
             Download CSV Template
           </a>

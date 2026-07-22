@@ -13,14 +13,14 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
 
     return (
       <div ref={ref} className={cn("relative", className)} {...props}>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+        <div className="h-3 w-full overflow-hidden rounded-full bg-accent">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"
             style={{ width: `${percentage}%` }}
           />
         </div>
         {showLabel && (
-          <span className="mt-1 text-xs font-medium text-gray-600">
+          <span className="mt-1 text-xs font-medium text-muted-foreground">
             {Math.round(percentage)}%
           </span>
         )}

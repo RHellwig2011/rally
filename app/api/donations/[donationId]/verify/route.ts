@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import Stripe from "stripe";
 import { checkRouteRateLimit } from "@/lib/utils/with-rate-limit";
 import { RATE_LIMITS } from "@/lib/utils/rate-limiter";
+import { completeDonation } from "@/lib/donations";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -71,10 +72,12 @@ export async function POST(
       });
     }
 
-    // Verify the payment intent with Stripe
+    // Verify the payment intent with Stripe (expand payment_method for last4)
     let paymentIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ["payment_method"],
+      });
     } catch (stripeError) {
       console.error('Stripe error retrieving payment intent:', stripeError);
       return NextResponse.json(
@@ -93,118 +96,44 @@ export async function POST(
 
     // Check payment status
     if (paymentIntent.status === 'succeeded') {
-      // Get the charge ID and last 4 digits
-      const chargeId = paymentIntent.latest_charge as string;
+      // Get the last 4 digits if available (payment_method is expanded)
       const paymentMethod = paymentIntent.payment_method;
-
-      // Try to get the last 4 digits if available
-      let last4 = null;
+      let last4: string | null = null;
       if (paymentMethod && typeof paymentMethod === 'object' && 'card' in paymentMethod) {
-        last4 = paymentMethod.card?.last4;
+        last4 = paymentMethod.card?.last4 ?? null;
       }
 
-      // Update donation status to completed
-      const updatedDonation = await prisma.$transaction(async (tx) => {
-        // Update donation
-        const updated = await tx.donation.update({
-          where: { id: donationId },
-          data: {
-            status: 'COMPLETED',
-            paymentMethodLast4: last4,
-          }
-        });
-
-        // Update campaign total
-        await tx.campaign.update({
-          where: { id: donation.campaignId },
-          data: {
-            currentAmount: {
-              increment: donation.grossAmount
-            }
-          }
-        });
-
-        // Update team member total if referral code is team member ID
-        if (donation.referralCode) {
-          // Try to find and update team member by referral code (assuming it's the team member ID)
-          try {
-            await tx.teamMember.update({
-              where: { id: donation.referralCode },
-              data: {
-                amountRaised: {
-                  increment: donation.grossAmount
-                }
-              }
-            });
-          } catch (error) {
-            // Team member not found or referral code is not a team member ID
-            console.log('Referral code does not match a team member:', donation.referralCode);
-          }
-        }
-
-        // Update banking account
-        const bankingAccount = await tx.bankingAccount.findUnique({
-          where: { campaignId: donation.campaignId }
-        });
-
-        if (bankingAccount) {
-          await tx.bankingAccount.update({
-            where: { campaignId: donation.campaignId },
-            data: {
-              totalRaised: {
-                increment: donation.grossAmount
-              },
-              availableBalance: {
-                increment: donation.netAmount
-              },
-              platformFeesCollected: {
-                increment: donation.platformFee
-              }
-            }
-          });
-        }
-
-        return updated;
+      // Atomically complete the donation and apply credits. Returns null if
+      // another caller (e.g. the Stripe webhook) already completed it.
+      const completed = await completeDonation(donationId, {
+        paymentMethodLast4: last4,
       });
 
-      // Send confirmation email
-      try {
-        const { sendDonationReceipt } = await import('@/lib/email');
-
-        // Get team member name if applicable
-        let teamMemberName;
-        if (donation.referralCode) {
-          try {
-            const teamMember = await prisma.teamMember.findUnique({
-              where: { id: donation.referralCode },
-              select: { name: true }
-            });
-            teamMemberName = teamMember?.name;
-          } catch (error) {
-            // Ignore if team member not found
-          }
+      if (completed) {
+        // Send confirmation email (only from the caller that won the race)
+        try {
+          const { sendDonationReceipt } = await import('@/lib/email');
+          await sendDonationReceipt({
+            toEmail: donation.donorEmail,
+            donorName: donation.donorName || 'Anonymous Donor',
+            campaignName: `${donation.campaign.teamName} - ${donation.campaign.organizationName}`,
+            amount: Number(donation.grossAmount) / 100,
+            donationDate: donation.createdAt,
+            taxDeductible: false, // TODO: Set based on campaign's tax-exempt status
+          });
+        } catch (emailError) {
+          console.error('Failed to send confirmation email:', emailError);
+          // Don't fail the request if email fails
         }
-
-        await sendDonationReceipt({
-          toEmail: donation.donorEmail,
-          donorName: donation.donorName || 'Anonymous Donor',
-          campaignName: `${donation.campaign.teamName} - ${donation.campaign.organizationName}`,
-          amount: Number(donation.grossAmount) / 100,
-          donationDate: donation.createdAt,
-          taxDeductible: false, // TODO: Set based on campaign's tax-exempt status
-        });
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the request if email fails
       }
 
       return NextResponse.json({
         success: true,
-        message: "Payment verified successfully",
+        message: completed ? "Payment verified successfully" : "Donation already completed",
         donation: {
-          id: updatedDonation.id,
-          status: updatedDonation.status,
-          amount: Number(updatedDonation.grossAmount) / 100,
+          id: donation.id,
+          status: 'COMPLETED',
+          amount: Number(donation.grossAmount) / 100,
           campaignName: `${donation.campaign.teamName} - ${donation.campaign.organizationName}`,
         }
       });
@@ -264,7 +193,8 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to verify donation"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to verify donation"
       },
       { status: 500 }
     );

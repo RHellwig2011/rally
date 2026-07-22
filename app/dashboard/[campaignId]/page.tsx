@@ -27,6 +27,9 @@ import {
   CheckCircle,
   Archive,
   FileText,
+  Heart,
+  Trophy,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +56,20 @@ import {
 import { formatCurrency, formatRelativeTime, calculatePercentage } from "@/lib/utils";
 import { exportStatusHistoryToCSV } from "@/lib/utils/export";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
+
+// The campaign/disbursement/donation APIs return DOLLAR values;
+// formatCurrency expects cents, so convert before formatting.
+const toCents = (dollars: unknown) => Math.round(Number(dollars ?? 0) * 100);
+
+const PURPOSE_LABELS: Record<string, string> = {
+  EQUIPMENT: "Equipment & Supplies",
+  TRAVEL: "Travel & Lodging",
+  UNIFORMS: "Team Apparel",
+  FACILITIES: "Facilities",
+  TOURNAMENT_FEES: "Competition Registration",
+  OTHER: "Other",
+};
 
 interface DashboardData {
   campaign: any;
@@ -69,8 +86,10 @@ export default function DashboardPage({
   params: { campaignId: string };
 }) {
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingDisbursement, setIsSubmittingDisbursement] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -111,14 +130,26 @@ export default function DashboardPage({
         throw new Error(result.error || 'Failed to fetch campaign data');
       }
 
+      // Fetch recent donations and disbursement requests alongside the
+      // campaign. These are secondary — tolerate failures (e.g. a viewer
+      // without disbursement access) and fall back to empty lists.
+      const [donationsResult, disbursementsResult] = await Promise.all([
+        fetch(`/api/campaigns/${params.campaignId}/recent-donations?limit=5`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+        fetch(`/api/campaigns/${params.campaignId}/disbursements`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]);
+
       // The API returns { success: true, campaign: {...} }
       // No need to convert - API already converts BigInt to numbers
       const dashboardData: DashboardData = {
         campaign: result.campaign,
         bankingAccount: result.campaign.bankingAccount || null,
-        recentDonations: [],  // Will be fetched separately or add to API
-        disbursementRequests: [],  // Will be fetched separately or add to API
-        teamMembers: [],  // Will be fetched separately or add to API
+        recentDonations: donationsResult?.donations || [],
+        disbursementRequests: disbursementsResult?.disbursements || [],
+        teamMembers: [],  // Not rendered on this page yet
         stats: {
           donorCount: result.campaign.statistics?.uniqueDonorCount || 0,
           avgDonation: result.campaign.statistics?.averageDonation || 0,
@@ -136,11 +167,55 @@ export default function DashboardPage({
     }
   };
 
-  const handleDisbursementRequest = () => {
-    console.log("Disbursement request:", disbursementForm);
-    alert("Disbursement request submitted! (Will save to database once connected)");
-    setIsRequestDialogOpen(false);
-    setDisbursementForm({ amount: "", purpose: "", description: "" });
+  const refreshDisbursements = async () => {
+    try {
+      const res = await fetch(`/api/campaigns/${params.campaignId}/disbursements`);
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setData((prev) =>
+          prev ? { ...prev, disbursementRequests: result.disbursements || [] } : prev
+        );
+      }
+    } catch (err) {
+      console.error('Error refreshing disbursements:', err);
+    }
+  };
+
+  const handleDisbursementRequest = async () => {
+    try {
+      setIsSubmittingDisbursement(true);
+      const res = await fetch(`/api/campaigns/${params.campaignId}/disbursements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify({
+          amount: parseFloat(disbursementForm.amount), // API expects dollars
+          purpose: disbursementForm.purpose,
+          description: disbursementForm.description,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        const details = Array.isArray(result.details)
+          ? `: ${result.details.map((d: any) => d.message).join(', ')}`
+          : '';
+        throw new Error((result.error || 'Failed to submit disbursement request') + details);
+      }
+
+      alert('Disbursement request submitted successfully!');
+      setIsRequestDialogOpen(false);
+      setDisbursementForm({ amount: "", purpose: "", description: "" });
+      refreshDisbursements();
+    } catch (err) {
+      console.error('Error submitting disbursement request:', err);
+      alert(err instanceof Error ? err.message : 'Failed to submit disbursement request');
+    } finally {
+      setIsSubmittingDisbursement(false);
+    }
   };
 
   const openStatusChangeDialog = (newStatus: string) => {
@@ -156,7 +231,10 @@ export default function DashboardPage({
       setIsChangingStatus(true);
       const res = await fetch(`/api/campaigns/${params.campaignId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify({
           status: selectedNewStatus,
           reason: statusChangeReason || undefined,
@@ -210,16 +288,24 @@ export default function DashboardPage({
     if (!data) return;
 
     try {
+      const body: Record<string, unknown> = {
+        organizationName: settingsForm.organizationName,
+        teamName: settingsForm.teamName,
+        description: settingsForm.description,
+        goalAmount: parseFloat(settingsForm.goalAmount), // API expects dollars
+      };
+      // The API schema rejects endDate: null — omit the key when blank
+      if (settingsForm.endDate) {
+        body.endDate = new Date(settingsForm.endDate).toISOString();
+      }
+
       const res = await fetch(`/api/campaigns/${params.campaignId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationName: settingsForm.organizationName,
-          teamName: settingsForm.teamName,
-          description: settingsForm.description,
-          goalAmount: parseFloat(settingsForm.goalAmount) * 100, // Convert to cents
-          endDate: settingsForm.endDate ? new Date(settingsForm.endDate).toISOString() : null,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
+        body: JSON.stringify(body),
       });
 
       const result = await res.json();
@@ -244,7 +330,7 @@ export default function DashboardPage({
       organizationName: data.campaign.organizationName || '',
       teamName: data.campaign.teamName || '',
       description: data.campaign.description || '',
-      goalAmount: (Number(data.campaign.goalAmount) / 100).toString(),
+      goalAmount: String(data.campaign.goalAmount ?? ''), // API already returns dollars
       endDate: data.campaign.endDate ? new Date(data.campaign.endDate).toISOString().split('T')[0] : '',
     });
     setIsSettingsDialogOpen(true);
@@ -338,7 +424,7 @@ export default function DashboardPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-muted">
         <nav className="border-b bg-white sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
@@ -346,7 +432,7 @@ export default function DashboardPage({
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-lg">R</span>
                 </div>
-                <span className="text-2xl font-bold text-gray-900">Rally</span>
+                <span className="text-2xl font-bold text-foreground">Rally</span>
               </Link>
             </div>
           </div>
@@ -355,10 +441,10 @@ export default function DashboardPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Skeleton */}
           <div className="mb-8">
-            <div className="h-9 w-96 bg-gray-200 rounded animate-pulse mb-2" />
+            <div className="h-9 w-96 bg-accent rounded animate-pulse mb-2" />
             <div className="flex flex-wrap gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-9 w-32 bg-gray-200 rounded animate-pulse" />
+                <div key={i} className="h-9 w-32 bg-accent rounded animate-pulse" />
               ))}
             </div>
           </div>
@@ -368,11 +454,11 @@ export default function DashboardPage({
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-white border rounded-lg p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-5 w-5 bg-gray-200 rounded-full animate-pulse" />
+                  <div className="h-4 w-24 bg-accent rounded animate-pulse" />
+                  <div className="h-5 w-5 bg-accent rounded-full animate-pulse" />
                 </div>
-                <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-2" />
-                <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
+                <div className="h-8 w-32 bg-accent rounded animate-pulse mb-2" />
+                <div className="h-3 w-20 bg-accent rounded animate-pulse" />
               </div>
             ))}
           </div>
@@ -399,11 +485,11 @@ export default function DashboardPage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Campaign</h2>
-          <p className="text-gray-600 mb-4">{error || 'Unknown error occurred'}</p>
+          <AlertCircle className="w-12 h-12 text-warning mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Failed to Load Campaign</h2>
+          <p className="text-muted-foreground mb-4">{error || 'Unknown error occurred'}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
@@ -411,17 +497,20 @@ export default function DashboardPage({
   }
 
   const percentage = calculatePercentage(
-    data.campaign.currentAmount,
-    data.campaign.goalAmount
+    toCents(data.campaign.currentAmount),
+    toCents(data.campaign.goalAmount)
   );
+
+  // Banking details are only returned to owners/guardians/admins — null otherwise
+  const banking = data.bankingAccount;
 
   const pendingRequests = data.disbursementRequests.filter(dr => dr.status === 'PENDING');
   const completedDisbursements = data.disbursementRequests.filter(
-    dr => dr.status === 'COMPLETED' && dr.disbursementDate
+    dr => dr.status === 'COMPLETED'
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -430,7 +519,7 @@ export default function DashboardPage({
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" asChild>
@@ -452,7 +541,7 @@ export default function DashboardPage({
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
                 {data.campaign.organizationName} {data.campaign.teamName}
               </h1>
             </div>
@@ -635,7 +724,7 @@ export default function DashboardPage({
                           className="mt-2"
                           rows={3}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           This will be recorded in the campaign history
                         </p>
                       </div>
@@ -681,9 +770,9 @@ export default function DashboardPage({
                   <div className="py-4">
                     {statusHistory.length === 0 ? (
                       <div className="text-center py-8">
-                        <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600">No status changes recorded yet</p>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-muted-foreground">No status changes recorded yet</p>
+                        <p className="text-sm text-muted-foreground mt-1">
                           Status change history will appear here
                         </p>
                       </div>
@@ -701,19 +790,19 @@ export default function DashboardPage({
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center justify-between mb-1">
-                                <p className="font-semibold text-gray-900">
+                                <p className="font-semibold text-foreground">
                                   {change.from} → {change.to}
                                 </p>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-muted-foreground">
                                   {formatRelativeTime(change.timestamp)}
                                 </span>
                               </div>
                               {change.reason && (
-                                <p className="text-sm text-gray-600 italic mb-2">
+                                <p className="text-sm text-muted-foreground italic mb-2">
                                   "{change.reason}"
                                 </p>
                               )}
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 Changed by {change.changedBy?.name || change.changedBy?.email}
                               </p>
                             </div>
@@ -840,20 +929,20 @@ export default function DashboardPage({
                 <CheckCircle className="h-4 w-4" />
                 <AlertTitle>Goal Reached! 🎉</AlertTitle>
                 <AlertDescription>
-                  Congratulations! You've reached your fundraising goal of {formatCurrency(data.campaign.goalAmount)}.
+                  Congratulations! You've reached your fundraising goal of {formatCurrency(toCents(data.campaign.goalAmount))}.
                   You can continue fundraising or mark the campaign as complete.
                 </AlertDescription>
               </Alert>
             )}
 
             {/* Low Balance Warning for Pending Disbursements */}
-            {data.bankingAccount.pendingDisbursement > data.bankingAccount.availableBalance && (
+            {banking && banking.pendingDisbursement > banking.availableBalance && (
               <Alert variant="warning">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Insufficient Balance for Pending Disbursements</AlertTitle>
                 <AlertDescription>
-                  You have {formatCurrency(data.bankingAccount.pendingDisbursement)} in pending disbursement requests,
-                  but only {formatCurrency(data.bankingAccount.availableBalance)} available.
+                  You have {formatCurrency(toCents(banking.pendingDisbursement))} in pending disbursement requests,
+                  but only {formatCurrency(toCents(banking.availableBalance))} available.
                   Some requests may need to wait for more donations.
                 </AlertDescription>
               </Alert>
@@ -897,9 +986,29 @@ export default function DashboardPage({
                 Mass Outreach
               </Link>
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export Data
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/${params.campaignId}/cheer-wall`}>
+                <Heart className="w-4 h-4 mr-2" />
+                Cheer Wall
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/${params.campaignId}/leaderboard`}>
+                <Trophy className="w-4 h-4 mr-2" />
+                Leaderboard
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/${params.campaignId}/alumni`}>
+                <GraduationCap className="w-4 h-4 mr-2" />
+                Alumni
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={`/api/campaigns/${params.campaignId}/export?type=donations`} download>
+                <Download className="w-4 h-4 mr-2" />
+                Export Data
+              </a>
             </Button>
           </div>
         </div>
@@ -908,14 +1017,14 @@ export default function DashboardPage({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Total Raised
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCurrency(data.bankingAccount.totalRaised)}
+              <div className="text-3xl font-bold text-foreground">
+                {formatCurrency(toCents(banking ? banking.totalRaised : data.campaign.totalRaised))}
               </div>
               <p className="text-sm text-success mt-1 flex items-center">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -926,46 +1035,46 @@ export default function DashboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Platform Fee
               </CardTitle>
-              <BarChart3 className="w-5 h-5 text-gray-400" />
+              <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCurrency(data.bankingAccount.platformFeesCollected)}
+              <div className="text-3xl font-bold text-foreground">
+                {banking ? formatCurrency(toCents(banking.platformFeesCollected)) : "—"}
               </div>
-              <p className="text-sm text-gray-500 mt-1">(10%)</p>
+              <p className="text-sm text-muted-foreground mt-1">(10%)</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Available Balance
               </CardTitle>
               <Wallet className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCurrency(data.bankingAccount.availableBalance)}
+              <div className="text-3xl font-bold text-foreground">
+                {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Ready to withdraw</p>
+              <p className="text-sm text-muted-foreground mt-1">Ready to withdraw</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Disbursed
               </CardTitle>
-              <ArrowUpRight className="w-5 h-5 text-gray-400" />
+              <ArrowUpRight className="w-5 h-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCurrency(data.bankingAccount.disbursedTotal)}
+              <div className="text-3xl font-bold text-foreground">
+                {banking ? formatCurrency(toCents(banking.disbursedTotal)) : "—"}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Total paid out</p>
+              <p className="text-sm text-muted-foreground mt-1">Total paid out</p>
             </CardContent>
           </Card>
         </div>
@@ -986,18 +1095,18 @@ export default function DashboardPage({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Goal Progress</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(data.campaign.currentAmount)} of{" "}
-                        {formatCurrency(data.campaign.goalAmount)}
+                      <p className="text-sm text-muted-foreground">Goal Progress</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency(toCents(data.campaign.currentAmount))} of{" "}
+                        {formatCurrency(toCents(data.campaign.goalAmount))}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-3xl font-bold text-primary">{percentage}%</p>
-                      <p className="text-sm text-gray-600">Complete</p>
+                      <p className="text-sm text-muted-foreground">Complete</p>
                     </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-accent rounded-full h-3">
                     <div
                       className="bg-primary rounded-full h-3 transition-all"
                       style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -1005,28 +1114,28 @@ export default function DashboardPage({
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-foreground">
                         {data.stats.donorCount}
                       </p>
-                      <p className="text-xs text-gray-600">Donors</p>
+                      <p className="text-xs text-muted-foreground">Donors</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(data.stats.avgDonation)}
+                      <p className="text-2xl font-bold text-foreground">
+                        {formatCurrency(toCents(data.stats.avgDonation))}
                       </p>
-                      <p className="text-xs text-gray-600">Avg Donation</p>
+                      <p className="text-xs text-muted-foreground">Avg Donation</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-success">
                         +{data.stats.newDonorsToday}
                       </p>
-                      <p className="text-xs text-gray-600">Today</p>
+                      <p className="text-xs text-muted-foreground">Today</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-2xl font-bold text-foreground">
                         {data.stats.daysLeft}
                       </p>
-                      <p className="text-xs text-gray-600">Days Left</p>
+                      <p className="text-xs text-muted-foreground">Days Left</p>
                     </div>
                   </div>
                 </div>
@@ -1049,11 +1158,11 @@ export default function DashboardPage({
               <CardContent>
                 {data.recentDonations.length === 0 ? (
                   <div className="text-center py-12">
-                    <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
                       No donations yet
                     </h3>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       Share your campaign link to start receiving donations
                     </p>
                     <Button asChild variant="outline">
@@ -1075,21 +1184,21 @@ export default function DashboardPage({
                             <DollarSign className="w-5 h-5 text-primary" />
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">
+                            <p className="font-semibold text-foreground">
                               {donation.donorName}
                             </p>
-                            {donation.donorMessage && (
-                              <p className="text-sm text-gray-600 mt-1 italic">
-                                "{donation.donorMessage}"
+                            {donation.message && (
+                              <p className="text-sm text-muted-foreground mt-1 italic">
+                                "{donation.message}"
                               </p>
                             )}
-                            <p className="text-xs text-gray-500 mt-1">
-                              {formatRelativeTime(donation.createdAt)}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatRelativeTime(donation.timestamp)}
                             </p>
                           </div>
                         </div>
                         <span className="font-bold text-success">
-                          {formatCurrency(donation.grossAmount)}
+                          {formatCurrency(toCents(donation.amount))}
                         </span>
                       </div>
                     ))}
@@ -1110,10 +1219,10 @@ export default function DashboardPage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 mb-1">Available Balance</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {formatCurrency(data.bankingAccount.availableBalance)}
+                <div className="bg-muted rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
                   </p>
                 </div>
 
@@ -1132,14 +1241,14 @@ export default function DashboardPage({
                       <DialogTitle>Request Fund Disbursement</DialogTitle>
                       <DialogDescription>
                         Available Balance:{" "}
-                        {formatCurrency(data.bankingAccount.availableBalance)}
+                        {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div>
                         <Label htmlFor="amount">Amount to Request *</Label>
                         <div className="flex items-center mt-2">
-                          <span className="text-gray-600 mr-2">$</span>
+                          <span className="text-muted-foreground mr-2">$</span>
                           <Input
                             id="amount"
                             type="number"
@@ -1168,19 +1277,20 @@ export default function DashboardPage({
                           className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
                           <option value="">Select purpose</option>
-                          <option value="Competition Registration">
+                          <option value="TOURNAMENT_FEES">
                             Competition Registration
                           </option>
-                          <option value="Travel & Lodging">Travel & Lodging</option>
-                          <option value="Equipment & Supplies">
+                          <option value="TRAVEL">Travel & Lodging</option>
+                          <option value="EQUIPMENT">
                             Equipment & Supplies
                           </option>
-                          <option value="Team Apparel">Team Apparel</option>
-                          <option value="Other">Other</option>
+                          <option value="UNIFORMS">Team Apparel</option>
+                          <option value="FACILITIES">Facilities</option>
+                          <option value="OTHER">Other</option>
                         </select>
                       </div>
                       <div>
-                        <Label htmlFor="description">Description</Label>
+                        <Label htmlFor="description">Description * (min 10 characters)</Label>
                         <Textarea
                           id="description"
                           placeholder="Provide details about this expense..."
@@ -1218,10 +1328,20 @@ export default function DashboardPage({
                       <Button
                         onClick={handleDisbursementRequest}
                         disabled={
-                          !disbursementForm.amount || !disbursementForm.purpose
+                          isSubmittingDisbursement ||
+                          !disbursementForm.amount ||
+                          !disbursementForm.purpose ||
+                          disbursementForm.description.trim().length < 10
                         }
                       >
-                        Submit Request
+                        {isSubmittingDisbursement ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Request'
+                        )}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1251,16 +1371,18 @@ export default function DashboardPage({
                         className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <p className="font-semibold text-gray-900">
-                            {formatCurrency(request.requestedAmount)}
+                          <p className="font-semibold text-foreground">
+                            {formatCurrency(toCents(request.amount))}
                           </p>
                           <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
                             Pending
                           </span>
                         </div>
-                        <p className="text-sm text-gray-700">{request.purpose}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Requested {formatRelativeTime(request.requestedAt)}
+                        <p className="text-sm text-foreground">
+                          {PURPOSE_LABELS[request.purpose] || request.purpose}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Requested {formatRelativeTime(request.createdAt)}
                         </p>
                         <p className="text-xs text-yellow-700 mt-2">
                           Awaiting guardian approval
@@ -1283,9 +1405,9 @@ export default function DashboardPage({
               <CardContent>
                 {completedDisbursements.length === 0 ? (
                   <div className="text-center py-8">
-                    <Check className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">No recent activity</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <Check className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">No recent activity</p>
+                    <p className="text-xs text-muted-foreground mt-1">
                       Completed disbursements will appear here
                     </p>
                   </div>
@@ -1298,12 +1420,12 @@ export default function DashboardPage({
                       >
                         <div className="w-2 h-2 rounded-full bg-success mt-2 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">
-                            {formatCurrency(disbursement.requestedAmount)} -{" "}
-                            {disbursement.purpose}
+                          <p className="font-medium text-foreground">
+                            {formatCurrency(toCents(disbursement.amount))} -{" "}
+                            {PURPOSE_LABELS[disbursement.purpose] || disbursement.purpose}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Completed {formatRelativeTime(disbursement.completedAt)}
+                          <p className="text-xs text-muted-foreground">
+                            Completed {formatRelativeTime(disbursement.approvedAt || disbursement.createdAt)}
                           </p>
                         </div>
                       </div>

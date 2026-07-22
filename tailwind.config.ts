@@ -23,6 +23,14 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // Reads the CSS variables already defined in app/globals.css, so it is
+        // dark-mode aware. Without this registration Tailwind never emits
+        // text-destructive/bg-destructive and the destructive variants of
+        // Alert and Toast render with no styling at all.
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
         primary: {
           DEFAULT: "#6366F1", // Indigo
           50: "#ECEFFE",

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSlugValidation } from "@/hooks/useSlugValidation";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 // Campaign form data type
 interface CampaignFormData {
@@ -64,6 +65,7 @@ const CATEGORIES = [
 
 export default function EnhancedCreateCampaignPage() {
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -286,7 +288,10 @@ export default function EnhancedCreateCampaignPage() {
     try {
       const response = await fetch("/api/campaigns", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
         body: JSON.stringify({
           organizationName: formData.organizationName.trim(),
           teamName: formData.teamName.trim(),
@@ -348,10 +353,10 @@ export default function EnhancedCreateCampaignPage() {
   // Show loading while checking authentication
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -370,7 +375,7 @@ export default function EnhancedCreateCampaignPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -379,13 +384,13 @@ export default function EnhancedCreateCampaignPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
 
             <div className="flex items-center gap-4">
               {/* Save Status Indicator */}
               {saveStatus && (
-                <span className="text-sm text-gray-600 flex items-center gap-1">
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
                   {saveStatus === 'saving' ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -393,7 +398,7 @@ export default function EnhancedCreateCampaignPage() {
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="w-3 h-3 text-green-600" />
+                      <CheckCircle className="w-3 h-3 text-success" />
                       Draft saved
                     </>
                   )}
@@ -429,10 +434,10 @@ export default function EnhancedCreateCampaignPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">Create Your Campaign</h1>
-            <span className="text-sm text-gray-600">{calculateProgress()}% Complete</span>
+            <h1 className="text-2xl font-bold text-foreground">Create Your Campaign</h1>
+            <span className="text-sm text-muted-foreground">{calculateProgress()}% Complete</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-accent rounded-full h-2">
             <div
               className="bg-primary h-2 rounded-full transition-all duration-500"
               style={{ width: `${calculateProgress()}%` }}
@@ -452,7 +457,7 @@ export default function EnhancedCreateCampaignPage() {
                         ? "bg-success text-white"
                         : currentStep === step.number
                         ? "bg-primary text-white ring-4 ring-primary/20"
-                        : "bg-gray-200 text-gray-600"
+                        : "bg-accent text-muted-foreground"
                     }`}
                   >
                     {currentStep > step.number ? (
@@ -464,13 +469,13 @@ export default function EnhancedCreateCampaignPage() {
                   <div className="mt-2 text-center absolute top-12 w-20">
                     <span
                       className={`text-xs font-medium block ${
-                        currentStep >= step.number ? "text-gray-900" : "text-gray-500"
+                        currentStep >= step.number ? "text-foreground" : "text-muted-foreground"
                       }`}
                     >
                       {step.title}
                     </span>
                     {currentStep === step.number && (
-                      <span className="text-xs text-gray-500 mt-1 hidden md:block">
+                      <span className="text-xs text-muted-foreground mt-1 hidden md:block">
                         {step.description}
                       </span>
                     )}
@@ -479,7 +484,7 @@ export default function EnhancedCreateCampaignPage() {
                 {index < STEPS.length - 1 && (
                   <div
                     className={`flex-1 h-1 mx-2 rounded transition-all ${
-                      currentStep > step.number ? "bg-success" : "bg-gray-200"
+                      currentStep > step.number ? "bg-success" : "bg-accent"
                     }`}
                   />
                 )}
@@ -494,19 +499,19 @@ export default function EnhancedCreateCampaignPage() {
             <CardTitle className="text-xl md:text-2xl">
               Step {currentStep}: {STEPS[currentStep - 1].title}
             </CardTitle>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {STEPS[currentStep - 1].description}
             </p>
           </CardHeader>
           <CardContent>
             {/* Error Alert */}
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+              <div className="mb-6 bg-warning-light border border-warning rounded-lg p-4 flex items-start">
+                <AlertCircle className="w-5 h-5 text-warning mr-3 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-red-900">{error}</p>
+                  <p className="text-sm font-medium text-warning-dark">{error}</p>
                   {Object.keys(validationErrors).length > 0 && (
-                    <ul className="mt-2 text-sm text-red-800 list-disc list-inside">
+                    <ul className="mt-2 text-sm text-warning-dark list-disc list-inside">
                       {Object.entries(validationErrors).map(([field, message]) => (
                         <li key={field}>{message}</li>
                       ))}
@@ -524,7 +529,7 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="organizationName">
                     Organization Name *
                     {fieldTouched.organizationName && !validationErrors.organizationName && formData.organizationName && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                   </Label>
                   <Input
@@ -535,16 +540,16 @@ export default function EnhancedCreateCampaignPage() {
                     onBlur={() => setFieldTouched(prev => ({ ...prev, organizationName: true }))}
                     className={`mt-2 ${
                       fieldTouched.organizationName && validationErrors.organizationName
-                        ? "border-red-500 focus:ring-red-500"
+                        ? "border-warning focus:ring-warning"
                         : fieldTouched.organizationName && formData.organizationName && !validationErrors.organizationName
-                        ? "border-green-500 focus:ring-green-500"
+                        ? "border-success focus:ring-success"
                         : ""
                     }`}
                     aria-invalid={!!validationErrors.organizationName}
                     aria-describedby="organizationName-error"
                   />
                   {fieldTouched.organizationName && validationErrors.organizationName && (
-                    <p id="organizationName-error" className="mt-1 text-sm text-red-600">
+                    <p id="organizationName-error" className="mt-1 text-sm text-warning">
                       {validationErrors.organizationName}
                     </p>
                   )}
@@ -555,7 +560,7 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="teamName">
                     Team/Group Name *
                     {fieldTouched.teamName && !validationErrors.teamName && formData.teamName && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                   </Label>
                   <Input
@@ -566,14 +571,14 @@ export default function EnhancedCreateCampaignPage() {
                     onBlur={() => setFieldTouched(prev => ({ ...prev, teamName: true }))}
                     className={`mt-2 ${
                       fieldTouched.teamName && validationErrors.teamName
-                        ? "border-red-500"
+                        ? "border-warning"
                         : fieldTouched.teamName && formData.teamName && !validationErrors.teamName
-                        ? "border-green-500"
+                        ? "border-success"
                         : ""
                     }`}
                   />
                   {fieldTouched.teamName && validationErrors.teamName && (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.teamName}</p>
+                    <p className="mt-1 text-sm text-warning">{validationErrors.teamName}</p>
                   )}
                 </div>
 
@@ -589,7 +594,7 @@ export default function EnhancedCreateCampaignPage() {
                         className={`p-3 rounded-lg border-2 transition-all text-center ${
                           formData.category === cat.value
                             ? "border-primary bg-primary/10 text-primary"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-border hover:border-border"
                         }`}
                       >
                         <span className="text-2xl mb-1 block">{cat.icon}</span>
@@ -604,17 +609,17 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="slug">
                     Campaign URL *
                     {slugValidation.isChecking && (
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-500 inline ml-2" />
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground inline ml-2" />
                     )}
                     {!slugValidation.isChecking && slugValidation.isAvailable && formData.slug && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                     {!slugValidation.isChecking && slugValidation.error && (
-                      <XCircle className="w-4 h-4 text-red-600 inline ml-2" />
+                      <XCircle className="w-4 h-4 text-warning inline ml-2" />
                     )}
                   </Label>
                   <div className="mt-2 flex flex-col md:flex-row md:items-center gap-2">
-                    <span className="text-sm text-gray-600">rally.com/raise/</span>
+                    <span className="text-sm text-muted-foreground">rally.com/raise/</span>
                     <Input
                       id="slug"
                       placeholder="lincoln-varsity-2024"
@@ -627,26 +632,26 @@ export default function EnhancedCreateCampaignPage() {
                       onBlur={() => setFieldTouched(prev => ({ ...prev, slug: true }))}
                       className={`flex-1 ${
                         slugValidation.error || validationErrors.slug
-                          ? "border-red-500"
+                          ? "border-warning"
                           : slugValidation.isAvailable && formData.slug
-                          ? "border-green-500"
+                          ? "border-success"
                           : ""
                       }`}
                       maxLength={50}
                     />
                   </div>
                   {(slugValidation.error || validationErrors.slug) && (
-                    <p className="text-xs text-red-600 mt-1">
+                    <p className="text-xs text-warning mt-1">
                       {slugValidation.error || validationErrors.slug}
                     </p>
                   )}
                   {slugValidation.isAvailable && formData.slug && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-success mt-1 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
                       This URL is available!
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {formData.slug.length}/50 characters
                   </p>
                 </div>
@@ -656,11 +661,11 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="goalAmount">
                     Fundraising Goal *
                     {fieldTouched.goalAmount && !validationErrors.goalAmount && formData.goalAmount && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                   </Label>
                   <div className="mt-2 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                     <Input
                       id="goalAmount"
                       type="number"
@@ -671,9 +676,9 @@ export default function EnhancedCreateCampaignPage() {
                       onBlur={() => setFieldTouched(prev => ({ ...prev, goalAmount: true }))}
                       className={`pl-8 ${
                         fieldTouched.goalAmount && validationErrors.goalAmount
-                          ? "border-red-500"
+                          ? "border-warning"
                           : fieldTouched.goalAmount && formData.goalAmount && !validationErrors.goalAmount
-                          ? "border-green-500"
+                          ? "border-success"
                           : ""
                       }`}
                       min="1"
@@ -681,9 +686,9 @@ export default function EnhancedCreateCampaignPage() {
                     />
                   </div>
                   {fieldTouched.goalAmount && validationErrors.goalAmount && (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.goalAmount}</p>
+                    <p className="mt-1 text-sm text-warning">{validationErrors.goalAmount}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Minimum $1, Maximum $100,000
                   </p>
                 </div>
@@ -700,13 +705,13 @@ export default function EnhancedCreateCampaignPage() {
                       onBlur={() => setFieldTouched(prev => ({ ...prev, startDate: true }))}
                       className={`mt-2 ${
                         fieldTouched.startDate && validationErrors.startDate
-                          ? "border-red-500"
+                          ? "border-warning"
                           : ""
                       }`}
                       min={new Date().toISOString().split('T')[0]}
                     />
                     {fieldTouched.startDate && validationErrors.startDate && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.startDate}</p>
+                      <p className="mt-1 text-sm text-warning">{validationErrors.startDate}</p>
                     )}
                   </div>
                   <div>
@@ -719,13 +724,13 @@ export default function EnhancedCreateCampaignPage() {
                       onBlur={() => setFieldTouched(prev => ({ ...prev, endDate: true }))}
                       className={`mt-2 ${
                         fieldTouched.endDate && validationErrors.endDate
-                          ? "border-red-500"
+                          ? "border-warning"
                           : ""
                       }`}
                       min={formData.startDate}
                     />
                     {fieldTouched.endDate && validationErrors.endDate && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.endDate}</p>
+                      <p className="mt-1 text-sm text-warning">{validationErrors.endDate}</p>
                     )}
                   </div>
                 </div>
@@ -740,7 +745,7 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="description">
                     Campaign Story *
                     {fieldTouched.description && !validationErrors.description && formData.description.length >= 10 && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                   </Label>
                   <Textarea
@@ -751,25 +756,25 @@ export default function EnhancedCreateCampaignPage() {
                     onBlur={() => setFieldTouched(prev => ({ ...prev, description: true }))}
                     className={`mt-2 min-h-[200px] ${
                       fieldTouched.description && validationErrors.description
-                        ? "border-red-500"
+                        ? "border-warning"
                         : fieldTouched.description && formData.description.length >= 10
-                        ? "border-green-500"
+                        ? "border-success"
                         : ""
                     }`}
                     maxLength={1000}
                   />
                   <div className="flex justify-between items-center mt-1">
                     {fieldTouched.description && validationErrors.description ? (
-                      <p className="text-xs text-red-600">{validationErrors.description}</p>
+                      <p className="text-xs text-warning">{validationErrors.description}</p>
                     ) : (
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         Make it personal and compelling!
                       </p>
                     )}
                     <span className={`text-xs ${
                       formData.description.length > 900 ? "text-orange-600" :
-                      formData.description.length > 1000 ? "text-red-600" :
-                      "text-gray-500"
+                      formData.description.length > 1000 ? "text-warning" :
+                      "text-muted-foreground"
                     }`}>
                       {formData.description.length}/1000
                     </span>
@@ -781,7 +786,7 @@ export default function EnhancedCreateCampaignPage() {
                   <Label>Brand Colors</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div>
-                      <Label htmlFor="primaryColor" className="text-xs text-gray-600">
+                      <Label htmlFor="primaryColor" className="text-xs text-muted-foreground">
                         Primary Color
                       </Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -806,7 +811,7 @@ export default function EnhancedCreateCampaignPage() {
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="secondaryColor" className="text-xs text-gray-600">
+                      <Label htmlFor="secondaryColor" className="text-xs text-muted-foreground">
                         Secondary Color
                       </Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -834,8 +839,8 @@ export default function EnhancedCreateCampaignPage() {
                 </div>
 
                 {/* Color Preview */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <p className="text-sm font-medium text-gray-700 mb-4">
+                <div className="bg-muted rounded-lg p-6">
+                  <p className="text-sm font-medium text-foreground mb-4">
                     Preview: Your Campaign Page Colors
                   </p>
                   <div className="space-y-3">
@@ -860,7 +865,7 @@ export default function EnhancedCreateCampaignPage() {
                           background: `linear-gradient(to right, ${formData.primaryColor}, ${formData.secondaryColor})`
                         }}
                       />
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         This is how your progress bar will look
                       </p>
                     </div>
@@ -888,7 +893,7 @@ export default function EnhancedCreateCampaignPage() {
                   <Label htmlFor="guardianEmail">
                     Guardian Email (Optional)
                     {fieldTouched.guardianEmail && !validationErrors.guardianEmail && formData.guardianEmail && (
-                      <CheckCircle className="w-4 h-4 text-green-600 inline ml-2" />
+                      <CheckCircle className="w-4 h-4 text-success inline ml-2" />
                     )}
                   </Label>
                   <Input
@@ -900,16 +905,16 @@ export default function EnhancedCreateCampaignPage() {
                     onBlur={() => setFieldTouched(prev => ({ ...prev, guardianEmail: true }))}
                     className={`mt-2 ${
                       fieldTouched.guardianEmail && validationErrors.guardianEmail
-                        ? "border-red-500"
+                        ? "border-warning"
                         : fieldTouched.guardianEmail && formData.guardianEmail && !validationErrors.guardianEmail
-                        ? "border-green-500"
+                        ? "border-success"
                         : ""
                     }`}
                   />
                   {fieldTouched.guardianEmail && validationErrors.guardianEmail ? (
-                    <p className="text-xs text-red-600 mt-1">{validationErrors.guardianEmail}</p>
+                    <p className="text-xs text-warning mt-1">{validationErrors.guardianEmail}</p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Guardian will receive notifications and can approve large disbursements
                     </p>
                   )}
@@ -931,7 +936,7 @@ export default function EnhancedCreateCampaignPage() {
                 <div>
                   <Label htmlFor="approvalThreshold">Approval Threshold</Label>
                   <div className="mt-2 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                     <Input
                       id="approvalThreshold"
                       type="number"
@@ -942,7 +947,7 @@ export default function EnhancedCreateCampaignPage() {
                       max="10000"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Disbursements over this amount require guardian approval (Min $50, Max $10,000)
                   </p>
                 </div>
@@ -965,7 +970,7 @@ export default function EnhancedCreateCampaignPage() {
                   {/* Organization Details */}
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-semibold text-gray-900">Organization Details</h4>
+                      <h4 className="font-semibold text-foreground">Organization Details</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -975,33 +980,33 @@ export default function EnhancedCreateCampaignPage() {
                         Edit
                       </Button>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div className="bg-muted rounded-lg p-4 space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Organization:</span>
+                        <span className="text-muted-foreground">Organization:</span>
                         <span className="font-medium">{formData.organizationName || "Not set"}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Team:</span>
+                        <span className="text-muted-foreground">Team:</span>
                         <span className="font-medium">{formData.teamName || "Not set"}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Category:</span>
+                        <span className="text-muted-foreground">Category:</span>
                         <span className="font-medium">{formData.category}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Goal:</span>
-                        <span className="font-medium text-green-600">
+                        <span className="text-muted-foreground">Goal:</span>
+                        <span className="font-medium text-success">
                           ${parseFloat(formData.goalAmount || "0").toLocaleString()}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Campaign URL:</span>
+                        <span className="text-muted-foreground">Campaign URL:</span>
                         <span className="font-medium text-primary break-all">
                           rally.com/raise/{formData.slug || "not-set"}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Duration:</span>
+                        <span className="text-muted-foreground">Duration:</span>
                         <span className="font-medium">
                           {new Date(formData.startDate).toLocaleDateString()}
                           {formData.endDate && ` - ${new Date(formData.endDate).toLocaleDateString()}`}
@@ -1013,7 +1018,7 @@ export default function EnhancedCreateCampaignPage() {
                   {/* Campaign Story */}
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-semibold text-gray-900">Campaign Story</h4>
+                      <h4 className="font-semibold text-foreground">Campaign Story</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1023,8 +1028,8 @@ export default function EnhancedCreateCampaignPage() {
                         Edit
                       </Button>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    <div className="bg-muted rounded-lg p-4">
+                      <p className="text-sm text-foreground whitespace-pre-wrap">
                         {formData.description || "No description provided"}
                       </p>
                       <div className="flex gap-2 mt-3">
@@ -1036,7 +1041,7 @@ export default function EnhancedCreateCampaignPage() {
                           className="w-8 h-8 rounded"
                           style={{ backgroundColor: formData.secondaryColor }}
                         />
-                        <span className="text-xs text-gray-600 ml-2 leading-8">Your brand colors</span>
+                        <span className="text-xs text-muted-foreground ml-2 leading-8">Your brand colors</span>
                       </div>
                     </div>
                   </div>
@@ -1045,7 +1050,7 @@ export default function EnhancedCreateCampaignPage() {
                   {(formData.guardianEmail || formData.guardianName) && (
                     <div>
                       <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-semibold text-gray-900">Guardian Oversight</h4>
+                        <h4 className="font-semibold text-foreground">Guardian Oversight</h4>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1055,21 +1060,21 @@ export default function EnhancedCreateCampaignPage() {
                           Edit
                         </Button>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div className="bg-muted rounded-lg p-4 space-y-2">
                         {formData.guardianName && (
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Guardian:</span>
+                            <span className="text-muted-foreground">Guardian:</span>
                             <span className="font-medium">{formData.guardianName}</span>
                           </div>
                         )}
                         {formData.guardianEmail && (
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Email:</span>
+                            <span className="text-muted-foreground">Email:</span>
                             <span className="font-medium">{formData.guardianEmail}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Approval Threshold:</span>
+                          <span className="text-muted-foreground">Approval Threshold:</span>
                           <span className="font-medium">${formData.approvalThreshold}</span>
                         </div>
                       </div>
@@ -1078,14 +1083,14 @@ export default function EnhancedCreateCampaignPage() {
                 </div>
 
                 {/* Launch Confirmation */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div className="bg-success-light border border-success rounded-lg p-4 flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-success mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-green-900">Ready to launch!</p>
-                    <p className="text-sm text-green-800 mt-1">
+                    <p className="text-sm font-medium text-success-dark">Ready to launch!</p>
+                    <p className="text-sm text-success-dark mt-1">
                       Once you create your campaign, you'll be able to:
                     </p>
-                    <ul className="text-sm text-green-800 mt-2 space-y-1 list-disc list-inside">
+                    <ul className="text-sm text-success-dark mt-2 space-y-1 list-disc list-inside">
                       <li>Share your unique fundraising link</li>
                       <li>Add team members to help fundraise</li>
                       <li>Track donations in real-time</li>
@@ -1141,7 +1146,7 @@ export default function EnhancedCreateCampaignPage() {
         </Card>
 
         {/* Help Text */}
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>Need help? Contact us at support@rally.com</p>
         </div>
       </div>

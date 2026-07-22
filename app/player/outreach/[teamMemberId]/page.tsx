@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useCsrfToken } from '@/hooks/useCsrfToken';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +34,7 @@ interface Recipient {
 export default function PlayerOutreachPage() {
   const params = useParams();
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const teamMemberId = params?.teamMemberId as string;
 
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,22 @@ export default function PlayerOutreachPage() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+
+  useEffect(() => {
+    if (!teamMemberId) return;
+    (async () => {
+      try {
+        const response = await fetch(`/api/team-members/${teamMemberId}/public`);
+        const data = await response.json();
+        if (data.campaign?.id) {
+          setCampaignId(data.campaign.id);
+        }
+      } catch {
+        // Message generation stays disabled without a campaign id
+      }
+    })();
+  }, [teamMemberId]);
 
   // Message form
   const [messageType, setMessageType] = useState<'email' | 'sms' | 'both'>('email');
@@ -70,14 +88,20 @@ export default function PlayerOutreachPage() {
   };
 
   const generateMessage = async (type: 'email' | 'sms') => {
+    if (!campaignId) {
+      setError('Campaign information is still loading. Please try again in a moment.');
+      return;
+    }
+
     setGenerating(true);
     setError('');
 
     try {
-      const response = await fetch(`/api/campaigns/${teamMemberId}/generate-message`, {
+      const response = await fetch(`/api/campaigns/${campaignId}/generate-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
         body: JSON.stringify({
           type,
@@ -110,14 +134,20 @@ export default function PlayerOutreachPage() {
   };
 
   const generateVideoScript = async () => {
+    if (!campaignId) {
+      setError('Campaign information is still loading. Please try again in a moment.');
+      return;
+    }
+
     setGenerating(true);
     setError('');
 
     try {
-      const response = await fetch(`/api/campaigns/${teamMemberId}/generate-message`, {
+      const response = await fetch(`/api/campaigns/${campaignId}/generate-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
         body: JSON.stringify({
           type: 'video',
@@ -173,6 +203,7 @@ export default function PlayerOutreachPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
         },
         body: JSON.stringify({
           type: messageType,
@@ -216,19 +247,19 @@ export default function PlayerOutreachPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
-            <Send className="h-8 w-8 text-indigo-600" />
+          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+            <Send className="h-8 w-8 text-primary-600" />
             Share Your Fundraiser
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-muted-foreground">
             Send personalized messages to friends and family
           </p>
         </div>
 
         {success && (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
+          <Alert className="mb-6 bg-success-light border-success">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <AlertDescription className="text-success-dark">
               Your messages were sent successfully! Keep sharing to reach your goal.
             </AlertDescription>
           </Alert>
@@ -245,7 +276,7 @@ export default function PlayerOutreachPage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-600" />
+              <Sparkles className="h-5 w-5 text-primary-600" />
               Step 1: Choose How to Send
             </CardTitle>
           </CardHeader>
@@ -284,7 +315,7 @@ export default function PlayerOutreachPage() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-indigo-600" />
+                <Mail className="h-5 w-5 text-primary-600" />
                 Step 2: Create Your Message
               </span>
               <div className="flex gap-2">
@@ -340,7 +371,7 @@ export default function PlayerOutreachPage() {
                 className="mt-1"
                 maxLength={messageType === 'sms' ? 160 : undefined}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Use {'{name}'} to personalize each message
                 {messageType === 'sms' && ` • ${message.length}/160 characters`}
               </p>
@@ -366,7 +397,7 @@ export default function PlayerOutreachPage() {
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Record a video message and paste the URL here (works in email & MMS)
               </p>
             </div>
@@ -377,7 +408,7 @@ export default function PlayerOutreachPage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-indigo-600" />
+              <Users className="h-5 w-5 text-primary-600" />
               Step 3: Add Recipients
             </CardTitle>
             <CardDescription>
@@ -414,7 +445,7 @@ export default function PlayerOutreachPage() {
                     variant="ghost"
                     onClick={() => removeRecipient(index)}
                   >
-                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-warning" />
                   </Button>
                 )}
               </div>
@@ -435,7 +466,7 @@ export default function PlayerOutreachPage() {
         <Button
           onClick={sendMessages}
           disabled={sending}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 text-lg"
+          className="w-full bg-primary-600 hover:bg-primary-700 h-12 text-lg"
           size="lg"
         >
           {sending ? (
@@ -451,7 +482,7 @@ export default function PlayerOutreachPage() {
           )}
         </Button>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-muted-foreground mt-4">
           Your fundraising link will be automatically included in each message
         </p>
       </div>

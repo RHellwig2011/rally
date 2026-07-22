@@ -120,7 +120,7 @@ export const listTeamMembersQuerySchema = z.object({
     .default("desc")
     .optional(),
 
-  status: z.enum(["all", "pending", "accepted", "rejected"])
+  status: z.enum(["all", "pending", "accepted", "email_failed", "expired"])
     .default("all")
     .optional(),
 

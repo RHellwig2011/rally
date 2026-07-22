@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -28,8 +29,9 @@ interface Campaign {
   slug: string;
   organizationName: string;
   teamName: string;
-  goalAmount: string;
-  currentAmount: string;
+  // Dollar values (the campaign API divides cents by 100 before responding)
+  goalAmount: number;
+  currentAmount: number;
 }
 
 interface Contact {
@@ -40,9 +42,30 @@ interface Contact {
   selected: boolean;
 }
 
+interface OutreachResultRow {
+  recipient: string | null;
+  status: "SENT" | "FAILED" | "SKIPPED";
+  error?: string;
+}
+
+/**
+ * The send endpoint returns HTTP 200 with success:true for any run that passes
+ * validation — including runs that delivered nothing. The real outcome lives
+ * in these counters, so the UI must read them rather than trusting `success`.
+ */
+interface SendOutreachResult {
+  attempted: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: OutreachResultRow[];
+  message?: string;
+}
+
 export default function OutreachPage() {
   const params = useParams();
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const campaignId = params?.campaignId as string;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -51,8 +74,9 @@ export default function OutreachPage() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsError, setContactsError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [sendResult, setSendResult] = useState<SendOutreachResult | null>(null);
 
   useEffect(() => {
     fetchCampaign();
@@ -82,36 +106,32 @@ export default function OutreachPage() {
 
   const fetchContacts = async () => {
     try {
+      setContactsError(null);
       const response = await fetch(`/api/campaigns/${campaignId}/contacts`);
       const data = await response.json();
 
-      if (data.success) {
-        setContacts(
-          data.contacts.map((c: any) => ({
-            ...c,
-            selected: true,
-          }))
+      if (!response.ok || !data.success) {
+        setContacts([]);
+        setContactsError(
+          response.status === 401
+            ? "Your session has expired. Please sign in again to load contacts."
+            : data.error || "Could not load contacts. Please try again."
         );
+        return;
       }
+
+      setContacts(
+        data.contacts.map((c: any) => ({
+          ...c,
+          selected: true,
+        }))
+      );
     } catch (error) {
       console.error("Failed to fetch contacts:", error);
-      // Use mock data if API fails
-      setContacts([
-        {
-          id: "1",
-          name: "John Doe",
-          email: "john@example.com",
-          phone: "+1234567890",
-          selected: true,
-        },
-        {
-          id: "2",
-          name: "Jane Smith",
-          email: "jane@example.com",
-          phone: "+1234567891",
-          selected: true,
-        },
-      ]);
+      // Never fall back to placeholder people — sending outreach to fabricated
+      // contacts is worse than showing the coach an error.
+      setContacts([]);
+      setContactsError("Could not load contacts. Please try again.");
     }
   };
 
@@ -149,28 +169,47 @@ export default function OutreachPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
         },
         body: JSON.stringify({
           messageType,
           subject: messageType === "email" ? subject : undefined,
           message,
+          // Strip null/empty fields — the API schema expects absent, not null
           contacts: selectedContacts.map((c) => ({
-            email: c.email,
-            phone: c.phone,
-            name: c.name,
+            email: c.email || undefined,
+            phone: c.phone || undefined,
+            name: c.name || undefined,
           })),
         }),
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        setSent(true);
+      if (!response.ok || !data.success) {
+        alert(data.error || "Failed to send messages");
+        return;
+      }
+
+      // success:true only means the request was accepted. Trust the counters.
+      const result: SendOutreachResult = {
+        attempted: data.attempted ?? selectedContacts.length,
+        sent: data.sent ?? 0,
+        failed: data.failed ?? 0,
+        skipped: data.skipped ?? 0,
+        results: Array.isArray(data.results) ? data.results : [],
+        message: data.message,
+      };
+
+      setSendResult(result);
+
+      // Only leave the page when everything actually went out. Navigating away
+      // from a run with failures is how a coach never learns the appeal was
+      // not delivered.
+      if (result.sent > 0 && result.failed === 0 && result.skipped === 0) {
         setTimeout(() => {
           router.push(`/dashboard/${campaignId}`);
         }, 2000);
-      } else {
-        alert(data.error || "Failed to send messages");
       }
     } catch (error) {
       console.error("Failed to send:", error);
@@ -187,10 +226,10 @@ export default function OutreachPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -198,9 +237,9 @@ export default function OutreachPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <Button asChild>
             <Link href="/dashboard">Go to Dashboard</Link>
           </Button>
@@ -211,8 +250,20 @@ export default function OutreachPage() {
 
   const selectedCount = contacts.filter((c) => c.selected).length;
 
+  // A run is "clean" only when something was sent and nothing failed or was
+  // withheld. Everything else must stay on screen with the detail attached.
+  const cleanRun =
+    sendResult !== null &&
+    sendResult.sent > 0 &&
+    sendResult.failed === 0 &&
+    sendResult.skipped === 0;
+  const totalFailure =
+    sendResult !== null && sendResult.sent === 0 && sendResult.attempted > 0;
+  const problemRows =
+    sendResult?.results.filter((r) => r.status !== "SENT") ?? [];
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-muted py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -224,18 +275,18 @@ export default function OutreachPage() {
           </Button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
                 <Send className="w-8 h-8 text-primary" />
                 Mass Outreach
               </h1>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Send emails or SMS messages to your contacts
               </p>
             </div>
           </div>
         </div>
 
-        {sent && (
+        {sendResult && cleanRun && (
           <Card className="mb-8 border-success bg-success-light">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -243,10 +294,95 @@ export default function OutreachPage() {
                   <Check className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900">Messages Sent Successfully!</h3>
-                  <p className="text-sm text-gray-700">
-                    Your message was sent to {selectedCount} contacts. Redirecting...
+                  <h3 className="font-bold text-foreground">Messages Sent Successfully!</h3>
+                  <p className="text-sm text-foreground">
+                    Your message was sent to {sendResult.sent} contact
+                    {sendResult.sent !== 1 ? "s" : ""}. Redirecting...
                   </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {sendResult && totalFailure && (
+          <Card className="mb-8 border-destructive bg-destructive/10">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-destructive rounded-full flex items-center justify-center flex-shrink-0">
+                  <X className="w-6 h-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-foreground">No Messages Were Delivered</h3>
+                  <p className="text-sm text-foreground">
+                    {sendResult.message ||
+                      `0 of ${sendResult.attempted} message${
+                        sendResult.attempted !== 1 ? "s" : ""
+                      } went out.`}
+                  </p>
+                  {problemRows.length > 0 && (
+                    <ul className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                      {problemRows.map((row, i) => (
+                        <li key={i} className="text-sm text-foreground">
+                          <span className="font-medium">
+                            {row.recipient || "Unknown recipient"}
+                          </span>
+                          {": "}
+                          <span className="text-muted-foreground">
+                            {row.error ||
+                              (row.status === "SKIPPED"
+                                ? "Skipped"
+                                : "Delivery failed")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {sendResult && !cleanRun && !totalFailure && (
+          <Card className="mb-8 border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-foreground">Partially Sent</h3>
+                  <p className="text-sm text-foreground">
+                    {sendResult.message ||
+                      `Sent ${sendResult.sent} of ${sendResult.attempted}.`}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {sendResult.sent} sent
+                    {sendResult.failed > 0 ? `, ${sendResult.failed} failed` : ""}
+                    {sendResult.skipped > 0
+                      ? `, ${sendResult.skipped} skipped (opted out or missing contact details)`
+                      : ""}
+                    .
+                  </p>
+                  {problemRows.length > 0 && (
+                    <ul className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                      {problemRows.map((row, i) => (
+                        <li key={i} className="text-sm text-foreground">
+                          <span className="font-medium">
+                            {row.recipient || "Unknown recipient"}
+                          </span>
+                          {": "}
+                          <span className="text-muted-foreground">
+                            {row.error ||
+                              (row.status === "SKIPPED"
+                                ? "Skipped"
+                                : "Delivery failed")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -267,6 +403,18 @@ export default function OutreachPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {contactsError && (
+                    <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2">
+                      <p className="text-sm text-destructive">{contactsError}</p>
+                      <button
+                        onClick={fetchContacts}
+                        className="mt-1 text-sm font-medium text-destructive underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -294,15 +442,15 @@ export default function OutreachPage() {
                         className={`w-full text-left px-3 py-2 rounded-lg border-2 transition-all ${
                           contact.selected
                             ? "border-primary bg-primary-50"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-border hover:border-border"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">
+                            <p className="font-semibold text-foreground text-sm truncate">
                               {contact.name}
                             </p>
-                            <p className="text-xs text-gray-500 truncate">
+                            <p className="text-xs text-muted-foreground truncate">
                               {messageType === "email" ? contact.email : contact.phone}
                             </p>
                           </div>
@@ -345,15 +493,16 @@ export default function OutreachPage() {
               <CardContent>
                 <div className="space-y-3">
                   <div>
-                    <div className="text-sm text-gray-600">Raised</div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(parseInt(campaign.currentAmount))}
+                    <div className="text-sm text-muted-foreground">Raised</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {/* API returns dollars; formatCurrency expects cents */}
+                      {formatCurrency(Math.round(Number(campaign.currentAmount) * 100))}
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Goal</div>
-                    <div className="text-xl font-semibold text-gray-700">
-                      {formatCurrency(parseInt(campaign.goalAmount))}
+                    <div className="text-sm text-muted-foreground">Goal</div>
+                    <div className="text-xl font-semibold text-foreground">
+                      {formatCurrency(Math.round(Number(campaign.goalAmount) * 100))}
                     </div>
                   </div>
                 </div>
@@ -375,16 +524,16 @@ export default function OutreachPage() {
                     className={`flex-1 px-6 py-4 rounded-xl border-2 transition-all ${
                       messageType === "email"
                         ? "border-primary bg-primary-50"
-                        : "border-gray-200 hover:border-primary-200"
+                        : "border-border hover:border-primary-200"
                     }`}
                   >
                     <Mail
                       className={`w-6 h-6 mx-auto mb-2 ${
-                        messageType === "email" ? "text-primary" : "text-gray-400"
+                        messageType === "email" ? "text-primary" : "text-muted-foreground"
                       }`}
                     />
-                    <p className="font-semibold text-gray-900">Email</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="font-semibold text-foreground">Email</p>
+                    <p className="text-xs text-muted-foreground mt-1">
                       Full message with subject
                     </p>
                   </button>
@@ -394,16 +543,16 @@ export default function OutreachPage() {
                     className={`flex-1 px-6 py-4 rounded-xl border-2 transition-all ${
                       messageType === "sms"
                         ? "border-primary bg-primary-50"
-                        : "border-gray-200 hover:border-primary-200"
+                        : "border-border hover:border-primary-200"
                     }`}
                   >
                     <MessageSquare
                       className={`w-6 h-6 mx-auto mb-2 ${
-                        messageType === "sms" ? "text-primary" : "text-gray-400"
+                        messageType === "sms" ? "text-primary" : "text-muted-foreground"
                       }`}
                     />
-                    <p className="font-semibold text-gray-900">SMS</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="font-semibold text-foreground">SMS</p>
+                    <p className="text-xs text-muted-foreground mt-1">
                       Short text message
                     </p>
                   </button>
@@ -455,7 +604,7 @@ export default function OutreachPage() {
                     }
                   />
                   <div className="flex justify-between items-center mt-2 text-sm">
-                    <span className="text-gray-500">{message.length} characters</span>
+                    <span className="text-muted-foreground">{message.length} characters</span>
                     {messageType === "sms" && (
                       <span
                         className={
@@ -473,7 +622,7 @@ export default function OutreachPage() {
                 </div>
 
                 <div className="bg-primary-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-700">
+                  <p className="text-sm text-foreground">
                     <strong>💡 Pro Tip:</strong> Personalize your message by mentioning
                     specific details about your team's goals and why their support matters!
                   </p>
@@ -486,15 +635,15 @@ export default function OutreachPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="font-semibold text-gray-900">Ready to send?</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="font-semibold text-foreground">Ready to send?</p>
+                    <p className="text-sm text-muted-foreground">
                       This will send to {selectedCount} selected contact
                       {selectedCount !== 1 ? "s" : ""}
                     </p>
                   </div>
                   <Button
                     onClick={handleSend}
-                    disabled={sending || selectedCount === 0 || sent}
+                    disabled={sending || selectedCount === 0 || cleanRun}
                     size="lg"
                   >
                     {sending ? (
@@ -502,7 +651,7 @@ export default function OutreachPage() {
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                         Sending...
                       </>
-                    ) : sent ? (
+                    ) : cleanRun ? (
                       <>
                         <Check className="w-5 h-5 mr-2" />
                         Sent!
@@ -518,7 +667,7 @@ export default function OutreachPage() {
 
                 {messageType === "sms" && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-xs text-gray-700">
+                    <p className="text-xs text-foreground">
                       <strong>Note:</strong> SMS messages are charged per message sent.
                       Messages over 160 characters count as multiple messages.
                     </p>

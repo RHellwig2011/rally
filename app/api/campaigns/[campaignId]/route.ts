@@ -9,6 +9,7 @@ import {
   rateLimitConfigs,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 /**
  * GET /api/campaigns/[campaignId]
@@ -20,6 +21,26 @@ export async function GET(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Get token from cookie
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Verify token and get user
+    const user = await getUserFromToken(sessionToken);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
     const campaignId = params.campaignId;
 
     // Get campaign with all related data and aggregations
@@ -72,6 +93,14 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    // Sensitive data (banking balances, leader/guardian emails) is only
+    // returned to the campaign leader, its guardians, or an admin
+    const isOwner =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some((g) => g.id === user.id) ||
+      user.role === "ADMIN" ||
+      user.role === "BANK_ADMIN";
 
     // Calculate additional statistics
     const donations = await prisma.donation.aggregate({
@@ -154,12 +183,24 @@ export async function GET(
           largestDonation: donations._max.grossAmount ? Number(donations._max.grossAmount) / 100 : 0,
         },
 
-        // Leadership
-        primaryLeader: campaign.primaryLeader,
-        guardians: campaign.guardians,
+        // Leadership (emails only exposed to owner/guardian/admin)
+        primaryLeader: isOwner
+          ? campaign.primaryLeader
+          : {
+              id: campaign.primaryLeader.id,
+              firstName: campaign.primaryLeader.firstName,
+              lastName: campaign.primaryLeader.lastName,
+            },
+        guardians: isOwner
+          ? campaign.guardians
+          : campaign.guardians.map((g) => ({
+              id: g.id,
+              firstName: g.firstName,
+              lastName: g.lastName,
+            })),
 
-        // Banking (only include if user has access)
-        bankingAccount: campaign.bankingAccount ? {
+        // Banking (only included if user has access)
+        bankingAccount: isOwner && campaign.bankingAccount ? {
           availableBalance: Number(campaign.bankingAccount.availableBalance) / 100,
           totalRaised: Number(campaign.bankingAccount.totalRaised) / 100,
           disbursedTotal: Number(campaign.bankingAccount.disbursedTotal) / 100,
@@ -189,6 +230,12 @@ export async function PUT(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Get token from cookie
     const sessionToken = req.cookies.get("sessionToken")?.value;
 
@@ -273,6 +320,52 @@ export async function PUT(
     if (validatedData.endDate) updateData.endDate = new Date(validatedData.endDate);
     if (validatedData.primaryColor) updateData.primaryColor = validatedData.primaryColor;
     if (validatedData.secondaryColor) updateData.secondaryColor = validatedData.secondaryColor;
+    if (validatedData.seasonYear !== undefined) updateData.seasonYear = validatedData.seasonYear;
+
+    // Linking a campaign to a program is a privilege change, not cosmetics.
+    // GET /api/programs/[programId]/alumni grants access to anyone who leads a
+    // campaign in the program, and that data is contact details for athletes,
+    // collected while many of them were minors. Attaching your own campaign to
+    // a stranger's program would therefore hand you their alumni database, so
+    // the caller must already belong to the program they name.
+    if (validatedData.programId !== undefined) {
+      if (validatedData.programId === null) {
+        updateData.programId = null;
+      } else {
+        const program = await prisma.program.findUnique({
+          where: { id: validatedData.programId },
+          select: {
+            id: true,
+            createdById: true,
+            campaigns: { select: { primaryLeaderId: true } },
+          },
+        });
+
+        if (!program) {
+          return NextResponse.json(
+            { success: false, error: "Program not found" },
+            { status: 404 }
+          );
+        }
+
+        const belongsToProgram =
+          user.role === "ADMIN" ||
+          program.createdById === user.id ||
+          program.campaigns.some((c) => c.primaryLeaderId === user.id);
+
+        if (!belongsToProgram) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Not authorized to link this campaign to that program",
+            },
+            { status: 403 }
+          );
+        }
+
+        updateData.programId = program.id;
+      }
+    }
 
     // Update campaign
     const updatedCampaign = await prisma.campaign.update({
@@ -300,6 +393,8 @@ export async function PUT(
         description: updatedCampaign.description,
         goalAmount: Number(updatedCampaign.goalAmount) / 100,
         status: updatedCampaign.status,
+        programId: updatedCampaign.programId,
+        seasonYear: updatedCampaign.seasonYear,
         updatedAt: updatedCampaign.updatedAt,
       }
     });
@@ -322,7 +417,8 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update campaign"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to update campaign"
       },
       { status: 500 }
     );
@@ -338,6 +434,12 @@ export async function DELETE(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Get token from cookie
     const sessionToken = req.cookies.get("sessionToken")?.value;
 

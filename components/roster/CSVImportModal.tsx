@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-hot-toast';
 import { MAX_CSV_FILE_SIZE, MAX_CSV_ROWS } from '@/lib/utils/csv-parser';
 import { formatBytes } from '@/lib/utils/formatters';
+import { useCsrfToken } from '@/hooks/useCsrfToken';
 
 interface CSVImportModalProps {
   campaignId: string;
@@ -28,6 +29,7 @@ interface ImportResult {
 }
 
 export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportModalProps) {
+  const { csrfToken } = useCsrfToken();
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -73,6 +75,9 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/import-roster`, {
         method: 'POST',
+        // NOTE: do not set Content-Type here — the browser must generate the
+        // multipart boundary itself for FormData uploads.
+        headers: { 'x-csrf-token': csrfToken },
         body: formData,
       });
 
@@ -109,7 +114,10 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/import-roster/error-report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify(importResult),
       });
 
@@ -148,7 +156,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
             <h2 className="text-2xl font-bold">Import Team Members from CSV</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               ✕
             </button>
@@ -159,7 +167,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
               {/* Instructions */}
               <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                 <h3 className="font-semibold mb-2">CSV Requirements:</h3>
-                <ul className="text-sm text-gray-700 space-y-1">
+                <ul className="text-sm text-foreground space-y-1">
                   <li>• Required columns: name, email</li>
                   <li>• Optional columns: personalGoal, position, grade</li>
                   <li>• Maximum {MAX_CSV_ROWS} rows allowed</li>
@@ -172,11 +180,11 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-                  ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+                  ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-border hover:border-border'}`}
               >
                 <input {...getInputProps()} />
                 <svg
-                  className="mx-auto h-12 w-12 text-gray-400 mb-3"
+                  className="mx-auto h-12 w-12 text-muted-foreground mb-3"
                   stroke="currentColor"
                   fill="none"
                   viewBox="0 0 48 48"
@@ -192,17 +200,17 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                 {file ? (
                   <div>
                     <p className="text-sm font-medium">{file.name}</p>
-                    <p className="text-xs text-gray-500">{formatBytes(file.size)}</p>
+                    <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
                     <p className="text-xs text-blue-600 mt-2">Click or drag to replace</p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {isDragActive
                         ? 'Drop the CSV file here...'
                         : 'Drag and drop your CSV file here, or click to browse'}
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">CSV files only</p>
+                    <p className="text-xs text-muted-foreground mt-2">CSV files only</p>
                   </div>
                 )}
               </div>
@@ -219,14 +227,14 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                 <div className="space-x-3">
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                    className="px-4 py-2 border border-border rounded hover:bg-muted"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleImport}
                     disabled={!file || importing}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-foreground disabled:cursor-not-allowed"
                   >
                     {importing ? 'Importing...' : 'Import'}
                   </button>
@@ -238,24 +246,24 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
               {/* Import Results */}
               <div className="space-y-4">
                 {/* Summary */}
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-muted rounded-lg">
                   <h3 className="font-semibold mb-2">Import Summary</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <p className="text-gray-600">Total Rows</p>
+                      <p className="text-muted-foreground">Total Rows</p>
                       <p className="font-semibold">{importResult.summary.totalRows}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Successful</p>
-                      <p className="font-semibold text-green-600">{importResult.summary.successCount}</p>
+                      <p className="text-muted-foreground">Successful</p>
+                      <p className="font-semibold text-success">{importResult.summary.successCount}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Skipped</p>
+                      <p className="text-muted-foreground">Skipped</p>
                       <p className="font-semibold text-yellow-600">{importResult.summary.skipCount}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Errors</p>
-                      <p className="font-semibold text-red-600">{importResult.summary.errorCount}</p>
+                      <p className="text-muted-foreground">Errors</p>
+                      <p className="font-semibold text-warning">{importResult.summary.errorCount}</p>
                     </div>
                   </div>
                 </div>
@@ -275,10 +283,10 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                   <div className="space-y-4 max-h-64 overflow-y-auto">
                     {importResult.results.errors.length > 0 && (
                       <div>
-                        <h4 className="font-semibold text-red-600 mb-2">Errors</h4>
+                        <h4 className="font-semibold text-warning mb-2">Errors</h4>
                         <div className="space-y-1">
                           {importResult.results.errors.map((error, index) => (
-                            <div key={index} className="text-sm p-2 bg-red-50 rounded">
+                            <div key={index} className="text-sm p-2 bg-warning-light rounded">
                               Row {error.row}: {error.reason}
                               {error.field && ` (${error.field})`}
                             </div>
@@ -317,7 +325,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                       setFile(null);
                       setImportResult(null);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                    className="px-4 py-2 border border-border rounded hover:bg-muted"
                   >
                     Import Another
                   </button>

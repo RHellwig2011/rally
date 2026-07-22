@@ -34,26 +34,39 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Parse query parameters
+    // Parse and validate query parameters
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const category = searchParams.get('category');
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
+
+    const parsedLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Number.isNaN(parsedLimit) ? 50 : Math.min(Math.max(parsedLimit, 1), 100);
+    const parsedOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    // Whitelist sortable columns to avoid Prisma errors on unknown fields
+    const allowedSortFields = [
+      'createdAt', 'updatedAt', 'startDate', 'endDate',
+      'goalAmount', 'currentAmount', 'organizationName', 'teamName', 'status',
+    ];
+    const sortByParam = searchParams.get('sortBy') || 'createdAt';
+    const sortBy = allowedSortFields.includes(sortByParam) ? sortByParam : 'createdAt';
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
+
+    const validStatuses = ['DRAFT', 'ACTIVE', 'PAUSED', 'COMPLETED', 'ARCHIVED'];
+    const validCategories = ['SPORTS', 'ARTS', 'EDUCATION', 'COMMUNITY', 'OTHER'];
 
     // Build where clause
     const where: any = {};
 
-    if (status) {
+    if (status && validStatuses.includes(status)) {
       where.status = status;
     }
 
-    if (category) {
+    if (category && validCategories.includes(category)) {
       where.category = category;
     }
 
@@ -65,10 +78,20 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    if (dateFrom || dateTo) {
+    // Validate dates before use; reject unparseable values instead of crashing
+    const fromDate = dateFrom ? new Date(dateFrom) : null;
+    const toDate = dateTo ? new Date(dateTo) : null;
+    if ((fromDate && Number.isNaN(fromDate.getTime())) || (toDate && Number.isNaN(toDate.getTime()))) {
+      return NextResponse.json(
+        { success: false, error: "Invalid dateFrom or dateTo parameter. Use an ISO date string." },
+        { status: 400 }
+      );
+    }
+
+    if (fromDate || toDate) {
       where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
+      if (fromDate) where.createdAt.gte = fromDate;
+      if (toDate) where.createdAt.lte = toDate;
     }
 
     // Get campaigns with related data
@@ -89,6 +112,7 @@ export async function GET(req: NextRequest) {
         bankingAccount: {
           select: {
             totalRaised: true,
+            platformFeesCollected: true,
             availableBalance: true,
             disbursedTotal: true,
             pendingDisbursement: true,
@@ -147,6 +171,7 @@ export async function GET(req: NextRequest) {
           // Banking
           banking: c.bankingAccount ? {
             totalRaised: Number(c.bankingAccount.totalRaised) / 100,
+            platformFeesCollected: Number(c.bankingAccount.platformFeesCollected) / 100,
             availableBalance: Number(c.bankingAccount.availableBalance) / 100,
             disbursedTotal: Number(c.bankingAccount.disbursedTotal) / 100,
             pendingDisbursement: Number(c.bankingAccount.pendingDisbursement) / 100,

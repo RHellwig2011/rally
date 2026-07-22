@@ -14,6 +14,7 @@ import {
   rateLimitConfigs,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 /**
  * GET /api/campaigns/[campaignId]/team-members/[memberId]
@@ -24,7 +25,54 @@ export async function GET(
   { params }: { params: { campaignId: string; memberId: string } }
 ) {
   try {
+    // Authentication check
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserFromToken(sessionToken);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
     const { campaignId, memberId } = params;
+
+    // Verify campaign exists and user is authorized
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        guardians: {
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check authorization: campaign leader, guardian, or admin
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some(g => g.id === user.id) ||
+      user.role === "ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized to view this team member" },
+        { status: 403 }
+      );
+    }
 
     // Get team member with campaign and donation data
     const teamMember = await prisma.teamMember.findFirst({
@@ -162,6 +210,12 @@ export async function PUT(
   { params }: { params: { campaignId: string; memberId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -312,7 +366,8 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update team member"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to update team member"
       },
       { status: 500 }
     );
@@ -328,6 +383,12 @@ export async function DELETE(
   { params }: { params: { campaignId: string; memberId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {

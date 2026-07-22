@@ -44,6 +44,7 @@ export async function POST(
       where: {
         id: teamMemberId,
         invitationToken: validatedData.invitationToken,
+        deletedAt: null,
       },
       include: {
         campaign: {
@@ -82,21 +83,40 @@ export async function POST(
       );
     }
 
-    // Update team member with onboarding info
+    // Update team member with onboarding info.
+    //
+    // Contact fields fall back to what the coach already had on file rather than
+    // to null: the form pre-fills them but does not require them, so a player
+    // who leaves the email box alone must not have their invite-time address
+    // erased — that address is how the campaign reaches them.
+    //
+    // Phone is written to `phoneNumber`, not the legacy `phone` column. Every
+    // staff-facing read and write uses `phoneNumber`; a number stored in `phone`
+    // was never visible to the coach anywhere.
     const updatedTeamMember = await prisma.teamMember.update({
       where: { id: teamMemberId },
       data: {
-        email: validatedData.email || null,
-        phone: validatedData.phone || null,
+        email: validatedData.email || teamMember.email,
+        phoneNumber: validatedData.phone || teamMember.phoneNumber,
         parentFirstName: validatedData.parentFirstName,
         parentLastName: validatedData.parentLastName,
-        parentEmail: validatedData.parentEmail || null,
-        parentPhone: validatedData.parentPhone || null,
+        // Same reasoning: a roster import can already have supplied these, and
+        // the player supplying only a phone must not blank out the email.
+        parentEmail: validatedData.parentEmail || teamMember.parentEmail,
+        parentPhone: validatedData.parentPhone || teamMember.parentPhone,
         secondParentFirstName: validatedData.secondParentFirstName || null,
         secondParentLastName: validatedData.secondParentLastName || null,
         secondParentEmail: validatedData.secondParentEmail || null,
         secondParentPhone: validatedData.secondParentPhone || null,
         onboardingCompletedAt: new Date(),
+        // Onboarding IS acceptance of the invitation. Without these two, the
+        // `?status=accepted` roster filter could never return an onboarded
+        // player, the roster badge showed them as pending forever, and the
+        // resend-invite guard (`invitationStatus === "ACCEPTED"`) was
+        // unreachable — so the system would re-email a player who had already
+        // finished, and reset them to PENDING.
+        invitationStatus: "ACCEPTED",
+        joinedAt: new Date(),
       },
       include: {
         campaign: {
@@ -110,7 +130,8 @@ export async function POST(
     });
 
     // Send welcome emails and SMS to parents
-    const fundraisingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/raise/${updatedTeamMember.campaign.slug}/player/${updatedTeamMember.fundLinkCode}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const fundraisingLink = `${appUrl}/raise/${updatedTeamMember.campaign.slug}/player/${updatedTeamMember.fundLinkCode}`;
 
     // Send to Parent 1
     if (validatedData.parentEmail || validatedData.parentPhone) {
@@ -119,7 +140,7 @@ export async function POST(
       // Send email
       if (validatedData.parentEmail) {
         try {
-          const { sendParentWelcomeEmail } = await import('@/lib/services/email');
+          const { sendParentWelcomeEmail } = await import('@/lib/email');
           await sendParentWelcomeEmail(
             validatedData.parentEmail,
             parentName,
@@ -156,7 +177,7 @@ export async function POST(
 
       if (validatedData.secondParentEmail) {
         try {
-          const { sendParentWelcomeEmail } = await import('@/lib/services/email');
+          const { sendParentWelcomeEmail } = await import('@/lib/email');
           await sendParentWelcomeEmail(
             validatedData.secondParentEmail,
             parentName,
@@ -236,6 +257,7 @@ export async function GET(
       where: {
         id: params.teamMemberId,
         invitationToken: token,
+        deletedAt: null,
       },
       include: {
         campaign: {

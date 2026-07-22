@@ -32,6 +32,22 @@ async function main() {
 
   console.log('✅ Created coach user:', coach.email);
 
+  // Create a test admin user
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
+    update: {},
+    create: {
+      email: 'admin@example.com',
+      passwordHash: hashedPassword,
+      firstName: 'Ada',
+      lastName: 'Admin',
+      role: 'ADMIN',
+      emailVerified: true,
+    }
+  });
+
+  console.log('✅ Created admin user:', admin.email);
+
   // Create a test campaign
   const campaign = await prisma.campaign.upsert({
     where: { slug: 'test-basketball-2024' },
@@ -45,8 +61,8 @@ async function main() {
       category: 'SPORTS',
       goalAmount: BigInt(10000 * 100), // $10,000 in cents
       currentAmount: BigInt(0),
-      startDate: new Date('2024-11-01'),
-      endDate: new Date('2025-02-28'),
+      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days from now
       primaryLeaderId: coach.id,
       primaryColor: '#1e40af',
       secondaryColor: '#dbeafe',
@@ -126,9 +142,11 @@ async function main() {
     const donor = donors[i];
     const teamMember = createdMembers[i % createdMembers.length]; // Distribute donations among team members
 
-    const grossAmount = BigInt(donor.amount * 100);
+    const grossAmountCents = donor.amount * 100;
+    const grossAmount = BigInt(grossAmountCents);
     const platformFee = grossAmount * BigInt(10) / BigInt(100); // 10% platform fee
-    const netAmount = grossAmount - platformFee;
+    const processingFee = BigInt(Math.round(grossAmountCents * 0.029) + 30); // Stripe: 2.9% + $0.30
+    const netAmount = grossAmount - platformFee - processingFee;
 
     const donation = await prisma.donation.create({
       data: {
@@ -139,11 +157,12 @@ async function main() {
         grossAmount,
         netAmount,
         platformFee,
-        message: `Go ${teamMember.name.split(' ')[0]}! Good luck this season!`,
+        processingFee,
+        donorMessage: `Go ${teamMember.name.split(' ')[0]}! Good luck this season!`,
         isAnonymous: donor.isAnonymous || false,
         status: 'COMPLETED',
-        stripePaymentIntentId: `pi_test_${Math.random().toString(36).substring(2, 15)}`,
-        stripeChargeId: `ch_test_${Math.random().toString(36).substring(2, 15)}`,
+        paymentProvider: 'SIMULATED',
+        paymentIntentId: `pi_test_${Math.random().toString(36).substring(2, 15)}`,
         createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date in last 30 days
       }
     });

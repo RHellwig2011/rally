@@ -144,13 +144,13 @@ export async function GET(req: NextRequest) {
       donation_count: bigint;
     }>>`
       SELECT
-        DATE(created_at) as date,
-        SUM(gross_amount) as total_amount,
+        DATE("createdAt") as date,
+        SUM("grossAmount") as total_amount,
         COUNT(*) as donation_count
       FROM "Donation"
       WHERE status = 'COMPLETED'
-        AND created_at >= ${startDate}
-      GROUP BY DATE(created_at)
+        AND "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt")
       ORDER BY date ASC
     `;
 

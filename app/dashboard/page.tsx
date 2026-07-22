@@ -84,7 +84,7 @@ export default function CampaignsListPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-muted">
         <nav className="border-b bg-white sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
@@ -92,7 +92,7 @@ export default function CampaignsListPage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-lg">R</span>
                 </div>
-                <span className="text-2xl font-bold text-gray-900">Rally</span>
+                <span className="text-2xl font-bold text-foreground">Rally</span>
               </Link>
             </div>
           </div>
@@ -101,15 +101,15 @@ export default function CampaignsListPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-2">
-              <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-96 bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 w-48 bg-accent rounded animate-pulse" />
+              <div className="h-4 w-96 bg-accent rounded animate-pulse" />
             </div>
-            <div className="h-11 w-40 bg-gray-200 rounded animate-pulse" />
+            <div className="h-11 w-40 bg-accent rounded animate-pulse" />
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-80 bg-gray-100 rounded-lg animate-pulse" />
+              <div key={i} className="h-80 bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         </div>
@@ -119,9 +119,9 @@ export default function CampaignsListPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-warning mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function CampaignsListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -138,7 +138,7 @@ export default function CampaignsListPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
           </div>
         </div>
@@ -148,8 +148,8 @@ export default function CampaignsListPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">My Campaigns</h1>
-            <p className="text-gray-600">
+            <h1 className="text-3xl font-bold text-foreground mb-2">My Campaigns</h1>
+            <p className="text-muted-foreground">
               Manage your fundraising campaigns and track progress
             </p>
           </div>
@@ -166,11 +166,11 @@ export default function CampaignsListPage() {
           <Card>
             <CardContent className="py-12">
               <div className="text-center">
-                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
                   No campaigns yet
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-muted-foreground mb-4">
                   Get started by creating your first fundraising campaign
                 </p>
                 <Button asChild>
@@ -209,15 +209,15 @@ export default function CampaignsListPage() {
                         <CardTitle className="text-lg mb-1">
                           {campaign.teamName}
                         </CardTitle>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           {campaign.organizationName}
                         </p>
                       </div>
                       <span
                         className={`px-2 py-1 text-xs font-medium rounded-full ${
                           campaign.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-success-light text-success-dark'
+                            : 'bg-muted text-foreground'
                         }`}
                       >
                         {campaign.status}
@@ -229,20 +229,20 @@ export default function CampaignsListPage() {
                       {/* Progress Bar */}
                       <div>
                         <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="font-semibold text-gray-900">
+                          <span className="font-semibold text-foreground">
                             {formatCurrency(campaign.currentAmount)}
                           </span>
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             of {formatCurrency(campaign.goalAmount)}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-accent rounded-full h-2">
                           <div
                             className="bg-primary rounded-full h-2 transition-all"
                             style={{ width: `${Math.min(percentage, 100)}%` }}
                           />
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {percentage}% raised
                         </p>
                       </div>
@@ -252,8 +252,8 @@ export default function CampaignsListPage() {
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-success" />
                           <div>
-                            <p className="text-xs text-gray-600">Available</p>
-                            <p className="text-sm font-semibold text-gray-900">
+                            <p className="text-xs text-muted-foreground">Available</p>
+                            <p className="text-sm font-semibold text-foreground">
                               {campaign.bankingAccount
                                 ? formatCurrency(campaign.bankingAccount.availableBalance)
                                 : '$0.00'}
@@ -264,8 +264,8 @@ export default function CampaignsListPage() {
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-primary" />
                             <div>
-                              <p className="text-xs text-gray-600">Days Left</p>
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className="text-xs text-muted-foreground">Days Left</p>
+                              <p className="text-sm font-semibold text-foreground">
                                 {daysLeft}
                               </p>
                             </div>

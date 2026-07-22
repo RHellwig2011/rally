@@ -115,7 +115,7 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               ✕
             </button>
@@ -124,7 +124,7 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
                 Name *
               </label>
               <input
@@ -134,17 +134,17 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.name}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.name ? 'border-red-500' : 'border-gray-300'
+                  errors.name ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="John Doe"
                 required
               />
-              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+              {errors.name && <p className="text-warning text-xs mt-1">{errors.name}</p>}
             </div>
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
                 Email *
               </label>
               <input
@@ -155,20 +155,20 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 onChange={handleInputChange}
                 disabled={isEditing}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.email ? 'border-red-500' : 'border-gray-300'
-                } ${isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  errors.email ? 'border-warning' : 'border-border'
+                } ${isEditing ? 'bg-muted cursor-not-allowed' : ''}`}
                 placeholder="john.doe@example.com"
                 required
               />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+              {errors.email && <p className="text-warning text-xs mt-1">{errors.email}</p>}
               {isEditing && (
-                <p className="text-gray-500 text-xs mt-1">Email cannot be changed after creation</p>
+                <p className="text-muted-foreground text-xs mt-1">Email cannot be changed after creation</p>
               )}
             </div>
 
             {/* Personal Goal */}
             <div>
-              <label htmlFor="personalGoal" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="personalGoal" className="block text-sm font-medium text-foreground mb-1">
                 Personal Goal ($)
               </label>
               <input
@@ -178,20 +178,20 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.personalGoal}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.personalGoal ? 'border-red-500' : 'border-gray-300'
+                  errors.personalGoal ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="500"
                 min="1"
                 max="50000"
                 step="1"
               />
-              {errors.personalGoal && <p className="text-red-500 text-xs mt-1">{errors.personalGoal}</p>}
-              <p className="text-gray-500 text-xs mt-1">Optional. Between $1 and $50,000</p>
+              {errors.personalGoal && <p className="text-warning text-xs mt-1">{errors.personalGoal}</p>}
+              <p className="text-muted-foreground text-xs mt-1">Optional. Between $1 and $50,000</p>
             </div>
 
             {/* Position */}
             <div>
-              <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="position" className="block text-sm font-medium text-foreground mb-1">
                 Position
               </label>
               <input
@@ -201,17 +201,17 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.position}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.position ? 'border-red-500' : 'border-gray-300'
+                  errors.position ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="Forward, Goalkeeper, etc."
                 maxLength={50}
               />
-              {errors.position && <p className="text-red-500 text-xs mt-1">{errors.position}</p>}
+              {errors.position && <p className="text-warning text-xs mt-1">{errors.position}</p>}
             </div>
 
             {/* Grade */}
             <div>
-              <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="grade" className="block text-sm font-medium text-foreground mb-1">
                 Grade
               </label>
               <input
@@ -221,17 +221,17 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.grade}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.grade ? 'border-red-500' : 'border-gray-300'
+                  errors.grade ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="12, Senior, College Freshman, etc."
                 maxLength={20}
               />
-              {errors.grade && <p className="text-red-500 text-xs mt-1">{errors.grade}</p>}
+              {errors.grade && <p className="text-warning text-xs mt-1">{errors.grade}</p>}
             </div>
 
             {/* Phone Number */}
             <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-foreground mb-1">
                 Phone Number
               </label>
               <input
@@ -241,16 +241,16 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.phoneNumber}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
+                  errors.phoneNumber ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="+1234567890"
               />
-              {errors.phoneNumber && <p className="text-red-500 text-xs mt-1">{errors.phoneNumber}</p>}
+              {errors.phoneNumber && <p className="text-warning text-xs mt-1">{errors.phoneNumber}</p>}
             </div>
 
             {/* Profile Photo URL */}
             <div>
-              <label htmlFor="profilePhotoUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="profilePhotoUrl" className="block text-sm font-medium text-foreground mb-1">
                 Profile Photo URL
               </label>
               <input
@@ -260,11 +260,11 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.profilePhotoUrl}
                 onChange={handleInputChange}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.profilePhotoUrl ? 'border-red-500' : 'border-gray-300'
+                  errors.profilePhotoUrl ? 'border-warning' : 'border-border'
                 }`}
                 placeholder="https://example.com/photo.jpg"
               />
-              {errors.profilePhotoUrl && <p className="text-red-500 text-xs mt-1">{errors.profilePhotoUrl}</p>}
+              {errors.profilePhotoUrl && <p className="text-warning text-xs mt-1">{errors.profilePhotoUrl}</p>}
             </div>
 
             {/* Action Buttons */}
@@ -272,14 +272,14 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-foreground disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : isEditing ? 'Update' : 'Add Member'}
               </button>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { constructWebhookEvent } from "@/lib/stripe";
 import { processDonation } from "@/lib/banking";
+import { completeDonation, refundDonation } from "@/lib/donations";
 import prisma from "@/lib/prisma";
 import Stripe from "stripe";
 
@@ -44,12 +45,14 @@ export async function POST(req: NextRequest) {
     // Verify webhook signature
     let event: Stripe.Event;
 
-    // TEMPORARY DEV WORKAROUND: Skip signature verification in development
-    // TODO: Fix before production - Next.js 14 App Router has issues with raw body access
-    // See: https://github.com/vercel/next.js/discussions/48427
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('⚠️  DEVELOPMENT MODE: Skipping webhook signature verification');
-      console.warn('⚠️  THIS MUST BE FIXED BEFORE PRODUCTION DEPLOYMENT');
+    // Signature verification can only be skipped with an explicit opt-in
+    // env flag, and never in production.
+    const allowUnsigned =
+      process.env.ALLOW_UNSIGNED_WEBHOOKS === "true" &&
+      process.env.NODE_ENV !== "production";
+
+    if (allowUnsigned) {
+      console.warn('⚠️  ALLOW_UNSIGNED_WEBHOOKS: Skipping webhook signature verification');
       event = JSON.parse(body) as Stripe.Event;
     } else {
       try {
@@ -103,18 +106,49 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
   const { campaignId, donorEmail, donorName, referralCode } = paymentIntent.metadata;
 
-  if (!campaignId || !donorEmail) {
-    console.error("Missing required metadata in payment intent:", paymentIntent.id);
-    return;
-  }
-
-  // Check if donation already exists (idempotency)
+  // Normal flow: the app pre-creates a PENDING donation before the client
+  // confirms payment, so complete that record (idempotent — a no-op if the
+  // verify endpoint already completed it).
   const existingDonation = await prisma.donation.findFirst({
     where: { paymentIntentId: paymentIntent.id },
   });
 
   if (existingDonation) {
-    console.log("Donation already processed:", paymentIntent.id);
+    const completed = await completeDonation(existingDonation.id);
+    if (!completed) {
+      console.log("Donation already completed:", paymentIntent.id);
+      return;
+    }
+
+    console.log("Donation completed via webhook:", existingDonation.id);
+
+    try {
+      const { sendDonationReceipt } = await import('@/lib/email');
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: existingDonation.campaignId },
+        select: { organizationName: true, teamName: true },
+      });
+
+      if (campaign) {
+        await sendDonationReceipt({
+          toEmail: existingDonation.donorEmail,
+          donorName: existingDonation.donorName || 'Donor',
+          campaignName: `${campaign.organizationName} ${campaign.teamName}`,
+          amount: Number(existingDonation.grossAmount) / 100,
+          donationDate: existingDonation.createdAt,
+          taxDeductible: false,
+        });
+      }
+    } catch (emailError) {
+      console.error('Failed to send donation receipt:', emailError);
+    }
+    return;
+  }
+
+  // Fallback: a payment intent we never recorded (e.g. created outside the
+  // app). Requires metadata to reconstruct the donation.
+  if (!campaignId || !donorEmail) {
+    console.error("Missing required metadata in payment intent:", paymentIntent.id);
     return;
   }
 
@@ -146,9 +180,9 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
           toEmail: donorEmail,
           donorName: donorName || 'Donor',
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-          amount: paymentIntent.amount,
+          amount: paymentIntent.amount / 100,
           donationDate: new Date(),
-          taxDeductible: true,
+          taxDeductible: false,
         });
       }
     } catch (emailError) {
@@ -198,51 +232,22 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   // Find the donation
   const donation = await prisma.donation.findFirst({
     where: { paymentIntentId },
-    include: {
-      campaign: {
-        include: {
-          bankingAccount: true,
-        },
-      },
-    },
+    select: { id: true },
   });
 
-  if (!donation || !donation.campaign.bankingAccount) {
-    console.error("Donation or banking account not found for payment intent:", paymentIntentId);
+  if (!donation) {
+    console.error("Donation not found for payment intent:", paymentIntentId);
     return;
   }
 
-  // Update donation status
-  await prisma.donation.update({
-    where: { id: donation.id },
-    data: { status: "REFUNDED" },
-  });
+  // Atomically flip COMPLETED -> REFUNDED and reverse all credits
+  // (campaign total, team member total, banking balances + REFUND transaction)
+  const refunded = await refundDonation(donation.id);
 
-  // Create refund transaction
-  await prisma.transaction.create({
-    data: {
-      bankingAccountId: donation.campaign.bankingAccount.id,
-      type: "REFUND",
-      amount: -donation.netAmount,
-      balanceAfter: donation.campaign.bankingAccount.availableBalance - donation.netAmount,
-      donationId: donation.id,
-      description: `Refund for donation ${donation.id}`,
-      createdBy: "system",
-    },
-  });
-
-  // Update banking account balance
-  await prisma.bankingAccount.update({
-    where: { id: donation.campaign.bankingAccount.id },
-    data: {
-      availableBalance: {
-        decrement: donation.netAmount,
-      },
-      totalRaised: {
-        decrement: donation.grossAmount,
-      },
-    },
-  });
+  if (!refunded) {
+    console.log("Donation was not in COMPLETED state; refund skipped:", donation.id);
+    return;
+  }
 
   console.log("Refund processed successfully for donation:", donation.id);
 }

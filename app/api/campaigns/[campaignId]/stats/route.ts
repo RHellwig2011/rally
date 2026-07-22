@@ -17,7 +17,26 @@ export async function GET(
   try {
     const campaignId = params.campaignId;
 
-    // Verify campaign exists
+    // Authentication
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserFromToken(sessionToken);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    // Verify campaign exists (guardians included for the ownership check only)
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       select: {
@@ -25,6 +44,8 @@ export async function GET(
         startDate: true,
         endDate: true,
         createdAt: true,
+        primaryLeaderId: true,
+        guardians: { select: { id: true } },
       }
     });
 
@@ -32,6 +53,22 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
+      );
+    }
+
+    // Authorization: campaign leader, guardian, or admin only.
+    // This endpoint returns the revenue timeline and named player performance,
+    // so without this check any authenticated user could read another team's
+    // fundraising data (including minors' names).
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some((g) => g.id === user.id) ||
+      user.role === "ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized" },
+        { status: 403 }
       );
     }
 
@@ -47,14 +84,14 @@ export async function GET(
       donation_count: bigint;
     }>>`
       SELECT
-        DATE(created_at) as date,
-        SUM(gross_amount) as total_amount,
+        DATE("createdAt") as date,
+        SUM("grossAmount") as total_amount,
         COUNT(*) as donation_count
       FROM "Donation"
-      WHERE campaign_id = ${campaignId}
+      WHERE "campaignId" = ${campaignId}
         AND status = 'COMPLETED'
-        AND created_at >= ${startDate}
-      GROUP BY DATE(created_at)
+        AND "createdAt" >= ${startDate}
+      GROUP BY DATE("createdAt")
       ORDER BY date DESC
     `;
 
@@ -101,14 +138,14 @@ export async function GET(
 
       // New donors (first-time donors in last 30 days)
       const newDonors = await tx.$queryRaw<Array<{ donor_count: bigint }>>`
-        SELECT COUNT(DISTINCT donor_email) as donor_count
+        SELECT COUNT(DISTINCT "donorEmail") as donor_count
         FROM (
-          SELECT donor_email, MIN(created_at) as first_donation
+          SELECT "donorEmail", MIN("createdAt") as first_donation
           FROM "Donation"
-          WHERE campaign_id = ${campaignId}
+          WHERE "campaignId" = ${campaignId}
             AND status = 'COMPLETED'
-          GROUP BY donor_email
-          HAVING MIN(created_at) >= ${thirtyDaysAgo}
+          GROUP BY "donorEmail"
+          HAVING MIN("createdAt") >= ${thirtyDaysAgo}
         ) as new_donors
       `;
 
@@ -116,11 +153,11 @@ export async function GET(
       const repeatDonors = await tx.$queryRaw<Array<{ donor_count: bigint }>>`
         SELECT COUNT(*) as donor_count
         FROM (
-          SELECT donor_email, COUNT(*) as donation_count
+          SELECT "donorEmail", COUNT(*) as donation_count
           FROM "Donation"
-          WHERE campaign_id = ${campaignId}
+          WHERE "campaignId" = ${campaignId}
             AND status = 'COMPLETED'
-          GROUP BY donor_email
+          GROUP BY "donorEmail"
           HAVING COUNT(*) > 1
         ) as repeat_donors
       `;
@@ -215,7 +252,8 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch campaign statistics"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to fetch campaign statistics"
       },
       { status: 500 }
     );

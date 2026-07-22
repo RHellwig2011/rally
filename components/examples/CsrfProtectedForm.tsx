@@ -108,7 +108,7 @@ export default function CsrfProtectedForm() {
       {result && (
         <div
           className={`mt-4 p-3 rounded ${
-            result.startsWith("Success") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            result.startsWith("Success") ? "bg-success-light text-success-dark" : "bg-warning-light text-warning-dark"
           }`}
         >
           {result}

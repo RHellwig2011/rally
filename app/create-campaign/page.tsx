@@ -215,17 +215,17 @@ export default function CreateCampaignPage() {
   // Show loading while checking authentication
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -234,7 +234,7 @@ export default function CreateCampaignPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <Button variant="ghost" asChild>
               <Link href="/">
@@ -260,7 +260,7 @@ export default function CreateCampaignPage() {
                         ? "bg-success text-white"
                         : currentStep === step.number
                         ? "bg-primary text-white ring-4 ring-primary-100"
-                        : "bg-gray-200 text-gray-600"
+                        : "bg-accent text-muted-foreground"
                     }`}
                   >
                     {currentStep > step.number ? (
@@ -271,7 +271,7 @@ export default function CreateCampaignPage() {
                   </div>
                   <span
                     className={`mt-2 text-xs font-medium text-center absolute top-12 whitespace-nowrap ${
-                      currentStep >= step.number ? "text-gray-900" : "text-gray-500"
+                      currentStep >= step.number ? "text-foreground" : "text-muted-foreground"
                     }`}
                   >
                     {step.title}
@@ -280,7 +280,7 @@ export default function CreateCampaignPage() {
                 {index < STEPS.length - 1 && (
                   <div
                     className={`flex-1 h-1 mx-2 rounded transition-all ${
-                      currentStep > step.number ? "bg-success" : "bg-gray-200"
+                      currentStep > step.number ? "bg-success" : "bg-accent"
                     }`}
                   />
                 )}
@@ -299,10 +299,10 @@ export default function CreateCampaignPage() {
           <CardContent>
             {/* Error Alert */}
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+              <div className="mb-6 bg-warning-light border border-warning rounded-lg p-4 flex items-start">
+                <AlertCircle className="w-5 h-5 text-warning mr-3 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-red-900">{error}</p>
+                  <p className="text-sm font-medium text-warning-dark">{error}</p>
                 </div>
               </div>
             )}
@@ -318,10 +318,10 @@ export default function CreateCampaignPage() {
                     placeholder="Lincoln High School"
                     value={formData.organizationName}
                     onChange={(e) => updateFormData("organizationName", e.target.value)}
-                    className={`mt-2 h-12 ${validationErrors.organizationName ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.organizationName ? "border-warning" : ""}`}
                   />
                   {validationErrors.organizationName && (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.organizationName}</p>
+                    <p className="mt-1 text-sm text-warning">{validationErrors.organizationName}</p>
                   )}
                 </div>
 
@@ -333,10 +333,10 @@ export default function CreateCampaignPage() {
                     placeholder="Robotics Team"
                     value={formData.teamName}
                     onChange={(e) => updateFormData("teamName", e.target.value)}
-                    className={`mt-2 h-12 ${validationErrors.teamName ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.teamName ? "border-warning" : ""}`}
                   />
                   {validationErrors.teamName && (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.teamName}</p>
+                    <p className="mt-1 text-sm text-warning">{validationErrors.teamName}</p>
                   )}
                 </div>
 
@@ -357,20 +357,20 @@ export default function CreateCampaignPage() {
                 <div>
                   <Label htmlFor="slug">Campaign URL</Label>
                   <div className="mt-2 flex items-center">
-                    <span className="text-sm text-gray-600 mr-2">rally.com/raise/</span>
+                    <span className="text-sm text-muted-foreground mr-2">rally.com/raise/</span>
                     <Input
                       id="slug"
                       type="text"
                       placeholder="lincoln-high-robotics"
                       value={formData.slug}
                       onChange={(e) => updateFormData("slug", e.target.value)}
-                      className={`flex-1 h-12 ${validationErrors.slug ? "border-red-500" : ""}`}
+                      className={`flex-1 h-12 ${validationErrors.slug ? "border-warning" : ""}`}
                     />
                   </div>
                   {validationErrors.slug ? (
-                    <p className="text-xs text-red-600 mt-1">{validationErrors.slug}</p>
+                    <p className="text-xs text-warning mt-1">{validationErrors.slug}</p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       This will be your campaign's unique URL
                     </p>
                   )}
@@ -379,7 +379,7 @@ export default function CreateCampaignPage() {
                 <div>
                   <Label htmlFor="goalAmount">Fundraising Goal *</Label>
                   <div className="mt-2 flex items-center">
-                    <span className="text-sm text-gray-600 mr-2">$</span>
+                    <span className="text-sm text-muted-foreground mr-2">$</span>
                     <Input
                       id="goalAmount"
                       type="number"
@@ -390,13 +390,13 @@ export default function CreateCampaignPage() {
                       placeholder="12000"
                       value={formData.goalAmount}
                       onChange={(e) => updateFormData("goalAmount", e.target.value)}
-                      className={`flex-1 h-12 ${validationErrors.goalAmount ? "border-red-500" : ""}`}
+                      className={`flex-1 h-12 ${validationErrors.goalAmount ? "border-warning" : ""}`}
                     />
                   </div>
                   {validationErrors.goalAmount ? (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.goalAmount}</p>
+                    <p className="mt-1 text-sm text-warning">{validationErrors.goalAmount}</p>
                   ) : (
-                    <p className="mt-1 text-xs text-gray-500">Maximum: $100,000</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Maximum: $100,000</p>
                   )}
                 </div>
 
@@ -435,12 +435,12 @@ export default function CreateCampaignPage() {
                     placeholder="Tell donors about your team and what you're raising funds for..."
                     value={formData.description}
                     onChange={(e) => updateFormData("description", e.target.value)}
-                    className={`mt-2 min-h-[200px] ${validationErrors.description ? "border-red-500" : ""}`}
+                    className={`mt-2 min-h-[200px] ${validationErrors.description ? "border-warning" : ""}`}
                   />
                   {validationErrors.description ? (
-                    <p className="text-xs text-red-600 mt-1">{validationErrors.description}</p>
+                    <p className="text-xs text-warning mt-1">{validationErrors.description}</p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {formData.description.length} characters
                     </p>
                   )}
@@ -450,7 +450,7 @@ export default function CreateCampaignPage() {
                   <Label>Brand Colors</Label>
                   <div className="grid grid-cols-2 gap-4 mt-2">
                     <div>
-                      <Label htmlFor="primaryColor" className="text-xs text-gray-600">
+                      <Label htmlFor="primaryColor" className="text-xs text-muted-foreground">
                         Primary Color
                       </Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -470,7 +470,7 @@ export default function CreateCampaignPage() {
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="secondaryColor" className="text-xs text-gray-600">
+                      <Label htmlFor="secondaryColor" className="text-xs text-muted-foreground">
                         Secondary Color
                       </Label>
                       <div className="flex items-center gap-2 mt-1">
@@ -492,8 +492,8 @@ export default function CreateCampaignPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">
+                <div className="bg-muted rounded-lg p-4">
+                  <p className="text-sm font-medium text-foreground mb-2">
                     Preview: Your brand colors
                   </p>
                   <div className="flex gap-2">
@@ -529,12 +529,12 @@ export default function CreateCampaignPage() {
                     placeholder="treasurer@email.com"
                     value={formData.guardianEmail}
                     onChange={(e) => updateFormData("guardianEmail", e.target.value)}
-                    className={`mt-2 h-12 ${validationErrors.guardianEmail ? "border-red-500" : ""}`}
+                    className={`mt-2 h-12 ${validationErrors.guardianEmail ? "border-warning" : ""}`}
                   />
                   {validationErrors.guardianEmail ? (
-                    <p className="text-xs text-red-600 mt-1">{validationErrors.guardianEmail}</p>
+                    <p className="text-xs text-warning mt-1">{validationErrors.guardianEmail}</p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       Optional: Add someone who can approve disbursement requests above the threshold
                     </p>
                   )}
@@ -556,7 +556,7 @@ export default function CreateCampaignPage() {
                 <div>
                   <Label htmlFor="approvalThreshold">Approval Threshold</Label>
                   <div className="mt-2 flex items-center">
-                    <span className="text-sm text-gray-600 mr-2">$</span>
+                    <span className="text-sm text-muted-foreground mr-2">$</span>
                     <Input
                       id="approvalThreshold"
                       type="number"
@@ -565,7 +565,7 @@ export default function CreateCampaignPage() {
                       className="flex-1"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Disbursements over this amount require guardian approval
                   </p>
                 </div>
@@ -586,50 +586,50 @@ export default function CreateCampaignPage() {
 
                 <div className="space-y-4">
                   <div className="border-b pb-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">Organization Details</h4>
+                    <h4 className="font-semibold text-foreground mb-2">Organization Details</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600">Organization:</span>
+                        <span className="text-muted-foreground">Organization:</span>
                         <p className="font-medium">{formData.organizationName || "Not set"}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Team:</span>
+                        <span className="text-muted-foreground">Team:</span>
                         <p className="font-medium">{formData.teamName || "Not set"}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Category:</span>
+                        <span className="text-muted-foreground">Category:</span>
                         <p className="font-medium">{formData.category}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Goal:</span>
+                        <span className="text-muted-foreground">Goal:</span>
                         <p className="font-medium">${formData.goalAmount || "0"}</p>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-gray-600">Campaign URL:</span>
+                        <span className="text-muted-foreground">Campaign URL:</span>
                         <p className="font-medium text-primary">rally.com/raise/{formData.slug || "not-set"}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="border-b pb-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">Campaign Story</h4>
-                    <p className="text-sm text-gray-700">
+                    <h4 className="font-semibold text-foreground mb-2">Campaign Story</h4>
+                    <p className="text-sm text-foreground">
                       {formData.description || "No description provided"}
                     </p>
                   </div>
 
                   <div className="border-b pb-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">Financial Oversight</h4>
+                    <h4 className="font-semibold text-foreground mb-2">Financial Oversight</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600">Financial Overseer:</span>
+                        <span className="text-muted-foreground">Financial Overseer:</span>
                         <p className="font-medium">
                           {formData.guardianName || "Not set"}
                           {formData.guardianEmail && ` (${formData.guardianEmail})`}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Approval Threshold:</span>
+                        <span className="text-muted-foreground">Approval Threshold:</span>
                         <p className="font-medium">${formData.approvalThreshold}</p>
                       </div>
                     </div>

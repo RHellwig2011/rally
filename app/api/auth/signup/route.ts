@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerUser } from '@/lib/auth';
+import { sendEmailVerification } from '@/lib/email';
+import { checkAuthRateLimit } from '@/lib/utils/rate-limiter';
 import { z } from 'zod';
 
 const signupSchema = z.object({
@@ -15,8 +17,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = signupSchema.parse(body);
 
+    // Bounds account-creation floods and the outbound verification email they
+    // would trigger.
+    const rateLimitCheck = checkAuthRateLimit(request, validatedData.email);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
+
     // Create user using the existing registerUser function
-    const user = await registerUser({
+    const { user, verificationToken } = await registerUser({
       email: validatedData.email,
       password: validatedData.password,
       firstName: validatedData.firstName,
@@ -24,11 +33,27 @@ export async function POST(request: NextRequest) {
       role: validatedData.role || 'CAMPAIGN_LEADER',
     });
 
+    // Send verification email in the background — the token belongs only in
+    // the email link, never in the API response.
+    sendEmailVerification({
+      toEmail: user.email,
+      toName: user.firstName,
+      verificationToken,
+    }).catch((err) => {
+      console.error('Failed to send verification email:', err);
+    });
+
     return NextResponse.json(
       {
         success: true,
         message: 'Account created successfully! Please sign in.',
-        user,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
       },
       { status: 201 }
     );
@@ -50,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     console.error('Signup error:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to create user' },
+      { success: false, error: 'Failed to create account. Please try again.' },
       { status: 500 }
     );
   }

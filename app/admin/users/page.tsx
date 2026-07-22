@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatRelativeTime } from "@/lib/utils";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 interface User {
   id: string;
@@ -34,13 +35,18 @@ interface User {
   role: string;
   emailVerified: boolean;
   createdAt: string;
-  _count: {
-    campaignsLed: number;
-    donationsMade: number;
-  };
+  // GET /api/admin/users returns these flattened on each user
+  campaignsLed: number;
+  donationsMade: number;
 }
 
-const ROLE_CONFIG = {
+interface RoleConfigEntry {
+  label: string;
+  color: string;
+  bgColor: string;
+}
+
+const ROLE_CONFIG: Record<string, RoleConfigEntry> = {
   DONOR: {
     label: "Donor",
     color: "text-blue-600",
@@ -51,10 +57,20 @@ const ROLE_CONFIG = {
     color: "text-green-600",
     bgColor: "bg-green-100",
   },
+  TEAM_MEMBER: {
+    label: "Team Member",
+    color: "text-teal-600",
+    bgColor: "bg-teal-100",
+  },
   CAMPAIGN_LEADER: {
     label: "Campaign Leader",
     color: "text-purple-600",
     bgColor: "bg-purple-100",
+  },
+  GUARDIAN: {
+    label: "Guardian",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-100",
   },
   ADMIN: {
     label: "Admin",
@@ -68,6 +84,16 @@ const ROLE_CONFIG = {
   },
 };
 
+function getRoleConfig(role: string): RoleConfigEntry {
+  return (
+    ROLE_CONFIG[role] ?? {
+      label: role,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+    }
+  );
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +104,7 @@ export default function AdminUsersPage() {
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [newRole, setNewRole] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
+  const { csrfToken } = useCsrfToken();
 
   useEffect(() => {
     fetchUsers();
@@ -120,6 +147,7 @@ export default function AdminUsersPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
         },
         body: JSON.stringify({ role: newRole }),
       });
@@ -167,7 +195,7 @@ export default function AdminUsersPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-gray-600">Loading users...</p>
+          <p className="text-muted-foreground">Loading users...</p>
         </div>
       </div>
     );
@@ -177,11 +205,11 @@ export default function AdminUsersPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+        <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
           <Users className="w-8 h-8" />
           User Management
         </h1>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Manage users, roles, and permissions
         </p>
       </div>
@@ -190,38 +218,38 @@ export default function AdminUsersPage() {
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Users</div>
+            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+            <div className="text-sm text-muted-foreground">Total Users</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{stats.verified}</div>
-            <div className="text-sm text-gray-600">Verified</div>
+            <div className="text-2xl font-bold text-success">{stats.verified}</div>
+            <div className="text-sm text-muted-foreground">Verified</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-orange-600">{stats.unverified}</div>
-            <div className="text-sm text-gray-600">Unverified</div>
+            <div className="text-sm text-muted-foreground">Unverified</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-blue-600">{stats.donors}</div>
-            <div className="text-sm text-gray-600">Donors</div>
+            <div className="text-sm text-muted-foreground">Donors</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-purple-600">{stats.leaders}</div>
-            <div className="text-sm text-gray-600">Leaders</div>
+            <div className="text-sm text-muted-foreground">Leaders</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-red-600">{stats.admins}</div>
-            <div className="text-sm text-gray-600">Admins</div>
+            <div className="text-2xl font-bold text-warning">{stats.admins}</div>
+            <div className="text-sm text-muted-foreground">Admins</div>
           </CardContent>
         </Card>
       </div>
@@ -231,7 +259,7 @@ export default function AdminUsersPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name or email..."
                 value={searchQuery}
@@ -248,7 +276,9 @@ export default function AdminUsersPage() {
                 <option value="ALL">All Roles</option>
                 <option value="DONOR">Donors</option>
                 <option value="PLAYER">Players</option>
+                <option value="TEAM_MEMBER">Team Members</option>
                 <option value="CAMPAIGN_LEADER">Campaign Leaders</option>
+                <option value="GUARDIAN">Guardians</option>
                 <option value="ADMIN">Admins</option>
                 <option value="BANK_ADMIN">Bank Admins</option>
               </select>
@@ -262,9 +292,9 @@ export default function AdminUsersPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
+        <div className="mb-6 bg-warning-light border border-warning rounded-lg p-4 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-warning" />
+          <p className="text-warning-dark font-medium">{error}</p>
           <Button variant="outline" size="sm" onClick={() => fetchUsers()} className="ml-auto">
             Retry
           </Button>
@@ -281,26 +311,26 @@ export default function AdminUsersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">User</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Role</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Activity</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Joined</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-600">Actions</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Activity</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Joined</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.map((user) => {
-                  const roleConfig = ROLE_CONFIG[user.role as keyof typeof ROLE_CONFIG];
+                  const roleConfig = getRoleConfig(user.role);
 
                   return (
-                    <tr key={user.id} className="border-b hover:bg-gray-50">
+                    <tr key={user.id} className="border-b hover:bg-muted">
                       <td className="py-4 px-4">
                         <div>
-                          <p className="font-semibold text-gray-900">
+                          <p className="font-semibold text-foreground">
                             {user.firstName} {user.lastName}
                           </p>
-                          <p className="text-sm text-gray-600 flex items-center gap-1">
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <Mail className="w-3 h-3" />
                             {user.email}
                           </p>
@@ -315,7 +345,7 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="py-4 px-4">
                         {user.emailVerified ? (
-                          <span className="flex items-center gap-1 text-green-600 text-sm">
+                          <span className="flex items-center gap-1 text-success text-sm">
                             <CheckCircle className="w-4 h-4" />
                             Verified
                           </span>
@@ -327,12 +357,12 @@ export default function AdminUsersPage() {
                         )}
                       </td>
                       <td className="py-4 px-4">
-                        <div className="text-sm text-gray-600">
-                          <p>{user._count.campaignsLed} campaigns</p>
-                          <p>{user._count.donationsMade} donations</p>
+                        <div className="text-sm text-muted-foreground">
+                          <p>{user.campaignsLed ?? 0} campaigns</p>
+                          <p>{user.donationsMade ?? 0} donations</p>
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
+                      <td className="py-4 px-4 text-sm text-muted-foreground">
                         {formatRelativeTime(new Date(user.createdAt))}
                       </td>
                       <td className="py-4 px-4 text-right">
@@ -357,9 +387,9 @@ export default function AdminUsersPage() {
 
             {filteredUsers.length === 0 && (
               <div className="text-center py-12">
-                <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No users found</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No users found</p>
+                <p className="text-sm text-muted-foreground mt-1">
                   Try adjusting your search or filters
                 </p>
               </div>
@@ -379,16 +409,16 @@ export default function AdminUsersPage() {
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4 py-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-1">User</p>
-                <p className="font-semibold text-gray-900">
+              <div className="bg-muted rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-1">User</p>
+                <p className="font-semibold text-foreground">
                   {selectedUser.firstName} {selectedUser.lastName}
                 </p>
-                <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                <label className="text-sm font-medium text-foreground mb-2 block">
                   Select Role
                 </label>
                 <select
@@ -399,14 +429,18 @@ export default function AdminUsersPage() {
                 >
                   <option value="DONOR">Donor</option>
                   <option value="PLAYER">Player</option>
+                  <option value="TEAM_MEMBER">Team Member</option>
                   <option value="CAMPAIGN_LEADER">Campaign Leader</option>
+                  <option value="GUARDIAN">Guardian</option>
                   <option value="ADMIN">Admin</option>
                   <option value="BANK_ADMIN">Bank Admin</option>
                 </select>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   {newRole === "DONOR" && "Can make donations to campaigns"}
                   {newRole === "PLAYER" && "Can have a fundraising page and raise funds"}
+                  {newRole === "TEAM_MEMBER" && "Belongs to a team roster and can fundraise"}
                   {newRole === "CAMPAIGN_LEADER" && "Can create and manage campaigns"}
+                  {newRole === "GUARDIAN" && "Parent/guardian of a team member"}
                   {newRole === "ADMIN" && "Can manage all campaigns and view reports"}
                   {newRole === "BANK_ADMIN" && "Can approve disbursements and manage finances"}
                 </p>

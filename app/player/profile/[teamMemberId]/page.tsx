@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Save,
   Loader2,
@@ -18,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 interface TeamMemberProfile {
   id: string;
@@ -42,6 +42,7 @@ export default function PlayerProfileEditor() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { csrfToken } = useCsrfToken();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [profile, setProfile] = useState<TeamMemberProfile | null>(null);
@@ -101,7 +102,10 @@ export default function PlayerProfileEditor() {
       setIsSaving(true);
       const res = await fetch(`/api/team-members/${params?.teamMemberId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
         body: JSON.stringify(formData),
       });
 
@@ -132,10 +136,10 @@ export default function PlayerProfileEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-muted-foreground">Loading profile...</p>
         </div>
       </div>
     );
@@ -143,9 +147,9 @@ export default function PlayerProfileEditor() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Profile not found</p>
+          <p className="text-warning mb-4">Profile not found</p>
           <Button onClick={() => router.push('/player')}>Go to Dashboard</Button>
         </div>
       </div>
@@ -155,7 +159,7 @@ export default function PlayerProfileEditor() {
   const playerPageUrl = `/raise/${profile.campaign.slug}/player/${profile.id}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -164,7 +168,7 @@ export default function PlayerProfileEditor() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <div className="flex items-center gap-4">
               <Button
@@ -203,10 +207,10 @@ export default function PlayerProfileEditor() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             Edit Your Profile
           </h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Customize your fundraising page for {profile.campaign.organizationName} {profile.campaign.teamName}
           </p>
         </div>
@@ -220,16 +224,18 @@ export default function PlayerProfileEditor() {
             <CardContent className="space-y-4">
               {formData.profilePhotoUrl && (
                 <div className="relative w-40 h-40">
-                  <Image
+                  {/* User-supplied remote URL: plain <img>, not next/image */}
+                  <img
                     src={formData.profilePhotoUrl}
                     alt="Profile photo"
                     width={160}
                     height={160}
-                    className="w-full h-full rounded-full object-cover border-4 border-gray-200"
+                    loading="lazy"
+                    className="w-full h-full rounded-full object-cover border-4 border-border"
                   />
                   <button
                     onClick={() => setFormData({ ...formData, profilePhotoUrl: "" })}
-                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute top-0 right-0 bg-warning text-white rounded-full p-1 hover:bg-warning"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -246,7 +252,7 @@ export default function PlayerProfileEditor() {
                     setFormData({ ...formData, profilePhotoUrl: e.target.value })
                   }
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Upload your photo to a service like Imgur or use a direct image URL
                 </p>
               </div>
@@ -270,7 +276,7 @@ export default function PlayerProfileEditor() {
                   </video>
                   <button
                     onClick={() => setFormData({ ...formData, profileVideoUrl: "" })}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute top-2 right-2 bg-warning text-white rounded-full p-1 hover:bg-warning"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -287,7 +293,7 @@ export default function PlayerProfileEditor() {
                     setFormData({ ...formData, profileVideoUrl: e.target.value })
                   }
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Share a video introduction or message to your supporters
                 </p>
               </div>
@@ -311,7 +317,7 @@ export default function PlayerProfileEditor() {
                 }
                 className="mt-2"
               />
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 {formData.personalStory.length} characters
               </p>
             </CardContent>
@@ -377,13 +383,13 @@ export default function PlayerProfileEditor() {
                   onChange={(e) =>
                     setFormData({ ...formData, isProfilePublic: e.target.checked })
                   }
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 <Label htmlFor="isProfilePublic" className="font-normal">
                   Make my profile page public (recommended for fundraising)
                 </Label>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 When public, anyone with your link can view your fundraising page
               </p>
             </CardContent>

@@ -38,15 +38,23 @@ export async function GET(req: NextRequest) {
     const role = searchParams.get('role');
     const search = searchParams.get('search');
     const emailVerified = searchParams.get('emailVerified');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
+
+    const parsedLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Number.isNaN(parsedLimit) ? 50 : Math.min(Math.max(parsedLimit, 1), 100);
+    const parsedOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    const allowedSortFields = ['createdAt', 'updatedAt', 'email', 'firstName', 'lastName', 'role'];
+    const sortByParam = searchParams.get('sortBy') || 'createdAt';
+    const sortBy = allowedSortFields.includes(sortByParam) ? sortByParam : 'createdAt';
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
+
+    const validRoles = ['DONOR', 'PLAYER', 'TEAM_MEMBER', 'CAMPAIGN_LEADER', 'GUARDIAN', 'ADMIN', 'BANK_ADMIN'];
 
     // Build where clause
     const where: any = {};
 
-    if (role) {
+    if (role && validRoles.includes(role)) {
       where.role = role;
     }
 

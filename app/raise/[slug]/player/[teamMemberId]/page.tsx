@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   DollarSign,
   Heart,
@@ -136,10 +135,10 @@ export default function PlayerFundraisingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading player page...</p>
+          <p className="text-muted-foreground">Loading player page...</p>
         </div>
       </div>
     );
@@ -147,9 +146,9 @@ export default function PlayerFundraisingPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || "Player not found"}</p>
+          <p className="text-warning mb-4">{error || "Player not found"}</p>
           <Button onClick={() => router.push(`/raise/${params?.slug}`)}>
             Go to Campaign Page
           </Button>
@@ -166,7 +165,7 @@ export default function PlayerFundraisingPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -175,7 +174,7 @@ export default function PlayerFundraisingPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <Button
               onClick={() => setShowDonateForm(true)}
@@ -193,11 +192,13 @@ export default function PlayerFundraisingPage() {
       <div className="relative">
         {data.campaign.bannerImageUrl ? (
           <div className="h-48 md:h-64 w-full overflow-hidden">
-            <Image
+            {/* User-supplied remote URL: plain <img>, not next/image */}
+            <img
               src={data.campaign.bannerImageUrl}
               alt="Campaign banner"
               width={1920}
               height={400}
+              loading="lazy"
               className="w-full h-full object-cover"
             />
           </div>
@@ -220,11 +221,13 @@ export default function PlayerFundraisingPage() {
                 {/* Profile Photo */}
                 <div className="flex-shrink-0">
                   {data.teamMember.profilePhotoUrl ? (
-                    <Image
+                    // User-supplied remote URL: plain <img>, not next/image
+                    <img
                       src={data.teamMember.profilePhotoUrl}
                       alt={data.teamMember.name}
                       width={160}
                       height={160}
+                      loading="lazy"
                       className="w-40 h-40 rounded-full object-cover border-4 border-white shadow-lg"
                     />
                   ) : (
@@ -238,22 +241,22 @@ export default function PlayerFundraisingPage() {
 
                 {/* Player Info */}
                 <div className="flex-1">
-                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                  <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
                     {data.teamMember.name}
                   </h1>
-                  <p className="text-lg text-gray-600 mb-4">
+                  <p className="text-lg text-muted-foreground mb-4">
                     {data.campaign.organizationName} {data.campaign.teamName}
                   </p>
 
                   <div className="flex flex-wrap gap-4 mb-4">
                     {data.teamMember.position && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Target className="w-4 h-4" />
                         {data.teamMember.position}
                       </div>
                     )}
                     {data.teamMember.grade && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="w-4 h-4" />
                         {data.teamMember.grade}
                       </div>
@@ -263,20 +266,20 @@ export default function PlayerFundraisingPage() {
                   {/* Progress Bar */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">
+                      <span className="text-sm font-medium text-foreground">
                         Fundraising Progress
                       </span>
                       <span className="text-2xl font-bold text-primary">
                         {formatCurrency(parseInt(data.teamMember.amountRaised))}
                         {data.teamMember.personalGoal && (
-                          <span className="text-lg text-gray-600 font-normal">
+                          <span className="text-lg text-muted-foreground font-normal">
                             {" "}/ {formatCurrency(parseInt(data.teamMember.personalGoal))}
                           </span>
                         )}
                       </span>
                     </div>
                     {data.teamMember.personalGoal && (
-                      <div className="w-full bg-gray-200 rounded-full h-4 mb-1">
+                      <div className="w-full bg-accent rounded-full h-4 mb-1">
                         <div
                           className="bg-gradient-to-r from-primary to-secondary rounded-full h-4 transition-all flex items-center justify-end pr-2"
                           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -289,7 +292,7 @@ export default function PlayerFundraisingPage() {
                         </div>
                       </div>
                     )}
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       {data.stats.donationCount} {data.stats.donationCount === 1 ? 'donation' : 'donations'} • {data.stats.clickCount} page views
                     </p>
                   </div>
@@ -359,7 +362,7 @@ export default function PlayerFundraisingPage() {
             {data.teamMember.profileVideoUrl && (
               <Card>
                 <CardContent className="p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  <h2 className="text-xl font-bold text-foreground mb-4">
                     My Story
                   </h2>
                   <div className="aspect-video rounded-lg overflow-hidden">
@@ -379,11 +382,11 @@ export default function PlayerFundraisingPage() {
             {data.teamMember.personalStory && (
               <Card>
                 <CardContent className="p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  <h2 className="text-xl font-bold text-foreground mb-4">
                     About Me
                   </h2>
                   <div className="prose prose-gray max-w-none">
-                    <p className="whitespace-pre-wrap text-gray-700">
+                    <p className="whitespace-pre-wrap text-foreground">
                       {data.teamMember.personalStory}
                     </p>
                   </div>
@@ -398,10 +401,10 @@ export default function PlayerFundraisingPage() {
                   <div className="flex gap-4">
                     <div className="text-6xl text-primary/20 leading-none">"</div>
                     <div className="flex-1">
-                      <p className="text-lg italic text-gray-700 mb-2">
+                      <p className="text-lg italic text-foreground mb-2">
                         {data.teamMember.favoriteQuote}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         - {data.teamMember.name}
                       </p>
                     </div>
@@ -414,8 +417,8 @@ export default function PlayerFundraisingPage() {
             {data.recentDonations.length > 0 && (
               <Card>
                 <CardContent className="p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-red-500" />
+                  <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-warning" />
                     Recent Supporters
                   </h2>
                   <div className="space-y-4">
@@ -429,7 +432,7 @@ export default function PlayerFundraisingPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-semibold text-gray-900">
+                            <span className="font-semibold text-foreground">
                               {donation.isAnonymous
                                 ? "Anonymous"
                                 : donation.donorName || "Donor"}
@@ -439,11 +442,11 @@ export default function PlayerFundraisingPage() {
                             </span>
                           </div>
                           {donation.donorMessage && (
-                            <p className="text-sm text-gray-600 italic">
+                            <p className="text-sm text-muted-foreground italic">
                               "{donation.donorMessage}"
                             </p>
                           )}
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {new Date(donation.createdAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -460,12 +463,13 @@ export default function PlayerFundraisingPage() {
             <div className="sticky top-20">
               <Card className="shadow-lg">
                 <CardContent className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">
+                  <h3 className="text-xl font-bold text-foreground mb-4">
                     Support {data.teamMember.name}
                   </h3>
                   <DonationForm
                     campaignId={data.campaign.id}
                     campaignName={`${data.campaign.teamName} - ${data.campaign.organizationName}`}
+                    teamMemberId={data.teamMember.id}
                   />
                 </CardContent>
               </Card>
@@ -473,10 +477,10 @@ export default function PlayerFundraisingPage() {
               {/* Campaign Info */}
               <Card className="mt-6">
                 <CardContent className="p-6">
-                  <h4 className="font-semibold text-gray-900 mb-3">
+                  <h4 className="font-semibold text-foreground mb-3">
                     About the Campaign
                   </h4>
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     {data.campaign.description}
                   </p>
                   <Button
@@ -496,9 +500,9 @@ export default function PlayerFundraisingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 mt-12">
+      <footer className="bg-foreground text-white py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-400">
+          <p className="text-muted-foreground">
             Powered by <span className="font-bold text-white">Rally</span> - Fundraising Reimagined
           </p>
         </div>

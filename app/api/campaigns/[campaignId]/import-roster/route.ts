@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import {
   parseCSV,
   validateCSVRows,
@@ -20,6 +22,7 @@ import {
   getRateLimitIdentifier,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 /**
  * POST /api/campaigns/[campaignId]/import-roster
@@ -35,6 +38,12 @@ export async function POST(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -53,28 +62,6 @@ export async function POST(
     }
 
     const campaignId = params.campaignId;
-
-    // Rate limiting: 1 import per campaign per hour
-    const rateLimitId = `csv-import:${campaignId}`;
-    const rateLimitConfig = {
-      maxRequests: 1,
-      windowMs: 60 * 60 * 1000, // 1 hour
-    };
-    const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfig);
-
-    if (!rateLimitResult.allowed) {
-      const response = NextResponse.json(
-        {
-          success: false,
-          error: "CSV import rate limit exceeded. You can only import once per hour per campaign.",
-          retryAfter: rateLimitResult.retryAfter,
-          nextImportTime: new Date(rateLimitResult.resetTime).toISOString()
-        },
-        { status: 429 }
-      );
-      applyRateLimitHeaders(response.headers, rateLimitResult);
-      return response;
-    }
 
     // Verify campaign exists and user is authorized
     const campaign = await prisma.campaign.findUnique({
@@ -105,10 +92,37 @@ export async function POST(
       );
     }
 
-    // Get current team member count
+    // Rate limiting: 1 import per campaign per hour.
+    // Checked AFTER auth + authorization so failed or unauthorized attempts
+    // cannot burn the campaign's single hourly import slot.
+    const rateLimitId = `csv-import:${campaignId}`;
+    const rateLimitConfig = {
+      maxRequests: 1,
+      windowMs: 60 * 60 * 1000, // 1 hour
+    };
+    const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfig);
+
+    if (!rateLimitResult.allowed) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: "CSV import rate limit exceeded. You can only import once per hour per campaign.",
+          retryAfter: rateLimitResult.retryAfter,
+          nextImportTime: new Date(rateLimitResult.resetTime).toISOString()
+        },
+        { status: 429 }
+      );
+      applyRateLimitHeaders(response.headers, rateLimitResult);
+      return response;
+    }
+
+    // Get current team member count. Soft-deleted rows do not occupy a roster
+    // slot — they are invisible to every other query and can be revived — so
+    // they must not count against the 100 limit either.
     const currentMemberCount = await prisma.teamMember.count({
       where: {
         campaignId,
+        deletedAt: null,
       }
     });
 
@@ -171,19 +185,46 @@ export async function POST(
       );
     }
 
-    // Get existing team member emails for duplicate checking
+    // Get existing team member emails for duplicate checking.
+    // Compare against TeamMember.email directly (not the linked user account,
+    // which is usually null for invited members). Live rows only: the
+    // (campaignId, email) unique index is partial on `deletedAt IS NULL`, so a
+    // removed player's address is free again. Listing them in a new import
+    // revives their original record below rather than being skipped as a
+    // duplicate or stranding their fundraising total on a second row.
     const existingMembers = await prisma.teamMember.findMany({
       where: {
         campaignId,
+        deletedAt: null,
       },
       select: {
-        user: {
-          select: { email: true }
-        }
+        email: true,
       }
     });
 
-    const existingEmails = new Set(existingMembers.filter(m => m.user).map(m => m.user!.email.toLowerCase()));
+    const existingEmails = new Set(
+      existingMembers
+        .map(m => m.email?.toLowerCase())
+        .filter((email): email is string => !!email)
+    );
+
+    // Previously removed players, keyed by email, so a re-import restores them.
+    const deletedMembers = await prisma.teamMember.findMany({
+      where: {
+        campaignId,
+        deletedAt: { not: null },
+        email: { not: null },
+      },
+      orderBy: { deletedAt: "desc" },
+      select: { id: true, email: true, fundLinkCode: true },
+    });
+
+    const deletedByEmail = new Map<string, (typeof deletedMembers)[number]>();
+    for (const member of deletedMembers) {
+      const key = member.email!.toLowerCase();
+      // Most recent removal wins; older archived rows stay archived.
+      if (!deletedByEmail.has(key)) deletedByEmail.set(key, member);
+    }
 
     // Validate all rows
     const validation = validateCSVRows(parseResult.rows, existingEmails);
@@ -229,71 +270,120 @@ export async function POST(
       const members = [];
 
       for (const rowData of validation.validRows) {
-        // Generate unique fundraising link code
-        const fundLinkCode = await generateUniqueFundraisingLinkCode(campaignId);
+        const email = rowData.email.toLowerCase();
+        const invitationToken = crypto.randomBytes(32).toString("hex");
 
-        // Create team member
-        const member = await tx.teamMember.create({
-          data: {
-            campaignId,
-            name: rowData.name,
-            email: rowData.email.toLowerCase(),
-            personalGoal: rowData.personalGoal
-              ? BigInt(Math.round(rowData.personalGoal * 100))
-              : null,
-            position: rowData.position || null,
-            grade: rowData.grade || null,
-            fundLinkCode,
-            invitationStatus: "PENDING",
-            invitationSentAt: new Date(),
-            amountRaised: BigInt(0),
-            userId: null,
-          },
-        });
+        const shared = {
+          name: rowData.name,
+          email,
+          personalGoal: rowData.personalGoal
+            ? BigInt(Math.round(rowData.personalGoal * 100))
+            : null,
+          position: rowData.position || null,
+          grade: rowData.grade || null,
+          invitationToken,
+          invitationStatus: "PENDING" as const,
+          invitationSentAt: new Date(),
+        };
+
+        const removed = deletedByEmail.get(email);
+
+        // Restore a previously removed player instead of creating a twin: the
+        // soft-deleted row still holds everything they raised, and a second row
+        // would orphan it.
+        const member = removed
+          ? await tx.teamMember.update({
+              where: { id: removed.id },
+              data: {
+                ...shared,
+                fundLinkCode:
+                  removed.fundLinkCode ??
+                  (await generateUniqueFundraisingLinkCode(campaignId)),
+                deletedAt: null,
+                onboardingCompletedAt: null,
+                joinedAt: null,
+              },
+            })
+          : await tx.teamMember.create({
+              data: {
+                campaignId,
+                ...shared,
+                fundLinkCode: await generateUniqueFundraisingLinkCode(campaignId),
+                amountRaised: BigInt(0),
+                userId: null,
+              },
+            });
 
         members.push({
           ...member,
           _csvRow: rowData._csvRow,
           _originalData: rowData,
+          _restored: Boolean(removed),
         });
       }
 
       return members;
     });
 
-    // Send invitation emails in background (don't fail the import if emails fail)
-    const emailPromises = createdMembers.map(async (member) => {
-      try {
+    // Send the invitations and record what actually happened to each one.
+    //
+    // sendTeamMemberInvitation never throws — it catches internally and returns
+    // false — so branching on the returned boolean is the only way to detect a
+    // failure. A try/catch here would be dead code, which is exactly how every
+    // member of a failed import ended up reported as invited while their status
+    // sat at PENDING and the roster UI rendered that as "Invitation Sent".
+    const invitationResults = await Promise.all(
+      createdMembers.map(async (member) => {
+        const base = {
+          row: member._csvRow,
+          teamMemberId: member.id,
+          name: member.name,
+          email: member.email,
+        };
+
         if (!member.fundLinkCode || !member.email) {
-          throw new Error('Missing fundraising link code or email');
+          console.error(
+            `Cannot send invitation to team member ${member.id}: missing fundraising link code or email`
+          );
+          await prisma.teamMember.update({
+            where: { id: member.id },
+            data: { invitationStatus: "EMAIL_FAILED" },
+          });
+          return { ...base, invitationStatus: "EMAIL_FAILED" as const };
         }
+
         const fundraisingLink = formatFundraisingLink(campaign.slug, member.fundLinkCode);
-        await sendTeamMemberInvitation(
+        const onboardingLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/onboard/${member.id}?token=${member.invitationToken}`;
+
+        const emailSent = await sendTeamMemberInvitation(
           member.email,
           member.name,
           `${campaign.teamName} - ${campaign.organizationName}`,
           fundraisingLink,
-          member.personalGoal ? Number(member.personalGoal) / 100 : undefined
+          member.personalGoal ? Number(member.personalGoal) / 100 : undefined,
+          onboardingLink
         );
-        return { success: true, memberId: member.id };
-      } catch (error) {
-        console.error(`Failed to send invitation to ${member.email}:`, error);
-        // Update invitation status to email failed
-        await prisma.teamMember.update({
-          where: { id: member.id },
-          data: { invitationStatus: "EMAIL_FAILED" }
-        });
-        return { success: false, memberId: member.id };
-      }
-    });
 
-    // Don't wait for emails to complete
-    Promise.all(emailPromises).then((results) => {
-      const failedCount = results.filter(r => !r.success).length;
-      if (failedCount > 0) {
-        console.log(`${failedCount} invitation emails failed to send`);
-      }
-    });
+        if (!emailSent) {
+          console.error(`Failed to send invitation to ${member.email}`);
+          await prisma.teamMember.update({
+            where: { id: member.id },
+            data: { invitationStatus: "EMAIL_FAILED" },
+          });
+        }
+
+        return {
+          ...base,
+          invitationStatus: (emailSent ? "PENDING" : "EMAIL_FAILED") as
+            | "PENDING"
+            | "EMAIL_FAILED",
+        };
+      })
+    );
+
+    const failedInvitations = invitationResults.filter(
+      (r) => r.invitationStatus === "EMAIL_FAILED"
+    );
 
     // Update import result with successful imports
     importResult.success = true;
@@ -307,17 +397,38 @@ export async function POST(
         fundLinkCode: m.fundLinkCode || undefined,
       }));
 
-    return NextResponse.json(importResult);
+    return NextResponse.json({
+      ...importResult,
+      // The rows written are separate from the invitations delivered. Reported
+      // per member so the roster page can offer "resend failed invites" instead
+      // of the coach believing everyone was contacted.
+      invitations: {
+        sent: invitationResults.length - failedInvitations.length,
+        failed: failedInvitations.length,
+        results: invitationResults,
+      },
+      // Players who had been removed from this roster and are back on it, with
+      // their previous fundraising total intact.
+      restored: createdMembers
+        .filter((m) => m._restored)
+        .map((m) => ({ row: m._csvRow, name: m.name, email: m.email })),
+    });
 
   } catch (error) {
     console.error("CSV import error:", error);
 
-    // Handle specific database errors
-    if (error instanceof Error && error.message.includes('Unique constraint')) {
+    // Handle specific database errors. The (campaignId, email) unique index is
+    // partial on `deletedAt IS NULL`, so P2002 means a clash with a player
+    // currently on the roster — removed players are restored, not rejected.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Some emails already exist in the campaign. Please check for duplicates.",
+          error:
+            "Some of these emails are already used by players currently on the roster. Please check for duplicates.",
         },
         { status: 409 }
       );
@@ -326,7 +437,8 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to import CSV"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to import CSV"
       },
       { status: 500 }
     );

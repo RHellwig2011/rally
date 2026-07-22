@@ -102,10 +102,10 @@ export default function EnhancedDashboardPage({
   const progress = campaign.progress || 0;
   const daysRemaining = campaign.daysRemaining || 0;
   const trendIcon = stats?.trends?.weekOverWeek?.direction === 'up' ?
-    <TrendingUp className="w-4 h-4 text-green-600" /> :
+    <TrendingUp className="w-4 h-4 text-success" /> :
     stats?.trends?.weekOverWeek?.direction === 'down' ?
-    <TrendingDown className="w-4 h-4 text-red-600" /> :
-    <Minus className="w-4 h-4 text-gray-600" />;
+    <TrendingDown className="w-4 h-4 text-warning" /> :
+    <Minus className="w-4 h-4 text-muted-foreground" />;
 
   return (
     <div className="container mx-auto px-4 py-8">

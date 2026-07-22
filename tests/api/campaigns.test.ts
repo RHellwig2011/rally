@@ -8,7 +8,7 @@ import { z } from "zod";
 
 describe("Campaign API Validation Tests", () => {
   // Helper function to generate valid campaign data
-  const getValidCampaignData = () => ({
+  const getValidCampaignData = (): Record<string, unknown> => ({
     organizationName: "Lincoln High School",
     teamName: "Varsity Football",
     slug: "lincoln-varsity-2024",

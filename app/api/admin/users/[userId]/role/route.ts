@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { checkCsrf } from "@/lib/csrf";
 
 const updateRoleSchema = z.object({
-  role: z.enum(['DONOR', 'PLAYER', 'CAMPAIGN_LEADER', 'ADMIN', 'BANK_ADMIN']),
+  role: z.enum(['DONOR', 'PLAYER', 'TEAM_MEMBER', 'CAMPAIGN_LEADER', 'GUARDIAN', 'ADMIN', 'BANK_ADMIN']),
   reason: z.string().optional(),
 });
 
@@ -17,6 +18,12 @@ export async function PUT(
   { params }: { params: { userId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -166,7 +173,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update user role"
+        error: "Failed to update user role"
       },
       { status: 500 }
     );

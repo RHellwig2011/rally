@@ -66,7 +66,7 @@ interface AdminStats {
 interface PendingDisbursement {
   id: string;
   campaignId: string;
-  requestedAmount: number;
+  requestedAmount: number; // integer cents
   purpose: string;
   requestedAt: string;
   requestedByUser: {
@@ -134,7 +134,7 @@ export default function AdminOverviewPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-gray-600">Loading admin dashboard...</p>
+          <p className="text-muted-foreground">Loading admin dashboard...</p>
         </div>
       </div>
     );
@@ -145,8 +145,8 @@ export default function AdminOverviewPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-gray-900 font-semibold mb-2">Failed to load dashboard</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-foreground font-semibold mb-2">Failed to load dashboard</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>Retry</Button>
         </div>
       </div>
@@ -157,8 +157,8 @@ export default function AdminOverviewPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Overview</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Admin Overview</h1>
+        <p className="text-muted-foreground">
           Platform-wide statistics and recent activity
         </p>
       </div>
@@ -167,16 +167,16 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Raised
             </CardTitle>
             <DollarSign className="w-5 h-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-foreground">
               {formatCurrency(stats.totalRaised * 100)}
             </div>
-            <p className={`text-sm mt-1 flex items-center ${stats.growth.donations.trend === 'up' ? 'text-success' : stats.growth.donations.trend === 'down' ? 'text-destructive' : 'text-gray-500'}`}>
+            <p className={`text-sm mt-1 flex items-center ${stats.growth.donations.trend === 'up' ? 'text-success' : stats.growth.donations.trend === 'down' ? 'text-destructive' : 'text-muted-foreground'}`}>
               {stats.growth.donations.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : stats.growth.donations.trend === 'down' ? <ArrowDownRight className="w-3 h-3 mr-1" /> : null}
               {stats.growth.donations.percentage > 0 ? '+' : ''}{stats.growth.donations.percentage.toFixed(1)}% from last period
             </p>
@@ -185,16 +185,16 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Active Campaigns
             </CardTitle>
             <Activity className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-foreground">
               {stats.activeCampaigns}
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {stats.totalCampaigns} total campaigns
             </p>
           </CardContent>
@@ -202,31 +202,31 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Platform Fees
             </CardTitle>
             <Wallet className="w-5 h-5 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-foreground">
               {formatCurrency(stats.platformFees * 100)}
             </div>
-            <p className="text-sm text-gray-500 mt-1">10% of total raised</p>
+            <p className="text-sm text-muted-foreground mt-1">10% of total raised</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Users
             </CardTitle>
-            <Users className="w-5 h-5 text-gray-400" />
+            <Users className="w-5 h-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
+            <div className="text-3xl font-bold text-foreground">
               {stats.totalUsers.toLocaleString()}
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {stats.uniqueDonors} unique donors
             </p>
           </CardContent>
@@ -237,16 +237,16 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Donations
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-foreground">
                 {stats.totalDonations.toLocaleString()}
               </span>
-              <span className={`text-sm flex items-center ${stats.growth.donationCount.trend === 'up' ? 'text-success' : stats.growth.donationCount.trend === 'down' ? 'text-destructive' : 'text-gray-500'}`}>
+              <span className={`text-sm flex items-center ${stats.growth.donationCount.trend === 'up' ? 'text-success' : stats.growth.donationCount.trend === 'down' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {stats.growth.donationCount.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : stats.growth.donationCount.trend === 'down' ? <ArrowDownRight className="w-3 h-3 mr-1" /> : null}
                 {stats.growth.donationCount.percentage > 0 ? '+' : ''}{stats.growth.donationCount.percentage.toFixed(1)}%
               </span>
@@ -256,7 +256,7 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-warning" />
               Pending Approvals
             </CardTitle>
@@ -275,12 +275,12 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Avg Donation
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-bold text-gray-900">
+            <span className="text-2xl font-bold text-foreground">
               {formatCurrency(stats.averageDonation * 100)}
             </span>
           </CardContent>
@@ -312,38 +312,38 @@ export default function AdminOverviewPage() {
                         </div>
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {campaign.name}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                            campaign.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
+                            campaign.status === 'ACTIVE' ? 'bg-success-light text-success-dark' :
+                            campaign.status === 'DRAFT' ? 'bg-muted text-foreground' :
                             campaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
                             {campaign.status}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {campaign.progress.percentage}% of goal
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {formatRelativeTime(new Date(campaign.createdAt))}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {formatCurrency(campaign.progress.raised * 100)}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           of {formatCurrency(campaign.progress.goal * 100)}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-muted-foreground">
                     No recent campaigns
                   </div>
                 )}
@@ -372,29 +372,29 @@ export default function AdminOverviewPage() {
                       <div key={campaign.id} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-gray-400">
+                            <span className="text-lg font-bold text-muted-foreground">
                               #{index + 1}
                             </span>
                             <div>
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-foreground">
                                 {campaign.name}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 {campaign.donationCount} donations
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold text-gray-900">
+                            <p className="font-semibold text-foreground">
                               {formatCurrency(campaign.raised * 100)}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               of {formatCurrency(campaign.goal * 100)}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div className="flex-1 bg-accent rounded-full h-2">
                             <div
                               className="bg-primary rounded-full h-2 transition-all"
                               style={{ width: `${Math.min(campaign.percentage, 100)}%` }}
@@ -408,7 +408,7 @@ export default function AdminOverviewPage() {
                     );
                   })
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-muted-foreground">
                     No active campaigns
                   </div>
                 )}
@@ -435,18 +435,18 @@ export default function AdminOverviewPage() {
                       className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <p className="font-semibold text-gray-900">
-                          {formatCurrency(Number(disbursement.requestedAmount) * 100)}
+                        <p className="font-semibold text-foreground">
+                          {formatCurrency(Number(disbursement.requestedAmount))}
                         </p>
                         <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
                           Pending
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-gray-700 mb-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
                         {disbursement.bankingAccount.campaign.teamName} - {disbursement.bankingAccount.campaign.organizationName}
                       </p>
-                      <p className="text-sm text-gray-600 mb-2">{disbursement.purpose}</p>
-                      <div className="text-xs text-gray-500 space-y-1">
+                      <p className="text-sm text-muted-foreground mb-2">{disbursement.purpose}</p>
+                      <div className="text-xs text-muted-foreground space-y-1">
                         <p>Requested by: {disbursement.requestedByUser.firstName} {disbursement.requestedByUser.lastName}</p>
                         <p>{formatRelativeTime(new Date(disbursement.requestedAt))}</p>
                       </div>
@@ -462,7 +462,7 @@ export default function AdminOverviewPage() {
                 ) : (
                   <div className="text-center py-8">
                     <CheckCircle className="w-12 h-12 text-success mx-auto mb-3" />
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       No pending approvals
                     </p>
                   </div>

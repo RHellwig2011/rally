@@ -3,6 +3,7 @@ import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { sendCampaignStatusChangeNotification } from "@/lib/email";
+import { checkCsrf } from "@/lib/csrf";
 
 // Campaign status enum matching Prisma schema
 const CampaignStatus = {
@@ -38,6 +39,12 @@ export async function PUT(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -353,7 +360,8 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update campaign status"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to update campaign status"
       },
       { status: 500 }
     );

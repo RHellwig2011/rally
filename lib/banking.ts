@@ -9,11 +9,13 @@ import { TransactionType, DisbursementStatus } from "@prisma/client";
 export function calculateDonationFees(grossAmount: bigint | number, platformFeePercent: number = 10) {
   const amount = typeof grossAmount === 'bigint' ? grossAmount : BigInt(grossAmount);
 
-  // Calculate platform fee
-  const platformFee = (amount * BigInt(Math.round(platformFeePercent * 100))) / BigInt(10000);
+  // Calculate platform fee (half-up rounding to match the canonical formula
+  // in app/api/donations/route.ts: Math.round(gross * feePercent / 100))
+  const feeBps = BigInt(Math.round(platformFeePercent * 100));
+  const platformFee = (amount * feeBps + BigInt(5000)) / BigInt(10000);
 
-  // Processing fee: 2.9% + $0.30
-  const processingFee = (amount * BigInt(29)) / BigInt(1000) + BigInt(30);
+  // Processing fee: 2.9% + $0.30, rounded (Math.round(gross * 0.029) + 30)
+  const processingFee = (amount * BigInt(29) + BigInt(500)) / BigInt(1000) + BigInt(30);
 
   // Net amount after fees
   const netAmount = amount - platformFee - processingFee;

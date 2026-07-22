@@ -3,25 +3,43 @@ import { z } from "zod";
 import { createPayout } from "@/lib/stripe";
 import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
+import { checkCsrf } from "@/lib/csrf";
+import { runMoneyTransaction } from "@/lib/donations";
 
 const payoutSchema = z.object({
   disbursementRequestId: z.string().min(1, "Disbursement request ID is required"),
 });
 
+// Sentinel distinguishing the in-transaction funds guard (a 400) from a genuine
+// server fault (a 500) once the throw has unwound to the catch block.
+const INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS";
+
 /**
  * POST /api/stripe-connect/payout
- * Create a payout to a campaign's Stripe Connect account
- * This should be called by bank admins after approving a disbursement
+ * Create a payout to a campaign's Stripe Connect account (ADMIN or BANK_ADMIN).
+ *
+ * This is the only route that moves money out of a banking account, and the
+ * only writer that may set a disbursement to COMPLETED — which it does together
+ * with the Stripe transfer id, so a COMPLETED row always evidences a real
+ * transfer. Called after PUT /api/admin/disbursements/[requestId]/approve has
+ * moved the request to APPROVED.
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Verify authentication (throws if not authenticated)
     const user = await verifyAuth(req);
 
-    // Only BANK_ADMIN can create payouts
-    if (user.role !== "BANK_ADMIN") {
+    // Same rule as the approve/reject routes that feed this one: platform
+    // admins and banking admins can process payouts.
+    if (user.role !== "BANK_ADMIN" && user.role !== "ADMIN") {
       return NextResponse.json(
-        { success: false, error: "Only bank admins can process payouts" },
+        { success: false, error: "Only banking admins can process payouts" },
         { status: 403 }
       );
     }
@@ -73,55 +91,160 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the payout via Stripe
-    const transfer = await createPayout({
-      accountId: stripeAccountId,
-      amount: Number(disbursementRequest.requestedAmount),
-      metadata: {
-        disbursementRequestId: disbursementRequest.id,
-        campaignId: disbursementRequest.bankingAccount.campaign.id,
-        purpose: disbursementRequest.purpose,
-      },
+    // Step 1 — claim the request AND debit the funds before calling Stripe, in
+    // one atomic step. Claiming first means two concurrent payout calls can
+    // never both create a transfer (only one wins APPROVED -> PROCESSING), and
+    // debiting first means the authoritative balance check happens under the
+    // same lock, so two payouts on one account cannot overdraw it. Doing the
+    // debit afterwards could only detect an overdraft once the money was
+    // already gone.
+    const claim = await runMoneyTransaction(async (tx) => {
+      const claimed = await tx.disbursementRequest.updateMany({
+        where: { id: disbursementRequest.id, status: "APPROVED" },
+        data: { status: "PROCESSING" },
+      });
+
+      if (claimed.count === 0) {
+        return null;
+      }
+
+      const account = await tx.bankingAccount.update({
+        where: { id: disbursementRequest.bankingAccountId },
+        data: {
+          availableBalance: {
+            decrement: disbursementRequest.requestedAmount,
+          },
+          disbursedTotal: {
+            increment: disbursementRequest.requestedAmount,
+          },
+          pendingDisbursement: {
+            decrement: disbursementRequest.requestedAmount,
+          },
+        },
+      });
+
+      // A throw here rolls back both the claim and the balance changes.
+      if (account.availableBalance < BigInt(0)) {
+        throw new Error(INSUFFICIENT_FUNDS);
+      }
+
+      return { balanceAfter: account.availableBalance };
     });
 
-    // Update disbursement request
-    await prisma.disbursementRequest.update({
-      where: { id: disbursementRequest.id },
-      data: {
-        status: "COMPLETED",
-        disbursementDate: new Date(),
-        payoutTransactionId: transfer.id,
-      },
-    });
+    if (!claim) {
+      return NextResponse.json(
+        { success: false, error: "Disbursement request was already processed" },
+        { status: 409 }
+      );
+    }
 
-    // Create transaction record
-    await prisma.transaction.create({
-      data: {
-        bankingAccountId: disbursementRequest.bankingAccountId,
-        type: "DISBURSEMENT",
-        amount: -disbursementRequest.requestedAmount,
-        balanceAfter: disbursementRequest.bankingAccount.availableBalance - disbursementRequest.requestedAmount,
-        disbursementId: disbursementRequest.id,
-        description: `Disbursement: ${disbursementRequest.purpose}`,
-        createdBy: user.id,
+    // Step 2 — create the payout via Stripe. On failure, release the claim and
+    // give the funds back, leaving the request APPROVED and retryable.
+    let transfer;
+    try {
+      transfer = await createPayout({
+        accountId: stripeAccountId,
+        amount: Number(disbursementRequest.requestedAmount),
         metadata: {
-          stripeTransferId: transfer.id,
+          disbursementRequestId: disbursementRequest.id,
+          campaignId: disbursementRequest.bankingAccount.campaign.id,
+          purpose: disbursementRequest.purpose,
         },
-      },
-    });
+      });
+    } catch (stripeError) {
+      await runMoneyTransaction(async (tx) => {
+        const released = await tx.disbursementRequest.updateMany({
+          where: { id: disbursementRequest.id, status: "PROCESSING" },
+          data: { status: "APPROVED" },
+        });
 
-    // Update banking account balance
-    await prisma.bankingAccount.update({
-      where: { id: disbursementRequest.bankingAccountId },
-      data: {
-        availableBalance: {
-          decrement: disbursementRequest.requestedAmount,
+        if (released.count === 0) {
+          return;
+        }
+
+        await tx.bankingAccount.update({
+          where: { id: disbursementRequest.bankingAccountId },
+          data: {
+            availableBalance: {
+              increment: disbursementRequest.requestedAmount,
+            },
+            disbursedTotal: {
+              decrement: disbursementRequest.requestedAmount,
+            },
+            pendingDisbursement: {
+              increment: disbursementRequest.requestedAmount,
+            },
+          },
+        });
+      });
+      throw stripeError;
+    }
+
+    // Invariant: a disbursement is only ever marked COMPLETED alongside the id
+    // of a transfer that actually happened. Without one the request stays
+    // PROCESSING for manual reconciliation rather than claiming a phantom
+    // payment.
+    if (!transfer?.id) {
+      console.error(
+        `Stripe returned no transfer id for disbursement ${disbursementRequest.id}; left PROCESSING for reconciliation`
+      );
+      return NextResponse.json(
+        { success: false, error: "Payout could not be confirmed" },
+        { status: 502 }
+      );
+    }
+
+    // Step 3 — settle the claim and write the ledger row. The money has already
+    // moved at Stripe, so this is recorded even if it takes a retry; the
+    // transfer id is logged if it ultimately fails so the row can be
+    // reconciled by hand.
+    try {
+      await runMoneyTransaction(async (tx) => {
+        const settled = await tx.disbursementRequest.updateMany({
+          where: { id: disbursementRequest.id, status: "PROCESSING" },
+          data: {
+            status: "COMPLETED",
+            disbursementDate: new Date(),
+            payoutTransactionId: transfer.id,
+          },
+        });
+
+        // We hold the exclusive PROCESSING claim, so losing it means something
+        // else moved the row out from under us — do not write a ledger entry
+        // against a state we no longer own.
+        if (settled.count === 0) {
+          throw new Error("Disbursement left PROCESSING before the payout was recorded");
+        }
+
+        await tx.transaction.create({
+          data: {
+            bankingAccountId: disbursementRequest.bankingAccountId,
+            type: "DISBURSEMENT",
+            amount: -disbursementRequest.requestedAmount,
+            balanceAfter: claim.balanceAfter,
+            disbursementId: disbursementRequest.id,
+            description: `Disbursement: ${disbursementRequest.purpose}`,
+            createdBy: user.id,
+            metadata: {
+              stripeTransferId: transfer.id,
+            },
+          },
+        });
+      });
+    } catch (settleError) {
+      console.error(
+        `Stripe transfer ${transfer.id} succeeded for disbursement ${disbursementRequest.id} but recording it failed; reconcile manually:`,
+        settleError
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Payout was sent but could not be recorded. Contact support before retrying.",
+          transferId: transfer.id,
         },
-        disbursedTotal: {
-          increment: disbursementRequest.requestedAmount,
-        },
-      },
-    });
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
@@ -132,7 +255,20 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure — pass it through
+    if (error instanceof NextResponse) {
+      return error;
+    }
     console.error("Failed to create payout:", error);
+
+    // The in-transaction funds guard is an expected business failure, not a
+    // server fault.
+    if (error instanceof Error && error.message === INSUFFICIENT_FUNDS) {
+      return NextResponse.json(
+        { success: false, error: "Insufficient balance for payout" },
+        { status: 400 }
+      );
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -146,10 +282,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create payout",
-      },
+      { success: false, error: "Failed to create payout" },
       { status: 500 }
     );
   }

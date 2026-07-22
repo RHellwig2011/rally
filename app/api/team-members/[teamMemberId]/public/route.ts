@@ -12,9 +12,15 @@ export async function GET(
   try {
     const { teamMemberId } = params;
 
-    // Get team member with campaign and donations
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: teamMemberId },
+    // Get team member with campaign and donations.
+    // Shared fundraising links use fundLinkCode in the URL, while internal
+    // links use the cuid id — resolve either. Everything downstream is keyed
+    // on the resolved teamMember.id, so donation attribution is unaffected.
+    const teamMember = await prisma.teamMember.findFirst({
+      where: {
+        OR: [{ id: teamMemberId }, { fundLinkCode: teamMemberId }],
+        deletedAt: null,
+      },
       include: {
         campaign: {
           select: {
@@ -63,13 +69,16 @@ export async function GET(
       },
     }) : null;
 
-    // Get recent donations attributed to this player
+    // Get recent donations attributed to this player.
+    // Attribution is strictly: donation.teamMemberId matches, or (legacy records)
+    // donation.referralCode stored the team member id. Never fall back to
+    // campaign-wide matches.
     const recentDonations = await prisma.donation.findMany({
       where: {
         campaignId: teamMember.campaignId,
         OR: [
-          { referralCode: referral?.referralCode },
-          { referredByUserId: teamMember.userId },
+          { teamMemberId: teamMember.id },
+          { referralCode: teamMember.id },
         ],
         status: "COMPLETED",
       },
@@ -82,6 +91,19 @@ export async function GET(
         isAnonymous: true,
         donorMessage: true,
         createdAt: true,
+      },
+    });
+
+    // Count ALL donations attributed to this player (not just the 20 shown),
+    // so stats work for players without a linked user/referral row too.
+    const donationCount = await prisma.donation.count({
+      where: {
+        campaignId: teamMember.campaignId,
+        OR: [
+          { teamMemberId: teamMember.id },
+          { referralCode: teamMember.id },
+        ],
+        status: "COMPLETED",
       },
     });
 
@@ -115,10 +137,12 @@ export async function GET(
       referralCode: referral?.referralCode || '',
       recentDonations: recentDonations.map((d) => ({
         ...d,
+        // Never expose real donor names for anonymous donations
+        donorName: d.isAnonymous ? null : d.donorName,
         grossAmount: d.grossAmount.toString(),
       })),
       stats: {
-        donationCount: referral?.donationCount || 0,
+        donationCount,
         clickCount: referral?.clickCount || 0,
       },
     };

@@ -146,8 +146,8 @@ export default function TeamMemberOnboardingPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-indigo-600" />
-          <p className="text-gray-600">Loading your invitation...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary-600" />
+          <p className="text-muted-foreground">Loading your invitation...</p>
         </div>
       </div>
     );
@@ -158,7 +158,7 @@ export default function TeamMemberOnboardingPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <div className="flex items-center gap-2 text-red-600 mb-2">
+            <div className="flex items-center gap-2 text-warning mb-2">
               <AlertCircle className="h-6 w-6" />
               <CardTitle>Oops!</CardTitle>
             </div>
@@ -174,7 +174,7 @@ export default function TeamMemberOnboardingPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <div className="flex items-center gap-2 text-green-600 mb-2">
+            <div className="flex items-center gap-2 text-success mb-2">
               <CheckCircle2 className="h-8 w-8" />
               <CardTitle>All Set!</CardTitle>
             </div>
@@ -183,7 +183,7 @@ export default function TeamMemberOnboardingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Redirecting you to your campaign page...
             </p>
           </CardContent>
@@ -204,10 +204,10 @@ export default function TeamMemberOnboardingPage() {
               className="h-20 w-20 object-contain mx-auto mb-4"
             />
           )}
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             Welcome, {teamMemberInfo?.teamMember.name}! 🎉
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-muted-foreground">
             {teamMemberInfo?.campaign.teamName} - {teamMemberInfo?.campaign.organizationName}
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function TeamMemberOnboardingPage() {
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <div className="bg-indigo-100 text-indigo-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
+                <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
                   1
                 </div>
                 How This Works
@@ -269,7 +269,7 @@ export default function TeamMemberOnboardingPage() {
 
               <Button
                 onClick={() => setCurrentStep(2)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                className="w-full bg-primary-600 hover:bg-primary-700"
                 size="lg"
               >
                 Got It! Let's Get Started
@@ -283,7 +283,7 @@ export default function TeamMemberOnboardingPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <div className="bg-indigo-100 text-indigo-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
+                <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
                   2
                 </div>
                 Your Contact Information
@@ -296,8 +296,8 @@ export default function TeamMemberOnboardingPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Player Contact Info */}
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    Your Contact Info <span className="text-sm font-normal text-gray-500">(Optional)</span>
+                  <h3 className="font-semibold text-foreground flex items-center gap-2">
+                    Your Contact Info <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                   </h3>
 
                   <div>
@@ -310,7 +310,7 @@ export default function TeamMemberOnboardingPage() {
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       className="mt-1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">We'll send you updates about donations and progress</p>
+                    <p className="text-xs text-muted-foreground mt-1">We'll send you updates about donations and progress</p>
                   </div>
 
                   <div>
@@ -323,14 +323,14 @@ export default function TeamMemberOnboardingPage() {
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       className="mt-1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Optional: For text notifications</p>
+                    <p className="text-xs text-muted-foreground mt-1">Optional: For text notifications</p>
                   </div>
                 </div>
 
                 <div className="border-t pt-6">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
                     <Users className="h-5 w-5" />
-                    Parent/Guardian Contact Info <span className="text-sm font-normal text-red-600">(Required)</span>
+                    Parent/Guardian Contact Info <span className="text-sm font-normal text-warning">(Required)</span>
                   </h3>
 
                   <div className="space-y-4">
@@ -369,7 +369,7 @@ export default function TeamMemberOnboardingPage() {
                         onChange={(e) => handleInputChange('parentEmail', e.target.value)}
                         className="mt-1"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Your parent will receive fundraising updates</p>
+                      <p className="text-xs text-muted-foreground mt-1">Your parent will receive fundraising updates</p>
                     </div>
 
                     <div>
@@ -382,7 +382,7 @@ export default function TeamMemberOnboardingPage() {
                         onChange={(e) => handleInputChange('parentPhone', e.target.value)}
                         className="mt-1"
                       />
-                      <p className="text-xs text-gray-500 mt-1">At least one contact method (email or phone) is required</p>
+                      <p className="text-xs text-muted-foreground mt-1">At least one contact method (email or phone) is required</p>
                     </div>
                   </div>
                 </div>
@@ -402,8 +402,8 @@ export default function TeamMemberOnboardingPage() {
                 {showSecondParent && (
                   <div className="border-t pt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                        Second Parent/Guardian <span className="text-sm font-normal text-gray-500">(Optional)</span>
+                      <h3 className="font-semibold text-foreground flex items-center gap-2">
+                        Second Parent/Guardian <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                       </h3>
                       <Button
                         type="button"
@@ -494,7 +494,7 @@ export default function TeamMemberOnboardingPage() {
                   <Button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    className="w-full bg-primary-600 hover:bg-primary-700"
                   >
                     {submitting ? (
                       <>
@@ -507,7 +507,7 @@ export default function TeamMemberOnboardingPage() {
                   </Button>
                 </div>
 
-                <p className="text-xs text-center text-gray-500">
+                <p className="text-xs text-center text-muted-foreground">
                   By completing this form, you agree to share this information with your coach and team administrators.
                   Your parents will receive notifications about your fundraising activities.
                 </p>

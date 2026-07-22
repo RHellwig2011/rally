@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import { z } from 'zod';
 import { createTeamMemberSchema } from '@/lib/validations/team-member';
+import { toCsvRow } from '@/lib/utils/export';
 
 /**
  * CSV Import utilities for team member roster
@@ -347,7 +348,7 @@ export function createErrorReport(result: CSVImportResult): string {
     lines.push('Successfully Imported:');
     lines.push('Row,Name,Email');
     result.results.successful.forEach(item => {
-      lines.push(`${item.row},"${item.name}","${item.email}"`);
+      lines.push(toCsvRow([item.row, item.name, item.email]));
     });
     lines.push('');
   }
@@ -356,7 +357,7 @@ export function createErrorReport(result: CSVImportResult): string {
     lines.push('Skipped (Duplicates):');
     lines.push('Row,Email,Reason');
     result.results.skipped.forEach(item => {
-      lines.push(`${item.row},"${item.email || 'N/A'}","${item.reason}"`);
+      lines.push(toCsvRow([item.row, item.email || 'N/A', item.reason]));
     });
     lines.push('');
   }
@@ -365,7 +366,7 @@ export function createErrorReport(result: CSVImportResult): string {
     lines.push('Errors:');
     lines.push('Row,Field,Reason');
     result.results.errors.forEach(item => {
-      lines.push(`${item.row},"${item.field || 'N/A'}","${item.reason}"`);
+      lines.push(toCsvRow([item.row, item.field || 'N/A', item.reason]));
     });
     lines.push('');
   }

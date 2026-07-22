@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import crypto from "crypto";
 import {
@@ -21,6 +22,7 @@ import {
   rateLimitConfigs,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import { checkCsrf } from "@/lib/csrf";
 
 /**
  * POST /api/campaigns/[campaignId]/team-members
@@ -31,6 +33,12 @@ export async function POST(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -124,42 +132,105 @@ export async function POST(
       );
     }
 
-    // Generate unique fundraising link code
-    const fundLinkCode = await generateUniqueFundraisingLinkCode(campaignId);
+    const normalizedEmail = validatedData.email.toLowerCase();
+
+    // A removed player is only ever soft-deleted, and their row keeps the money
+    // they raised. Re-adding that email must revive the original record rather
+    // than insert a second one — a new row would strand their historical
+    // amountRaised on a record no query can see.
+    const softDeleted = await prisma.teamMember.findFirst({
+      where: {
+        campaignId,
+        email: normalizedEmail,
+        deletedAt: { not: null },
+      },
+      orderBy: { deletedAt: "desc" },
+      select: { id: true, fundLinkCode: true },
+    });
 
     // Generate unique invitation token for onboarding
     const invitationToken = crypto.randomBytes(32).toString('hex');
 
-    // Create team member record
-    const teamMember = await prisma.teamMember.create({
-      data: {
-        campaignId,
-        name: validatedData.name,
-        email: validatedData.email.toLowerCase(),
-        personalGoal: validatedData.personalGoal
-          ? BigInt(Math.round(validatedData.personalGoal * 100))
-          : null,
-        position: validatedData.position,
-        grade: validatedData.grade,
-        profilePhotoUrl: validatedData.profilePhotoUrl,
-        phoneNumber: validatedData.phoneNumber,
-        fundLinkCode,
-        invitationToken,
-        invitationStatus: "PENDING",
-        invitationSentAt: new Date(),
-        amountRaised: BigInt(0),
-        userId: null, // Will be connected when user signs up
+    const memberFields = {
+      name: validatedData.name,
+      email: normalizedEmail,
+      personalGoal: validatedData.personalGoal
+        ? BigInt(Math.round(validatedData.personalGoal * 100))
+        : null,
+      position: validatedData.position,
+      grade: validatedData.grade,
+      profilePhotoUrl: validatedData.profilePhotoUrl,
+      phoneNumber: validatedData.phoneNumber,
+      invitationToken,
+      invitationStatus: "PENDING" as const,
+      invitationSentAt: new Date(),
+    };
+
+    const campaignSelect = {
+      campaign: {
+        select: { slug: true, teamName: true, organizationName: true },
       },
-      include: {
-        campaign: {
-          select: { slug: true, teamName: true, organizationName: true }
-        }
+    };
+
+    let teamMember;
+    let fundLinkCode: string;
+    try {
+      if (softDeleted) {
+        // Keep the existing fundraising link if the player still has one, so any
+        // link already shared for them keeps working.
+        fundLinkCode =
+          softDeleted.fundLinkCode ??
+          (await generateUniqueFundraisingLinkCode(campaignId));
+
+        teamMember = await prisma.teamMember.update({
+          where: { id: softDeleted.id },
+          data: {
+            ...memberFields,
+            fundLinkCode,
+            // Restore, deliberately leaving amountRaised and their donation
+            // history untouched.
+            deletedAt: null,
+            onboardingCompletedAt: null,
+            joinedAt: null,
+          },
+          include: campaignSelect,
+        });
+      } else {
+        fundLinkCode = await generateUniqueFundraisingLinkCode(campaignId);
+
+        teamMember = await prisma.teamMember.create({
+          data: {
+            campaignId,
+            ...memberFields,
+            fundLinkCode,
+            amountRaised: BigInt(0),
+            userId: null, // Will be connected when user signs up
+          },
+          include: campaignSelect,
+        });
       }
-    });
+    } catch (error) {
+      // The (campaignId, email) unique index is partial on deletedAt IS NULL, so
+      // this is a genuine live collision that raced the check above — report it
+      // as the conflict it is instead of a generic 500.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A team member with this email already exists in the campaign",
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     // Send invitation email with onboarding link
     const fundraisingLink = formatFundraisingLink(campaign.slug, fundLinkCode);
-    const onboardingLink = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
+    const onboardingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
 
     const emailSent = await sendTeamMemberInvitation(
       validatedData.email,
@@ -188,11 +259,15 @@ export async function POST(
           personalGoal: teamMember.personalGoal
             ? Number(teamMember.personalGoal) / 100
             : null,
-          amountRaised: 0,
+          // A revived member keeps the total they raised before removal.
+          amountRaised: Number(teamMember.amountRaised) / 100,
           fundLinkCode: teamMember.fundLinkCode,
           fundraisingLink,
           invitationStatus: emailSent ? "PENDING" : "EMAIL_FAILED",
           invitationSentAt: teamMember.invitationSentAt,
+          // True when this re-activated a previously removed player, which is
+          // why amountRaised can be non-zero on a freshly "added" member.
+          restored: Boolean(softDeleted),
         }
       },
       { status: 201 }
@@ -218,7 +293,8 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to add team member"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to add team member"
       },
       { status: 500 }
     );
@@ -234,7 +310,55 @@ export async function GET(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Authentication check
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserFromToken(sessionToken);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
     const campaignId = params.campaignId;
+
+    // Verify campaign exists and user is authorized
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        guardians: {
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check authorization: campaign leader, guardian, or admin
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some(g => g.id === user.id) ||
+      user.role === "ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized to view this campaign's team members" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
 
     // Parse query parameters
@@ -260,8 +384,27 @@ export async function GET(
     };
 
     // Add status filter
+    // Map query values to actual InvitationStatus enum values (PENDING,
+    // ACCEPTED, EMAIL_FAILED, EXPIRED). Unknown values (e.g. "rejected")
+    // are rejected with 400 instead of being passed to Prisma.
     if (validatedQuery.status && validatedQuery.status !== "all") {
-      where.invitationStatus = validatedQuery.status.toUpperCase();
+      const statusMap: Record<string, string> = {
+        pending: "PENDING",
+        accepted: "ACCEPTED",
+        email_failed: "EMAIL_FAILED",
+        expired: "EXPIRED",
+      };
+      const mappedStatus = statusMap[validatedQuery.status.toLowerCase()];
+      if (!mappedStatus) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Invalid status filter "${validatedQuery.status}". Valid values: all, pending, accepted, email_failed, expired`,
+          },
+          { status: 400 }
+        );
+      }
+      where.invitationStatus = mappedStatus;
     }
 
     // Add search filter

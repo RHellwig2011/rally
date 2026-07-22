@@ -15,7 +15,7 @@ export default function AboutPage() {
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
               Fundraising Shouldn't Be This Hard
             </h1>
-            <p className="text-xl md:text-2xl text-indigo-100 mb-8">
+            <p className="text-xl md:text-2xl text-primary-100 mb-8">
               So we built Bleacher Backers to make it ridiculously easy for youth teams, clubs,
               and school groups to raise money and achieve their dreams.
             </p>
@@ -30,22 +30,22 @@ export default function AboutPage() {
             <div className="inline-block bg-primary-100 text-primary font-semibold px-4 py-2 rounded-full mb-4">
               Our Mission
             </div>
-            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+            <h2 className="text-4xl font-bold text-foreground mb-6">
               Every kid deserves a chance to play, learn, and grow
             </h2>
-            <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+            <p className="text-lg text-foreground mb-6 leading-relaxed">
               We started Bleacher Backers because we saw too many talented kids miss out on opportunities
               simply because fundraising was too complicated, time-consuming, or expensive.
             </p>
-            <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+            <p className="text-lg text-foreground mb-6 leading-relaxed">
               Traditional fundraising meant bake sales, door-to-door candy sales, and
               awkward donation requests. Coaches and parents spent countless hours managing
               spreadsheets, counting cash, and chasing down receipts.
             </p>
-            <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+            <p className="text-lg text-foreground mb-6 leading-relaxed">
               <strong>There had to be a better way.</strong>
             </p>
-            <p className="text-lg text-gray-700 leading-relaxed">
+            <p className="text-lg text-foreground leading-relaxed">
               So we built Bleacher Backers—a modern fundraising platform that combines AI-powered outreach,
               secure banking, and real-time tracking to help teams reach their goals faster than ever before.
             </p>
@@ -56,19 +56,19 @@ export default function AboutPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-primary mb-2">$2.5M+</div>
-                  <div className="text-sm text-gray-600">Total Raised</div>
+                  <div className="text-sm text-muted-foreground">Total Raised</div>
                 </div>
                 <div className="text-center">
                   <div className="text-4xl font-bold text-primary mb-2">500+</div>
-                  <div className="text-sm text-gray-600">Teams Helped</div>
+                  <div className="text-sm text-muted-foreground">Teams Helped</div>
                 </div>
                 <div className="text-center">
                   <div className="text-4xl font-bold text-primary mb-2">15K+</div>
-                  <div className="text-sm text-gray-600">Happy Donors</div>
+                  <div className="text-sm text-muted-foreground">Happy Donors</div>
                 </div>
                 <div className="text-center">
                   <div className="text-4xl font-bold text-primary mb-2">98%</div>
-                  <div className="text-sm text-gray-600">Success Rate</div>
+                  <div className="text-sm text-muted-foreground">Success Rate</div>
                 </div>
               </div>
             </div>
@@ -77,11 +77,11 @@ export default function AboutPage() {
       </section>
 
       {/* Values Section */}
-      <section className="bg-gray-50 py-20">
+      <section className="bg-muted py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">What We Stand For</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <h2 className="text-4xl font-bold text-foreground mb-4">What We Stand For</h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Our values guide everything we do—from product decisions to customer support
             </p>
           </div>
@@ -92,8 +92,8 @@ export default function AboutPage() {
               <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
                 <Sparkles className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Simplicity First</h3>
-              <p className="text-gray-700 leading-relaxed">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Simplicity First</h3>
+              <p className="text-foreground leading-relaxed">
                 Fundraising should be simple enough for a 12-year-old to launch a campaign.
                 If it's complicated, we redesign it. No exceptions.
               </p>
@@ -104,8 +104,8 @@ export default function AboutPage() {
               <div className="w-16 h-16 bg-secondary-100 rounded-xl flex items-center justify-center mb-6">
                 <Shield className="w-8 h-8 text-secondary" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Trust & Transparency</h3>
-              <p className="text-gray-700 leading-relaxed">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Trust & Transparency</h3>
+              <p className="text-foreground leading-relaxed">
                 Every penny is tracked. Every fee is clear. No hidden charges, no surprises.
                 Donors and teams deserve complete transparency.
               </p>
@@ -116,8 +116,8 @@ export default function AboutPage() {
               <div className="w-16 h-16 bg-success-light rounded-xl flex items-center justify-center mb-6">
                 <Heart className="w-8 h-8 text-success" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Kids Come First</h3>
-              <p className="text-gray-700 leading-relaxed">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Kids Come First</h3>
+              <p className="text-foreground leading-relaxed">
                 Every feature we build, every decision we make—we ask: "Does this help more
                 kids participate?" If not, we don't do it.
               </p>
@@ -129,8 +129,8 @@ export default function AboutPage() {
       {/* How We're Different */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">How Bleacher Backers Is Different</h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <h2 className="text-4xl font-bold text-foreground mb-4">How Bleacher Backers Is Different</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
             We're not just another fundraising platform. We're building the future of youth fundraising.
           </p>
         </div>
@@ -142,8 +142,8 @@ export default function AboutPage() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">AI-Powered Outreach</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">AI-Powered Outreach</h3>
+              <p className="text-foreground">
                 No other platform has AI that writes personalized messages for you. Click once,
                 get a perfect message. Send to hundreds in seconds.
               </p>
@@ -156,8 +156,8 @@ export default function AboutPage() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Built-In Banking</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">Built-In Banking</h3>
+              <p className="text-foreground">
                 Funds go directly into a secure campaign account. No waiting for payouts,
                 no complicated transfers. Just simple, transparent banking.
               </p>
@@ -170,8 +170,8 @@ export default function AboutPage() {
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">5-Minute Setup</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">5-Minute Setup</h3>
+              <p className="text-foreground">
                 From signup to live campaign in 5 minutes. No approval delays, no paperwork,
                 no waiting. Just answer a few questions and go.
               </p>
@@ -184,8 +184,8 @@ export default function AboutPage() {
               <Users className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Individual Tracking</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">Individual Tracking</h3>
+              <p className="text-foreground">
                 Every team member gets their own link and dashboard. See exactly who raised what.
                 Gamify fundraising and watch the competition boost donations.
               </p>
@@ -198,8 +198,8 @@ export default function AboutPage() {
               <Target className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Real-Time Updates</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">Real-Time Updates</h3>
+              <p className="text-foreground">
                 Watch donations roll in live. Get instant notifications. Share updates with
                 supporters. Everything happens in real-time.
               </p>
@@ -212,8 +212,8 @@ export default function AboutPage() {
               <Heart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">We Actually Care</h3>
-              <p className="text-gray-700">
+              <h3 className="text-xl font-bold text-foreground mb-2">We Actually Care</h3>
+              <p className="text-foreground">
                 Real humans answer support emails. We respond in hours, not days.
                 Your success is our success.
               </p>
@@ -229,7 +229,7 @@ export default function AboutPage() {
             <h2 className="text-4xl font-bold mb-4">Our Story</h2>
           </div>
 
-          <div className="space-y-6 text-lg text-gray-300 leading-relaxed">
+          <div className="space-y-6 text-lg text-muted-foreground leading-relaxed">
             <p>
               Bleacher Backers started when our founder, a former high school coach, watched talented athletes
               miss tournaments because their team couldn't raise enough money. The fundraising process
@@ -269,7 +269,7 @@ export default function AboutPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="bg-gradient-to-r from-primary-600 to-purple-700 rounded-3xl p-12 text-center text-white">
           <h2 className="text-4xl font-bold mb-4">Ready to Transform Your Fundraising?</h2>
-          <p className="text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
             Join hundreds of teams that are raising more money in less time with Bleacher Backers
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -291,7 +291,7 @@ export default function AboutPage() {
       {/* Footer */}
       <footer className="border-t bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved. We never sell or share your data.</p>
           </div>
         </div>

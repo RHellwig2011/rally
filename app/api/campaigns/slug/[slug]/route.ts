@@ -16,7 +16,6 @@ export async function GET(
           select: {
             firstName: true,
             lastName: true,
-            email: true,
           }
         },
         bankingAccount: {
@@ -66,6 +65,10 @@ export async function GET(
           }
         },
         teamMembers: {
+          where: {
+            deletedAt: null,
+            isProfilePublic: true,
+          },
           include: {
             user: {
               select: {

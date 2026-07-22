@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkCsrf } from "@/lib/csrf";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { sendEmail } from "@/lib/services/email";
 import { z } from "zod";
 
 // Validation schema for creating disbursement request
@@ -24,6 +26,12 @@ export async function POST(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // CSRF protection (double-submit cookie)
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -154,6 +162,7 @@ export async function POST(
         requestedByUser: { connect: { id: user.id } },
         requestedAmount: BigInt(amountInCents),
         purpose: validatedData.purpose,
+        description: validatedData.description,
         receiptsUrls: [],
         status: 'PENDING',
       },
@@ -233,7 +242,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to create disbursement request"
+        error: "Failed to create disbursement request"
       },
       { status: 500 }
     );
@@ -386,13 +395,53 @@ export async function GET(
   }
 }
 
-// Helper function to send notification
+/**
+ * Notify a bank admin that a new disbursement request needs review.
+ *
+ * Transactional: bank admins must receive these regardless of marketing
+ * preferences, since an unreviewed request blocks a team's payout.
+ *
+ * @param amount Requested amount in DOLLARS (the validated request payload).
+ */
 async function sendDisbursementRequestNotification(
   email: string,
   name: string,
   campaignName: string,
   amount: number
 ): Promise<void> {
-  // TODO: Implement email notification
-  console.log(`Notifying ${name} (${email}) of new disbursement request for ${campaignName}: $${amount}`);
+  const formattedAmount = amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
+  const reviewUrl = `${
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  }/admin/disbursements`;
+
+  const result = await sendEmail({
+    to: email,
+    subject: `New disbursement request: ${campaignName} (${formattedAmount})`,
+    transactional: true,
+    html: `
+      <p>Hi ${name},</p>
+      <p>
+        <strong>${campaignName}</strong> has submitted a new disbursement request for
+        <strong>${formattedAmount}</strong>.
+      </p>
+      <p>It is pending review and will not be paid out until approved.</p>
+      <p><a href="${reviewUrl}">Review disbursement requests</a></p>
+    `,
+    text:
+      `Hi ${name},\n\n` +
+      `${campaignName} has submitted a new disbursement request for ${formattedAmount}.\n` +
+      `It is pending review and will not be paid out until approved.\n\n` +
+      `Review disbursement requests: ${reviewUrl}\n`,
+  });
+
+  // Surface failures to the caller's .catch so they are logged rather than
+  // silently swallowed — sendEmail reports errors in its return value.
+  if (!result.success) {
+    throw new Error(
+      `Disbursement notification to bank admin failed: ${result.error || "unknown error"}`
+    );
+  }
 }

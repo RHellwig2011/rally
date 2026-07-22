@@ -67,7 +67,7 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-warning-light border border-warning text-warning px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -120,10 +120,10 @@ export default function LoginPage() {
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-2 text-gray-500">or</span>
+                <span className="bg-white px-2 text-muted-foreground">or</span>
               </div>
             </div>
 

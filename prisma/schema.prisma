@@ -10,6 +10,35 @@ datasource db {
 }
 
 // ============================================================================
+// PLATFORM SETTINGS (singleton row, id = "singleton")
+// ============================================================================
+
+model PlatformSettings {
+  id                       String   @id @default("singleton")
+
+  // Financial (money stored in cents)
+  platformFeePercent       Float    @default(10.0)
+  minDonationAmountCents   BigInt   @default(100) // $1
+  maxDonationAmountCents   BigInt   @default(1000000) // $10,000
+  suggestedAmountsCents    BigInt[] @default([2500, 5000, 10000, 25000])
+
+  // Platform configuration
+  maxFileUploadSizeMb      Int      @default(5)
+  termsOfServiceUrl        String   @default("")
+  privacyPolicyUrl         String   @default("")
+
+  // Communication
+  supportEmail             String   @default("support@rallyfundraising.com")
+  enableEmailNotifications Boolean  @default(true)
+  enableSmsNotifications   Boolean  @default(false)
+
+  // System
+  maintenanceMode          Boolean  @default(false)
+
+  updatedAt                DateTime @updatedAt
+}
+
+// ============================================================================
 // USER MANAGEMENT
 // ============================================================================
 
@@ -50,6 +79,8 @@ model User {
   kycStatus     KYCStatus?
 
   // Metadata
+  programsCreated   Program[]      @relation("ProgramCreator")
+  rosterImports     RosterImport[] @relation("RosterImporter")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -114,8 +145,38 @@ enum CampaignCategory {
   OTHER
 }
 
+model Program {
+  id                String     @id @default(cuid())
+  organizationName  String
+  teamName          String
+  sport             String?
+  slug              String     @unique
+
+  createdById       String
+  createdBy         User       @relation("ProgramCreator", fields: [createdById], references: [id])
+
+  campaigns         Campaign[]
+  rosterImports     RosterImport[]
+  optOuts           ContactOptOut[]
+
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([organizationName, teamName])
+  @@index([createdById])
+}
+
 model Campaign {
   id                String           @id @default(cuid())
+
+  // Program this season belongs to (alumni + year-over-year data hang off Program)
+  programId         String?
+  program           Program?         @relation(fields: [programId], references: [id])
+  seasonYear        Int?
+
+  // Contact collection
+  minContactsPerPlayer Int           @default(0)
+  rosterImports     RosterImport[]
 
   // Basic Info
   organizationName  String
@@ -394,6 +455,7 @@ model Donation {
 enum DisbursementStatus {
   PENDING
   APPROVED
+  PROCESSING
   REJECTED
   COMPLETED
   CANCELLED
@@ -408,6 +470,7 @@ model DisbursementRequest {
   // Request details
   requestedAmount     BigInt              // In cents
   purpose             String
+  description         String?             @db.Text
   receiptsUrls        String[]
 
   // Requester
@@ -546,8 +609,15 @@ model TeamMember {
 
   name            String
   email           String?   // Player's email
-  phone           String?   // Player's phone (legacy phoneNumber)
-  phoneNumber     String?   // Additional phone field
+  // DEPRECATED. `phoneNumber` is the canonical player phone — every write path
+  // (staff add, roster import, player onboarding) targets it. This column is
+  // retained only because two read sites still reference it
+  // (app/api/programs/[programId]/alumni/route.ts, lib/alumni.ts) and both
+  // already fall back to phoneNumber. Existing values were backfilled into
+  // phoneNumber by 20260722_team_member_partial_unique_and_phone.sql; nothing
+  // writes here any more. Drop the column once those two readers are updated.
+  phone           String?
+  phoneNumber     String?   // Canonical player phone
   personalGoal    BigInt?   // In cents
   amountRaised    BigInt    @default(0) // In cents
 
@@ -556,7 +626,10 @@ model TeamMember {
   profileVideoUrl String?
   personalStory   String?   @db.Text
   position        String?   // For sports teams
-  grade           String?   // For schools
+  grade           String?   // For schools (free text, e.g. "11th")
+  graduationYear  Int?      // Drives alumni identification across seasons
+  jerseyNumber    String?
+  contactInvites  ContactInvite[]
   favoriteQuote   String?
 
   // Parent/Guardian 1 Information
@@ -592,7 +665,22 @@ model TeamMember {
   contacts        Contact[]
   donations       Donation[] @relation("TeamMemberDonations")
 
-  @@unique([campaignId, email])
+  // NOTE: uniqueness of (campaignId, email) is enforced by a PARTIAL unique
+  // index that Prisma's schema language cannot express, so it is created by
+  // raw SQL in prisma/migrations/20260722_team_member_partial_unique_and_phone.sql:
+  //
+  //   CREATE UNIQUE INDEX "TeamMember_campaignId_email_live_key"
+  //     ON "TeamMember"("campaignId", email) WHERE "deletedAt" IS NULL;
+  //
+  // It must stay partial. Soft delete is the only delete this table has, and an
+  // unconditional unique index let a removed player's email permanently occupy
+  // the slot: re-adding them failed at the database and no route could recover
+  // it, because every TeamMember query filters `deletedAt: null`. Restoring the
+  // soft-deleted row (rather than inserting a second one) is also what keeps the
+  // player's historical `amountRaised` attached to them.
+  //
+  // Do NOT reintroduce `@@unique([campaignId, email])` — `prisma db push` would
+  // then replace the partial index with an unconditional one and reinstate the bug.
   @@index([campaignId])
   @@index([invitationToken])
   @@index([fundLinkCode])
@@ -623,6 +711,13 @@ model Contact {
   // Metadata
   source          ContactSource @default(MANUAL_IMPORT)
   notes           String?       @db.Text
+
+  // Consent capture — who asserted permission to contact this person, when, and
+  // via which path. Queryable on purpose: a free-text note cannot answer
+  // "show me every contact we mailed without a recorded attestation".
+  consentAttestedAt   DateTime?
+  consentSource       String?    // e.g. "contact-invite:PLAYER", "contact-invite:GUARDIAN"
+  consentAttestedById String?    // ContactInvite.id or User.id when known
   tags            String[]
 
   // Tracking
@@ -737,4 +832,99 @@ model OutreachLog {
   @@index([outreachCampaignId])
   @@index([contactId])
   @@index([status])
+}
+
+
+// ============================================================================
+// ROSTER IMPORT / CONTACT COLLECTION / ALUMNI
+// ============================================================================
+
+enum RosterImportSource {
+  HUDL_CSV
+  GENERIC_CSV
+  MANUAL_PASTE
+}
+
+model RosterImport {
+  id             String             @id @default(cuid())
+  programId      String?
+  program        Program?           @relation(fields: [programId], references: [id])
+  campaignId     String
+  campaign       Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  source         RosterImportSource @default(GENERIC_CSV)
+  seasonYear     Int?
+  fileName       String?
+  columnMapping  Json?              // header -> field, so a re-import is reproducible
+
+  rowsTotal      Int                @default(0)
+  rowsImported   Int                @default(0)
+  rowsSkipped    Int                @default(0)
+  rowsFailed     Int                @default(0)
+
+  importedById   String
+  importedBy     User               @relation("RosterImporter", fields: [importedById], references: [id])
+  createdAt      DateTime           @default(now())
+
+  @@index([campaignId])
+  @@index([programId])
+}
+
+enum ContactInviteRole {
+  PLAYER
+  GUARDIAN
+}
+
+// Tokenised link a player opens to add supporters, or forwards to a parent so the
+// parent can add them instead. No account required for the guardian path.
+model ContactInvite {
+  id             String            @id @default(cuid())
+  teamMemberId   String
+  teamMember     TeamMember        @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  token          String            @unique
+  role           ContactInviteRole @default(PLAYER)
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  useCount       Int               @default(0)
+
+  createdAt      DateTime          @default(now())
+
+  @@index([teamMemberId])
+  @@index([token])
+}
+
+enum OptOutChannel {
+  EMAIL
+  SMS
+  ALL
+}
+
+enum OptOutSource {
+  UNSUBSCRIBE_LINK
+  SMS_STOP
+  MANUAL
+  BOUNCE
+  COMPLAINT
+}
+
+// Suppression list. Every outreach path must check this before sending.
+// Scoped to a program when known, but a null programId means suppress everywhere.
+model ContactOptOut {
+  id          String        @id @default(cuid())
+  programId   String?
+  program     Program?      @relation(fields: [programId], references: [id])
+
+  email       String?
+  phone       String?
+  channel     OptOutChannel @default(ALL)
+  source      OptOutSource  @default(UNSUBSCRIBE_LINK)
+  note        String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([email])
+  @@index([phone])
+  @@index([programId])
 }

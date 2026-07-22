@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { checkCsrf } from "@/lib/csrf";
 
 // Validation schema
 const createUpdateSchema = z.object({
@@ -16,6 +17,12 @@ export async function POST(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     const sessionToken = req.cookies.get("sessionToken")?.value;
 
     if (!sessionToken) {

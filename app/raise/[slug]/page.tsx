@@ -159,10 +159,10 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading campaign...</p>
+          <p className="text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
@@ -170,10 +170,10 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
-          <p className="text-gray-600 mb-4">{error || "This campaign does not exist or has been removed."}</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
+          <p className="text-muted-foreground mb-4">{error || "This campaign does not exist or has been removed."}</p>
           <Button asChild>
             <Link href="/">Go Home</Link>
           </Button>
@@ -188,7 +188,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
   const daysLeft = calculateDaysRemaining(new Date(campaign.endDate));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Navigation */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -197,7 +197,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg leading-none">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </Link>
             <Button asChild>
               <Link href="/">Start Your Campaign</Link>
@@ -250,7 +250,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                     <CardTitle className="text-2xl mb-1">
                       {campaign.organizationName} {campaign.teamName}
                     </CardTitle>
-                    <p className="text-gray-600">{campaign.category || 'Fundraising Campaign'}</p>
+                    <p className="text-muted-foreground">{campaign.category || 'Fundraising Campaign'}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -258,7 +258,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                 <div className="prose max-w-none">
                   <h3 className="text-xl font-semibold mb-3">About the Campaign</h3>
                   {campaign.description.split('\n\n').map((paragraph, i) => (
-                    <p key={i} className="text-gray-700 mb-3">{paragraph}</p>
+                    <p key={i} className="text-foreground mb-3">{paragraph}</p>
                   ))}
                 </div>
               </CardContent>
@@ -281,18 +281,18 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-gray-900">{donation.donorName}</p>
+                          <p className="font-semibold text-foreground">{donation.donorName}</p>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="font-semibold text-success">
                               {formatCurrency(typeof donation.grossAmount === 'string' ? parseInt(donation.grossAmount) : donation.grossAmount)}
                             </span>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-muted-foreground">
                               {formatRelativeTime(new Date(donation.createdAt))}
                             </span>
                           </div>
                         </div>
                         {donation.donorMessage && (
-                          <p className="text-gray-600 mt-1 italic">"{donation.donorMessage}"</p>
+                          <p className="text-muted-foreground mt-1 italic">"{donation.donorMessage}"</p>
                         )}
                       </div>
                     </div>
@@ -315,14 +315,14 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                 {campaign.cheerMessages && campaign.cheerMessages.length > 0 ? (
                   <div className="space-y-3">
                     {campaign.cheerMessages.map((message) => (
-                      <div key={message.id} className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-gray-700 mb-2">💬 "{message.message}"</p>
-                        <p className="text-sm text-gray-500">- {message.authorName}</p>
+                      <div key={message.id} className="bg-muted rounded-lg p-4">
+                        <p className="text-foreground mb-2">💬 "{message.message}"</p>
+                        <p className="text-sm text-muted-foreground">- {message.authorName}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center py-4 text-gray-500">No messages yet. Be the first to cheer them on!</p>
+                  <p className="text-center py-4 text-muted-foreground">No messages yet. Be the first to cheer them on!</p>
                 )}
 
                 <Dialog open={cheerDialogOpen} onOpenChange={setCheerDialogOpen}>
@@ -343,8 +343,8 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                       {cheerSuccess ? (
                         <div className="py-8 text-center">
                           <div className="text-4xl mb-2">🎉</div>
-                          <p className="text-green-600 font-semibold">Message submitted!</p>
-                          <p className="text-sm text-gray-600 mt-1">It will appear after approval.</p>
+                          <p className="text-success font-semibold">Message submitted!</p>
+                          <p className="text-sm text-muted-foreground mt-1">It will appear after approval.</p>
                         </div>
                       ) : (
                         <>
@@ -387,7 +387,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                                 maxLength={500}
                                 rows={4}
                               />
-                              <p className="text-xs text-gray-500 text-right">
+                              <p className="text-xs text-muted-foreground text-right">
                                 {cheerMessage.length}/500 characters
                               </p>
                             </div>
@@ -425,8 +425,8 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                     <div key={update.id} className="flex items-center gap-3 pb-3 border-b last:border-0">
                       <Calendar className="w-5 h-5 text-primary flex-shrink-0" />
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{update.title}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="font-medium text-foreground">{update.title}</p>
+                        <p className="text-sm text-muted-foreground">
                           {formatRelativeTime(new Date(update.publishedAt))}
                         </p>
                       </div>
@@ -445,15 +445,15 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   {/* Progress Section */}
                   <div className="mb-6">
                     <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-3xl font-bold text-gray-900">
+                      <span className="text-3xl font-bold text-foreground">
                         {formatCurrency(typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount)}
                       </span>
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         of {formatCurrency(typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount)}
                       </span>
                     </div>
                     <Progress value={typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount} max={typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount} className="mb-2" />
-                    <div className="flex items-center justify-between text-sm text-gray-600">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span className="font-semibold text-primary">{percentage}%</span>
                       <span>{campaign.stats?.donorCount || campaign.donorCount || 0} donors</span>
                     </div>
@@ -461,13 +461,13 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-gray-900">{campaign.stats?.donorCount || campaign.donorCount || 0}</p>
-                      <p className="text-xs text-gray-600">Donors</p>
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-foreground">{campaign.stats?.donorCount || campaign.donorCount || 0}</p>
+                      <p className="text-xs text-muted-foreground">Donors</p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-gray-900">{daysLeft}</p>
-                      <p className="text-xs text-gray-600">Days Left</p>
+                    <div className="bg-muted rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-foreground">{daysLeft}</p>
+                      <p className="text-xs text-muted-foreground">Days Left</p>
                     </div>
                   </div>
 
@@ -481,7 +481,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
                   {/* Quick Amounts */}
                   <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-2">Or donate:</p>
+                    <p className="text-sm text-muted-foreground mb-2">Or donate:</p>
                     <div className="grid grid-cols-3 gap-2">
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/raise/${params.slug}/donate`}>$25</Link>
@@ -496,7 +496,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   </div>
 
                   {/* Tax Deductible Badge */}
-                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                     <div className="w-5 h-5 bg-success rounded-full flex items-center justify-center flex-shrink-0">
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -514,24 +514,24 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   {/* Fee Breakdown */}
                   <div className="mt-6 pt-6 border-t">
                     <details className="cursor-pointer">
-                      <summary className="text-sm font-medium text-gray-700 mb-2">
+                      <summary className="text-sm font-medium text-foreground mb-2">
                         Where does my donation go?
                       </summary>
                       <div className="mt-3 space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Your donation:</span>
+                          <span className="text-muted-foreground">Your donation:</span>
                           <span className="font-semibold">$100.00</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Platform fee (10%):</span>
-                          <span className="text-gray-600">$10.00</span>
+                          <span className="text-muted-foreground">Platform fee (10%):</span>
+                          <span className="text-muted-foreground">$10.00</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Processing fee (~3%):</span>
-                          <span className="text-gray-600">$3.00</span>
+                          <span className="text-muted-foreground">Processing fee (~3%):</span>
+                          <span className="text-muted-foreground">$3.00</span>
                         </div>
                         <div className="pt-2 border-t flex justify-between">
-                          <span className="font-semibold text-gray-900">To campaign:</span>
+                          <span className="font-semibold text-foreground">To campaign:</span>
                           <span className="font-bold text-success">$87.00</span>
                         </div>
                       </div>

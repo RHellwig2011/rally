@@ -154,6 +154,23 @@ export const updateCampaignSchema = z.object({
   secondaryColor: z.string()
     .regex(hexColorRegex, "Secondary color must be a valid hex color")
     .optional(),
+
+  // Link this campaign to the Program it is a season of. Alumni and
+  // year-over-year roster data hang off Program, so a campaign with no
+  // programId can never contribute to either. Pass null to unlink.
+  programId: z.string()
+    .cuid("Invalid program id")
+    .nullable()
+    .optional(),
+
+  // Which season this campaign covers. Used to order seasons within a program
+  // and to identify alumni by graduation year.
+  seasonYear: z.number()
+    .int("Season year must be a whole number")
+    .min(1900, "Season year must be 1900 or later")
+    .max(2200, "Season year cannot exceed 2200")
+    .nullable()
+    .optional(),
 });
 
 // Schema for validating slug availability

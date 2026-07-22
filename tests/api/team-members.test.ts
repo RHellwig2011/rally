@@ -9,7 +9,7 @@ import { z } from "zod";
 
 describe("Team Member API Validation Tests", () => {
   // Helper function to generate valid team member data
-  const getValidTeamMemberData = () => ({
+  const getValidTeamMemberData = (): Record<string, unknown> => ({
     name: "John Doe",
     email: "john.doe@example.com",
     personalGoal: 500,
@@ -199,7 +199,7 @@ describe("Team Member API Validation Tests", () => {
       const data = { email: "newemail@example.com" };
       // Email field should not be in the update schema
       const parsed = schema.parse(data);
-      expect(parsed.email).toBeUndefined();
+      expect('email' in parsed).toBe(false);
     });
 
     it("should validate updated fields", () => {

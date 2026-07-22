@@ -10,8 +10,8 @@ export default function TestDonationPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch a campaign to test with
-    fetch("/api/campaigns?limit=1")
+    // Fetch a campaign to test with (public endpoint — no auth required)
+    fetch("/api/campaigns/public?limit=1")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.campaigns && data.campaigns.length > 0) {
@@ -29,10 +29,10 @@ export default function TestDonationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading campaign...</p>
+          <p className="text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
@@ -40,9 +40,9 @@ export default function TestDonationPage() {
 
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center max-w-md bg-white rounded-lg shadow p-8">
-          <p className="text-red-600 mb-4">{error || "Campaign not found"}</p>
+          <p className="text-warning mb-4">{error || "Campaign not found"}</p>
           <a href="/create-campaign" className="text-primary hover:underline">
             Create a campaign
           </a>
@@ -52,7 +52,7 @@ export default function TestDonationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       {/* Header */}
       <nav className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -61,7 +61,7 @@ export default function TestDonationPage() {
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
               </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Rally</span>
             </a>
           </div>
         </div>
@@ -73,19 +73,19 @@ export default function TestDonationPage() {
           {/* Campaign Info */}
           <div>
             <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{campaign.teamName}</h1>
-              <p className="text-gray-600 mb-4">{campaign.organizationName}</p>
-              <p className="text-gray-700 mb-6">{campaign.description}</p>
+              <h1 className="text-3xl font-bold text-foreground mb-2">{campaign.teamName}</h1>
+              <p className="text-muted-foreground mb-4">{campaign.organizationName}</p>
+              <p className="text-foreground mb-6">{campaign.description}</p>
 
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-muted rounded-lg p-4">
                 <div className="mb-2">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Progress</span>
+                    <span className="text-muted-foreground">Progress</span>
                     <span className="font-semibold">
                       ${(Number(campaign.currentAmount) / 100).toLocaleString()} of ${(Number(campaign.goalAmount) / 100).toLocaleString()}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-accent rounded-full h-3">
                     <div
                       className="bg-primary h-3 rounded-full transition-all"
                       style={{
@@ -94,7 +94,7 @@ export default function TestDonationPage() {
                     />
                   </div>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   {Math.round((Number(campaign.currentAmount) / Number(campaign.goalAmount)) * 100)}% of goal reached
                 </p>
               </div>

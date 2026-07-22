@@ -4,8 +4,9 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
-const JWT_EXPIRES_IN = "15m"; // access token lifetime
+import { JWT_SECRET } from "./jwt-secret";
+
+const JWT_EXPIRES_IN = "30d"; // access token lifetime — matches the 30-day sessionToken cookie
 
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 30);
 
@@ -15,6 +16,7 @@ export type PublicUser = {
   firstName: string;
   lastName: string;
   role: string;
+  emailVerified: boolean;
 };
 
 function toPublicUser(user: any): PublicUser {
@@ -24,6 +26,7 @@ function toPublicUser(user: any): PublicUser {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    emailVerified: user.emailVerified === true,
   };
 }
 
@@ -231,13 +234,38 @@ export async function resetPassword(token: string, newPassword: string) {
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash,
-      passwordResetToken: null,
-      passwordResetTokenExpiry: null,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Consume the reset token as part of the same conditional write, so two
+    // concurrent submissions of the same token cannot both succeed.
+    const consumed = await tx.user.updateMany({
+      where: {
+        id: user.id,
+        passwordResetToken: token,
+        passwordResetTokenExpiry: { gte: new Date() },
+      },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetTokenExpiry: null,
+      },
+    });
+
+    if (consumed.count === 0) {
+      throw new Error("Invalid or expired password reset token");
+    }
+
+    // A password reset exists to evict whoever compromised the account, so
+    // every outstanding refresh token dies with the old password. Without
+    // this, a stolen refresh token keeps minting fresh 30-day sessions
+    // indefinitely via rotateRefreshToken.
+    await tx.refreshToken.updateMany({
+      where: { userId: user.id, revoked: false },
+      data: {
+        revoked: true,
+        revokedAt: new Date(),
+        reason: "password_reset",
+      },
+    });
   });
 
   return toPublicUser(user);

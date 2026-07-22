@@ -1,32 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { CampaignStatus, CampaignCategory } from "@prisma/client";
+
+// Only these statuses may ever be listed publicly (never DRAFT/PAUSED/ARCHIVED)
+const PUBLIC_STATUSES: CampaignStatus[] = ["ACTIVE", "COMPLETED"];
 
 // GET public campaigns (no auth required)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
-    const status = searchParams.get("status") || "ACTIVE";
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const statusParam = searchParams.get("status");
+    const rawLimit = parseInt(searchParams.get("limit") || "50");
+    const rawOffset = parseInt(searchParams.get("offset") || "0");
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 100);
+    const offset = Number.isNaN(rawOffset) ? 0 : Math.max(rawOffset, 0);
+
+    // Validate status against the publicly listable statuses
+    let status: CampaignStatus = "ACTIVE";
+    if (statusParam) {
+      if (!PUBLIC_STATUSES.includes(statusParam as CampaignStatus)) {
+        return NextResponse.json(
+          { success: false, error: "Invalid status filter" },
+          { status: 400 }
+        );
+      }
+      status = statusParam as CampaignStatus;
+    }
+
+    // Validate category against the enum; ignore unknown values
+    const validCategory =
+      category &&
+      category !== "All" &&
+      (Object.values(CampaignCategory) as string[]).includes(category)
+        ? (category as CampaignCategory)
+        : null;
 
     // Get all active campaigns with their stats
-    const campaigns = await prisma.campaign.findMany({
-      where: {
-        status: status as any,
-        ...(category && category !== "All" ? { category: category as any } : {}),
-      },
-      take: limit,
-      skip: offset,
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: {
-            donations: true,
+    const where = {
+      status,
+      ...(validCategory ? { category: validCategory } : {}),
+    };
+    const [campaigns, total] = await Promise.all([
+      prisma.campaign.findMany({
+        where,
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+        include: {
+          _count: {
+            select: {
+              donations: true,
+            }
           }
         }
-      }
-    });
+      }),
+      prisma.campaign.count({ where }),
+    ]);
 
     // Convert BigInt to strings for JSON
     const serializedCampaigns = campaigns.map(c => ({
@@ -53,7 +83,8 @@ export async function GET(req: NextRequest) {
       {
         success: true,
         campaigns: serializedCampaigns,
-        total: serializedCampaigns.length
+        total,
+        hasMore: offset + campaigns.length < total
       },
       { status: 200 }
     );

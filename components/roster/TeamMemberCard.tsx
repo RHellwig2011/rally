@@ -94,9 +94,9 @@ export function TeamMemberCard({
             </div>
           )}
           <div>
-            <h3 className="font-semibold text-gray-900">{member.name}</h3>
-            {member.position && <p className="text-sm text-gray-600">{member.position}</p>}
-            {member.grade && <p className="text-xs text-gray-500">Grade {member.grade}</p>}
+            <h3 className="font-semibold text-foreground">{member.name}</h3>
+            {member.position && <p className="text-sm text-muted-foreground">{member.position}</p>}
+            {member.grade && <p className="text-xs text-muted-foreground">Grade {member.grade}</p>}
           </div>
         </div>
         <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(member.invitationStatus)}`}>
@@ -108,18 +108,18 @@ export function TeamMemberCard({
       {member.personalGoal && (
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-600">Progress</span>
+            <span className="text-muted-foreground">Progress</span>
             <span className="font-medium">
               {formatCurrency(member.amountRaised)} of {formatCurrency(member.personalGoal)}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-accent rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             {progressPercentage.toFixed(0)}% complete
           </div>
         </div>
@@ -128,11 +128,11 @@ export function TeamMemberCard({
       {/* Email and Link */}
       <div className="space-y-2 mb-4">
         <div className="text-sm">
-          <span className="text-gray-600">Email:</span>
-          <span className="ml-2 text-gray-900">{member.email}</span>
+          <span className="text-muted-foreground">Email:</span>
+          <span className="ml-2 text-foreground">{member.email}</span>
         </div>
         <div className="text-sm">
-          <span className="text-gray-600">Fundraising Link:</span>
+          <span className="text-muted-foreground">Fundraising Link:</span>
           <Link
             href={fundraisingLink}
             target="_blank"
@@ -157,7 +157,7 @@ export function TeamMemberCard({
           <>
             <button
               onClick={() => onEdit(member)}
-              className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              className="flex-1 px-3 py-1.5 text-sm border border-border rounded hover:bg-muted transition-colors"
             >
               Edit
             </button>
@@ -165,7 +165,7 @@ export function TeamMemberCard({
             {member.invitationStatus === 'PENDING' && (
               <button
                 onClick={() => onResendInvite(member.id)}
-                className="flex-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                className="flex-1 px-3 py-1.5 text-sm bg-success text-white rounded hover:bg-success transition-colors"
               >
                 Resend Invite
               </button>
@@ -174,7 +174,7 @@ export function TeamMemberCard({
             {member.invitationStatus !== 'REMOVED' && (
               <button
                 onClick={() => onDelete(member.id)}
-                className="flex-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                className="flex-1 px-3 py-1.5 text-sm bg-warning text-white rounded hover:bg-warning transition-colors"
               >
                 Remove
               </button>

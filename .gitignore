@@ -5,10 +5,12 @@ node_modules
 out/
 
 # Environment
+# Match every .env variant. The narrow list here previously missed .env.new,
+# which sat untracked in the tree holding live credentials — one `git add -A`
+# from being committed. Secrets belong only in .env.example, as placeholders.
 .env
-.env.local
-.env.production
-.env*.local
+.env.*
+!.env.example
 
 # Testing
 test-*.mjs
@@ -18,8 +20,8 @@ STRIPE_*.md
 # Build artifacts
 *.log
 
-  .next/
-  boba.zip
+.next/
+boba.zip
 .ds-sync/
 ds-bundle/
 .design-sync/.cache/

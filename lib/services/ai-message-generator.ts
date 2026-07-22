@@ -32,6 +32,34 @@ export async function generateEmailMessage(
   options: MessageOptions = {}
 ): Promise<{ subject: string; body: string }> {
   const {
+    includeStats = true,
+    includeCallToAction = true,
+  } = options;
+
+  const progress = ((context.currentAmount / context.goalAmount) * 100).toFixed(0);
+
+  try {
+    return await requestEmailMessage(context, options);
+  } catch (error) {
+    console.error('AI message generation error:', error);
+
+    // Fallback message if AI fails
+    return {
+      subject: `Support ${context.playerName} - ${context.campaignName}`,
+      body: `Hi!\n\nI'm ${context.playerName} and I'm raising money for ${context.campaignName}.\n\n${context.description}\n\n${includeStats ? `So far I've raised $${context.currentAmount.toFixed(2)} of my $${context.goalAmount.toFixed(2)} goal (${progress}%).` : ''}\n\n${includeCallToAction ? `Every donation helps and means so much to me and the team! Click the link below to support us.\n\nThank you! 🙏` : ''}`
+    };
+  }
+}
+
+/**
+ * Core AI email generation — throws on failure so callers that need to
+ * distinguish success from failure (e.g. A/B variations) can do so.
+ */
+async function requestEmailMessage(
+  context: CampaignContext,
+  options: MessageOptions = {}
+): Promise<{ subject: string; body: string }> {
+  const {
     tone = 'friendly',
     length = 'medium',
     includeStats = true,
@@ -64,42 +92,32 @@ ${customInstructions ? `- Additional instructions: ${customInstructions}` : ''}
 Return the response in JSON format with "subject" and "body" fields.
 The body should be plain text with line breaks for readability.`;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant that generates authentic, heartfelt fundraising messages for youth sports and activities. Write messages that sound like they come from real kids, not marketing copy. Be genuine and personal.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.8,
-    });
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant that generates authentic, heartfelt fundraising messages for youth sports and activities. Write messages that sound like they come from real kids, not marketing copy. Be genuine and personal.'
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.8,
+  });
 
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error('No content generated');
-    }
-
-    const result = JSON.parse(content);
-    return {
-      subject: result.subject || `Support ${context.playerName} - ${context.campaignName}`,
-      body: result.body || 'Please support our fundraiser!'
-    };
-  } catch (error) {
-    console.error('AI message generation error:', error);
-
-    // Fallback message if AI fails
-    return {
-      subject: `Support ${context.playerName} - ${context.campaignName}`,
-      body: `Hi!\n\nI'm ${context.playerName} and I'm raising money for ${context.campaignName}.\n\n${context.description}\n\n${includeStats ? `So far I've raised $${context.currentAmount.toFixed(2)} of my $${context.goalAmount.toFixed(2)} goal (${progress}%).` : ''}\n\n${includeCallToAction ? `Every donation helps and means so much to me and the team! Click the link below to support us.\n\nThank you! 🙏` : ''}`
-    };
+  const content = response.choices[0].message.content;
+  if (!content) {
+    throw new Error('No content generated');
   }
+
+  const result = JSON.parse(content);
+  return {
+    subject: result.subject || `Support ${context.playerName} - ${context.campaignName}`,
+    body: result.body || 'Please support our fundraiser!'
+  };
 }
 
 /**
@@ -162,6 +180,69 @@ Return only the SMS message text, no JSON.`;
 
     // Fallback message
     return `Hi! It's ${context.playerName}. Please support my ${context.campaignName} fundraiser! Every donation helps! 🙏`;
+  }
+}
+
+/**
+ * Generate a social media post (Facebook/Instagram)
+ */
+export async function generateSocialPost(
+  context: CampaignContext,
+  options: MessageOptions = {}
+): Promise<string> {
+  const {
+    tone = 'friendly',
+    includeStats = true,
+    customInstructions = ''
+  } = options;
+
+  const progress = ((context.currentAmount / context.goalAmount) * 100).toFixed(0);
+
+  const prompt = `Generate a social media post (Facebook/Instagram) for a fundraising campaign:
+
+Campaign: ${context.campaignName}
+Team: ${context.teamName}
+Player: ${context.playerName}
+Description: ${context.description}
+${includeStats ? `Progress: $${context.currentAmount.toFixed(2)} of $${context.goalAmount.toFixed(2)} (${progress}%)` : ''}
+
+Requirements:
+- Tone: ${tone}
+- 2-4 short paragraphs with line breaks
+- Include 2-4 relevant hashtags at the end
+- Personal and authentic (like a proud team member or parent would write)
+- Include a call-to-action to donate via the link
+${customInstructions ? `- ${customInstructions}` : ''}
+
+Return only the post text, no JSON.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that writes authentic social media posts for youth fundraisers. Keep it genuine and shareable, never corporate.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.8,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('No content generated');
+    }
+
+    return content.trim();
+  } catch (error) {
+    console.error('AI social post generation error:', error);
+
+    // Fallback post
+    return `🏆 Big things are happening for ${context.teamName}!\n\nI'm ${context.playerName} and we're raising money for ${context.campaignName}. ${context.description}\n\n${includeStats ? `We've raised $${context.currentAmount.toFixed(2)} of our $${context.goalAmount.toFixed(2)} goal so far — every donation gets us closer! ` : ''}Tap the link to support us. It means the world! 🙏\n\n#Fundraiser #SupportLocal #${context.teamName.replace(/\s+/g, '')}`;
   }
 }
 
@@ -243,7 +324,7 @@ export async function generateMessageVariations(
 
   for (let i = 0; i < Math.min(count, 3); i++) {
     try {
-      const message = await generateEmailMessage(context, {
+      const message = await requestEmailMessage(context, {
         tone: tones[i],
         length: 'medium',
         includeStats: true,
