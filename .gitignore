@@ -19,6 +19,9 @@ STRIPE_*.md
 
 # Build artifacts
 *.log
+# Incremental TypeScript build cache — rewritten on every compile, so tracking
+# it produces a spurious diff in unrelated commits.
+tsconfig.tsbuildinfo
 
 .next/
 boba.zip

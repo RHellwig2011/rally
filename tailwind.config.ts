@@ -31,43 +31,59 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        // Brand scales — Bleacher Backers UI, "Navy / Gray / Dark-Green".
+        // Source: Claude Design project "Bleacher Backers UI",
+        // templates/palette-navy-gray-green. Tailwind compiles these into
+        // literal utility classes, so they cannot be driven by the CSS
+        // variables in app/globals.css — the two must be kept in sync by hand.
         primary: {
-          DEFAULT: "#6366F1", // Indigo
-          50: "#ECEFFE",
-          100: "#E0E7FF",
-          200: "#C7D2FE",
-          300: "#A5B4FC",
-          400: "#818CF8",
-          500: "#6366F1",
-          600: "#4F46E5",
-          700: "#4338CA",
-          800: "#3730A3",
-          900: "#312E81",
+          DEFAULT: "#234C93", // Navy — brand / primary actions
+          50: "#EEF3FB",
+          100: "#D6E2F4",
+          200: "#AEC4E6",
+          300: "#7FA0CE",
+          400: "#4E71AE",
+          500: "#234C93",
+          600: "#1D3F7C",
+          700: "#173366",
+          800: "#122952",
+          900: "#0E1F3F",
           foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#F59E0B", // Amber
-          50: "#FFFBEB",
-          100: "#FEF3C7",
-          200: "#FDE68A",
-          300: "#FCD34D",
-          400: "#FBBF24",
-          500: "#F59E0B",
-          600: "#D97706",
-          700: "#B45309",
-          800: "#92400E",
-          900: "#78350F",
-          foreground: "#1F2937",
+          DEFAULT: "#15613F", // Dark green — secondary accent
+          50: "#E8F4EE",
+          100: "#C9E7D8",
+          200: "#9BD3BB",
+          300: "#5DB58C",
+          400: "#2E8E62",
+          500: "#15613F",
+          600: "#124E33",
+          700: "#0E3F2A",
+          800: "#0B3221",
+          900: "#08251A",
+          // Flipped from #1F2937 to white: the secondary surface is now dark
+          // green, so dark text on it would fail contrast.
+          foreground: "#FFFFFF",
         },
         success: {
-          DEFAULT: "#10B981",
-          light: "#D1FAE5",
-          dark: "#065F46",
+          DEFAULT: "#1C7A50",
+          light: "#DCF1E7",
+          600: "#166847",
+          // `dark` is not in the design-system spec, but ~17 call sites use
+          // text-success-dark / bg-success-dark. Dropping the key would make
+          // Tailwind silently emit no class at all, so it is retained here and
+          // set to the spec's own 600 value to stay on-palette.
+          dark: "#166847",
+          foreground: "#FFFFFF",
         },
+        // Red is danger-only and deliberately unchanged by the recolor.
+        // light/dark are retained for the same reason as success.dark above.
         warning: {
           DEFAULT: "#EF4444",
           light: "#FEE2E2",
           dark: "#991B1B",
+          foreground: "#FFFFFF",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
