@@ -1,0 +1,32 @@
+{
+  "projectId": "907806c7-1936-4f5a-a309-a5806da9fe72",
+  "shape": "package",
+  "pkg": "bleacher-backers",
+  "globalName": "BleacherBackersUI",
+  "srcDir": "components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/compiled/ds.css",
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "720x460"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "viewport": "520x420"
+    },
+    "Toast": {
+      "cardMode": "single",
+      "viewport": "620x300",
+      "primaryStory": "DonationReceived"
+    },
+    "DropdownMenuLabel": {
+      "cardMode": "single",
+      "primaryStory": "LabelledGroups"
+    },
+    "Input": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
