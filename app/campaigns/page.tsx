@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { SportArtwork } from "@/components/SportArtwork";
 import { formatCurrency, calculatePercentage } from "@/lib/utils";
 import type { CampaignCategory } from "@prisma/client";
 
@@ -155,27 +156,31 @@ export default function CampaignsPage() {
 
     return (
       <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary-200">
-        <div className="relative h-48 bg-gradient-to-br from-primary-100 to-secondary-100 overflow-hidden">
+        <div className="relative h-48 overflow-hidden">
           {campaign.bannerImageUrl ? (
+            // A real uploaded team photo always wins.
             <img
               src={campaign.bannerImageUrl}
               alt={campaign.teamName}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center text-primary-600">
-                {campaign.logoUrl ? (
-                  <img
-                    src={campaign.logoUrl}
-                    alt={campaign.teamName}
-                    className="w-24 h-24 mx-auto rounded-lg object-cover"
-                  />
-                ) : (
-                  <span className="text-6xl font-bold">{campaign.teamName.charAt(0)}</span>
-                )}
-              </div>
-            </div>
+            // No photo yet: designed illustrated artwork, with the team's own
+            // logo floated on top when they have one.
+            <>
+              <SportArtwork
+                seed={`${campaign.organizationName} ${campaign.teamName}`}
+                category={campaign.category}
+                className="transition-transform duration-300 group-hover:scale-105"
+              />
+              {campaign.logoUrl && (
+                <img
+                  src={campaign.logoUrl}
+                  alt={campaign.teamName}
+                  className="absolute inset-0 m-auto h-20 w-20 rounded-lg border border-white/30 object-cover shadow-lg"
+                />
+              )}
+            </>
           )}
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-foreground">
             {campaign.category}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SportArtwork } from "@/components/SportArtwork";
 
 /**
  * Marketing home page.
@@ -9,6 +10,15 @@ import Link from "next/link";
  * accent, hairline-divided stat rows, numbered rules instead of icon chips, and
  * full-bleed navy/green bands to break the page into movements.
  */
+
+/**
+ * Hero photo. To use a real team photo in the hero card: drop the file under
+ * public/ (e.g. public/images/hero-team.jpg, landscape ~1200×800 or wider) and
+ * set this to its path ("/images/hero-team.jpg"). It then layers over the
+ * illustrated band. Left null by default so the card shows the designed
+ * SportArtwork rather than a broken-image reference to a file that isn't there.
+ */
+const HERO_PHOTO: string | null = null;
 
 const SPORTS = [
   "BASKETBALL",
@@ -150,19 +160,35 @@ export default function Home() {
               aria-hidden
               className="absolute -inset-x-4 -inset-y-6 rounded-[28px] bg-[repeating-linear-gradient(135deg,rgba(35,76,147,0.05)_0_1px,transparent_1px_14px)]"
             />
-            <div className="relative rounded-[20px] border border-[#E4E8EF] bg-white p-6 shadow-[0_30px_60px_-30px_rgba(16,24,40,0.28)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="rounded-full bg-secondary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-secondary">
-                    Basketball
-                  </span>
-                  <h2 className="mt-3 font-display text-[20px] font-semibold text-primary">
-                    Lincoln High Varsity
-                  </h2>
-                  <p className="mt-1 text-sm text-[#5B6575]">
-                    Spring tournament travel &amp; new uniforms
-                  </p>
-                </div>
+            <div className="relative overflow-hidden rounded-[20px] border border-[#E4E8EF] bg-white shadow-[0_30px_60px_-30px_rgba(16,24,40,0.28)]">
+              {/* Photo band. The illustrated artwork always fills the band;
+                  a real team photo (HERO_PHOTO) layers on top when present and
+                  reveals the artwork again if the file is missing. */}
+              <div className="relative h-44">
+                <SportArtwork
+                  seed="Lincoln High Varsity Basketball"
+                  category="SPORTS"
+                />
+                {HERO_PHOTO ? (
+                  <img
+                    src={HERO_PHOTO}
+                    alt="A youth sports team"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : null}
+                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-secondary backdrop-blur-sm">
+                  Basketball
+                </span>
+              </div>
+
+              <div className="p-6">
+              <div>
+                <h2 className="font-display text-[20px] font-semibold text-primary">
+                  Lincoln High Varsity
+                </h2>
+                <p className="mt-1 text-sm text-[#5B6575]">
+                  Spring tournament travel &amp; new uniforms
+                </p>
               </div>
 
               <div className="mt-6 flex items-baseline justify-between">
@@ -198,6 +224,7 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             </div>
           </div>
