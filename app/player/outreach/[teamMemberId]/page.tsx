@@ -243,13 +243,15 @@ export default function PlayerOutreachPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4">
+    <div className="min-h-screen bg-muted py-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center justify-center gap-2">
-            <Send className="h-8 w-8 text-primary-600" />
-            Share Your Fundraiser
+          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-secondary mb-2">
+            Spread the word
+          </p>
+          <h1 className="font-display text-[clamp(30px,5vw,44px)] font-semibold tracking-[-0.02em] text-primary mb-2">
+            Share your fundraiser
           </h1>
           <p className="text-lg text-muted-foreground">
             Send personalized messages to friends and family
@@ -275,7 +277,7 @@ export default function PlayerOutreachPage() {
         {/* Message Type Selection */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="font-display flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary-600" />
               Step 1: Choose How to Send
             </CardTitle>
@@ -313,7 +315,7 @@ export default function PlayerOutreachPage() {
         {/* Message Composer */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="font-display flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <Mail className="h-5 w-5 text-primary-600" />
                 Step 2: Create Your Message
@@ -407,7 +409,7 @@ export default function PlayerOutreachPage() {
         {/* Recipients */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="font-display flex items-center gap-2">
               <Users className="h-5 w-5 text-primary-600" />
               Step 3: Add Recipients
             </CardTitle>

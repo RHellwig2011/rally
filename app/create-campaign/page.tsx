@@ -232,7 +232,7 @@ export default function CreateCampaignPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
+                <span className="text-white font-display font-bold text-sm">BB</span>
               </div>
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
@@ -513,8 +513,8 @@ export default function CreateCampaignPage() {
             {/* Step 3: Banking Setup */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-900">
+                <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
+                  <p className="text-sm text-primary-900">
                     <strong>Note:</strong> For MVP demo purposes, we're using a simplified banking setup.
                     In production, you'll connect a real bank account via Stripe Connect.
                   </p>

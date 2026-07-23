@@ -237,7 +237,7 @@ export default function CampaignsPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg leading-none">R</span>
+                <span className="text-white font-display font-bold text-sm leading-none">BB</span>
               </div>
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>

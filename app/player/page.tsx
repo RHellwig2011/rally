@@ -149,7 +149,7 @@ export default function PlayerDashboard() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
+                <span className="text-white font-display font-bold text-sm">BB</span>
               </div>
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>

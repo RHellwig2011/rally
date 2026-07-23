@@ -160,7 +160,7 @@ export default function TeamMemberOnboardingPage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-warning mb-2">
               <AlertCircle className="h-6 w-6" />
-              <CardTitle>Oops!</CardTitle>
+              <CardTitle className="font-display">Oops!</CardTitle>
             </div>
             <CardDescription className="text-base">{error}</CardDescription>
           </CardHeader>
@@ -176,7 +176,7 @@ export default function TeamMemberOnboardingPage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-success mb-2">
               <CheckCircle2 className="h-8 w-8" />
-              <CardTitle>All Set!</CardTitle>
+              <CardTitle className="font-display">All Set!</CardTitle>
             </div>
             <CardDescription className="text-base">
               Great job completing your profile! Your parents will be notified, and you're ready to start fundraising.
@@ -193,7 +193,7 @@ export default function TeamMemberOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4">
+    <div className="min-h-screen bg-muted py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -204,11 +204,14 @@ export default function TeamMemberOnboardingPage() {
               className="h-20 w-20 object-contain mx-auto mb-4"
             />
           )}
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-secondary mb-2">
+            You're on the roster
+          </p>
+          <h1 className="font-display text-[clamp(30px,5vw,44px)] font-semibold tracking-[-0.02em] text-primary mb-2">
             Welcome, {teamMemberInfo?.teamMember.name}! 🎉
           </h1>
           <p className="text-lg text-muted-foreground">
-            {teamMemberInfo?.campaign.teamName} - {teamMemberInfo?.campaign.organizationName}
+            {teamMemberInfo?.campaign.teamName} — {teamMemberInfo?.campaign.organizationName}
           </p>
         </div>
 
@@ -216,7 +219,7 @@ export default function TeamMemberOnboardingPage() {
         {currentStep === 1 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="font-display flex items-center gap-2">
                 <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
                   1
                 </div>
@@ -224,23 +227,23 @@ export default function TeamMemberOnboardingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Your Fundraising Journey</h3>
-                <ul className="space-y-2 text-sm text-blue-800">
+              <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
+                <h3 className="font-display font-semibold text-primary mb-2">Your Fundraising Journey</h3>
+                <ul className="space-y-2 text-sm text-primary-800">
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
                     <span>Your coach has invited you to join the team fundraiser</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
                     <span>You'll get your own personal fundraising page to share with family and friends</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
                     <span>People can donate directly to support you and the team</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
                     <span>Your parents will receive updates about your fundraising progress</span>
                   </li>
                 </ul>
@@ -282,7 +285,7 @@ export default function TeamMemberOnboardingPage() {
         {currentStep === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="font-display flex items-center gap-2">
                 <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
                   2
                 </div>
@@ -296,7 +299,7 @@ export default function TeamMemberOnboardingPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Player Contact Info */}
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
                     Your Contact Info <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                   </h3>
 
@@ -328,7 +331,7 @@ export default function TeamMemberOnboardingPage() {
                 </div>
 
                 <div className="border-t pt-6">
-                  <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
+                  <h3 className="font-display font-semibold text-foreground flex items-center gap-2 mb-4">
                     <Users className="h-5 w-5" />
                     Parent/Guardian Contact Info <span className="text-sm font-normal text-warning">(Required)</span>
                   </h3>
@@ -402,7 +405,7 @@ export default function TeamMemberOnboardingPage() {
                 {showSecondParent && (
                   <div className="border-t pt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
                         Second Parent/Guardian <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                       </h3>
                       <Button

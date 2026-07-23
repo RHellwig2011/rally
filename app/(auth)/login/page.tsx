@@ -56,12 +56,12 @@ export default function LoginPage() {
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">R</span>
+              <span className="text-white font-display font-bold text-xl">BB</span>
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+          <CardTitle className="font-display text-2xl font-semibold text-center">Welcome back</CardTitle>
           <CardDescription className="text-center">
-            Sign in to your Rally account
+            Sign in to your Bleacher Backers account
           </CardDescription>
         </CardHeader>
         <CardContent>

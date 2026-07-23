@@ -53,10 +53,10 @@ function VerifyEmailContent() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">R</span>
+              <span className="text-white font-display font-bold text-xl">BB</span>
             </div>
           </div>
-          <CardTitle className="text-2xl">Email Verification</CardTitle>
+          <CardTitle className="font-display text-2xl font-semibold">Email Verification</CardTitle>
           <CardDescription>
             {status === "verifying" ? "Confirming your email address..." : ""}
           </CardDescription>

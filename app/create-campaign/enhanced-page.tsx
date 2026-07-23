@@ -382,7 +382,7 @@ export default function EnhancedCreateCampaignPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
+                <span className="text-white font-display font-bold text-sm">BB</span>
               </div>
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
@@ -877,11 +877,11 @@ export default function EnhancedCreateCampaignPage() {
             {/* Step 3: Banking Setup */}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="bg-primary-50 border border-primary-100 rounded-lg p-4 flex items-start gap-3">
+                  <Info className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-blue-900">Banking Setup (Simplified for MVP)</p>
-                    <p className="text-sm text-blue-800 mt-1">
+                    <p className="text-sm font-medium text-primary-900">Banking Setup (Simplified for MVP)</p>
+                    <p className="text-sm text-primary-800 mt-1">
                       In the full version, you'll connect your bank account via Stripe Connect for automatic payouts.
                       For now, we're using a simplified guardian approval system.
                     </p>
