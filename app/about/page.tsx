@@ -1,299 +1,288 @@
 import Link from "next/link";
-import { ArrowRight, Heart, Users, Sparkles, Target, Shield, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/Navigation";
 
+/**
+ * About page, composed on the Bleacher Backers UI "Kinetic Site" direction:
+ * left-anchored sections, Space Grotesk display type set large and tight,
+ * numbered rules in place of icon chips, and an editorial story block with an
+ * Instrument Serif pull quote. Content is unchanged from the original — this is
+ * a recomposition, not a rewrite.
+ */
+
+const VALUES = [
+  {
+    n: "01",
+    title: "Simplicity first",
+    body: "Fundraising should be simple enough for a 12-year-old to launch a campaign. If it's complicated, we redesign it. No exceptions.",
+  },
+  {
+    n: "02",
+    title: "Trust & transparency",
+    body: "Every penny is tracked. Every fee is clear. No hidden charges, no surprises. Donors and teams deserve complete transparency.",
+  },
+  {
+    n: "03",
+    title: "Kids come first",
+    body: 'Every feature we build, every decision we make — we ask: "Does this help more kids participate?" If not, we don\'t do it.',
+  },
+];
+
+const DIFFERENTIATORS = [
+  {
+    label: "Outreach",
+    title: "Messages that sound like a person",
+    body: "Write one note and the platform personalizes the email and texts to every contact on the roster. Send to hundreds in seconds.",
+  },
+  {
+    label: "Banking",
+    title: "Built-in, not bolted on",
+    body: "Funds go directly into a secure campaign account with a running balance the whole booster board can see. No waiting, no transfers.",
+  },
+  {
+    label: "Setup",
+    title: "Live in an afternoon",
+    body: "From signup to a live campaign in minutes. No approval delays, no paperwork — just a few questions and you're raising.",
+  },
+  {
+    label: "Attribution",
+    title: "Credit to the right player",
+    body: "Every team member gets their own link and dashboard. See exactly who raised what, and let the friendly competition do the asking.",
+  },
+  {
+    label: "Live",
+    title: "Updates in real time",
+    body: "Watch donations roll in as they happen, notify supporters, and post updates without waiting on anyone.",
+  },
+  {
+    label: "Support",
+    title: "Real humans answer",
+    body: "We respond to support in hours, not days. Your season is on a deadline, and we treat it that way.",
+  },
+];
+
+const STATS = [
+  { v: "$2.5M+", l: "raised for teams" },
+  { v: "500+", l: "programs helped" },
+  { v: "15K+", l: "donors" },
+  { v: "98%", l: "reach their goal", accent: true },
+];
+
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#F5F7FA] text-[#101A2C] antialiased">
       <Navigation />
 
-      {/* Hero Section */}
-      <section className="bg-primary text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              Fundraising Shouldn't Be This Hard
-            </h1>
-            <p className="text-xl md:text-2xl text-primary-100 mb-8">
-              So we built Bleacher Backers to make it ridiculously easy for youth teams, clubs,
-              and school groups to raise money and achieve their dreams.
-            </p>
-          </div>
+      {/* -------------------------------------------------------------- Hero */}
+      <section className="bg-primary text-white">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
+          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary-200">
+            Our mission
+          </p>
+          <h1 className="mt-4 max-w-[16ch] font-display text-[clamp(40px,6.5vw,84px)] font-semibold leading-[0.98] tracking-[-0.03em]">
+            Fundraising shouldn't be this hard.
+          </h1>
+          <p className="mt-6 max-w-[52ch] text-[19px] leading-relaxed text-primary-100">
+            So we built Bleacher Backers to make it ridiculously easy for youth
+            teams, clubs, and school groups to raise money and get back to the
+            game.
+          </p>
         </div>
       </section>
 
-      {/* Mission Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      {/* ----------------------------------------------------------- Mission */}
+      <section className="bg-white">
+        <div className="mx-auto grid max-w-[1180px] gap-12 px-5 py-16 sm:px-8 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-16">
           <div>
-            <div className="inline-block bg-primary-100 text-primary font-semibold px-4 py-2 rounded-full mb-4">
-              Our Mission
-            </div>
-            <h2 className="text-4xl font-bold text-foreground mb-6">
-              Every kid deserves a chance to play, learn, and grow
+            <h2 className="font-display text-[clamp(28px,4vw,46px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
+              Every kid deserves a chance to play, learn, and grow.
             </h2>
-            <p className="text-lg text-foreground mb-6 leading-relaxed">
-              We started Bleacher Backers because we saw too many talented kids miss out on opportunities
-              simply because fundraising was too complicated, time-consuming, or expensive.
-            </p>
-            <p className="text-lg text-foreground mb-6 leading-relaxed">
-              Traditional fundraising meant bake sales, door-to-door candy sales, and
-              awkward donation requests. Coaches and parents spent countless hours managing
-              spreadsheets, counting cash, and chasing down receipts.
-            </p>
-            <p className="text-lg text-foreground mb-6 leading-relaxed">
-              <strong>There had to be a better way.</strong>
-            </p>
-            <p className="text-lg text-foreground leading-relaxed">
-              So we built Bleacher Backers—a modern fundraising platform that combines AI-powered outreach,
-              secure banking, and real-time tracking to help teams reach their goals faster than ever before.
-            </p>
+            <div className="mt-6 space-y-5 text-[17px] leading-relaxed text-[#5B6575]">
+              <p>
+                We started Bleacher Backers because we saw too many talented kids
+                miss out simply because fundraising was too complicated, too slow,
+                or too expensive.
+              </p>
+              <p>
+                Traditional fundraising meant bake sales, door-to-door candy, and
+                awkward asks. Coaches and parents spent evenings on spreadsheets,
+                counting cash, and chasing receipts.
+              </p>
+              <p className="font-semibold text-[#101A2C]">There had to be a better way.</p>
+              <p>
+                So we built one — a modern platform that combines personalized
+                outreach, secure banking, and real-time tracking to help teams
+                reach their goals faster than ever.
+              </p>
+            </div>
           </div>
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary-200 to-secondary-200 rounded-3xl transform rotate-3"></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl p-8 border-4 border-primary-100">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary mb-2">$2.5M+</div>
-                  <div className="text-sm text-muted-foreground">Total Raised</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary mb-2">500+</div>
-                  <div className="text-sm text-muted-foreground">Teams Helped</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary mb-2">15K+</div>
-                  <div className="text-sm text-muted-foreground">Happy Donors</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary mb-2">98%</div>
-                  <div className="text-sm text-muted-foreground">Success Rate</div>
-                </div>
-              </div>
+
+          {/* Stat panel — hairline grid, tabular figures */}
+          <div className="lg:pt-2">
+            <div className="rounded-[20px] border border-[#E4E8EF] bg-[#F5F7FA] p-8 sm:p-10">
+              <dl className="grid grid-cols-2 gap-y-8">
+                {STATS.map((s) => (
+                  <div key={s.l}>
+                    <dt className="sr-only">{s.l}</dt>
+                    <dd
+                      className={`font-display text-[clamp(28px,4vw,40px)] font-bold tabular-nums ${
+                        s.accent ? "text-secondary" : "text-primary"
+                      }`}
+                    >
+                      {s.v}
+                    </dd>
+                    <p className="mt-1 text-[13px] text-[#5B6575]">{s.l}</p>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Values Section */}
-      <section className="bg-muted py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-foreground mb-4">What We Stand For</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Our values guide everything we do—from product decisions to customer support
+      {/* ------------------------------------------------------------ Values */}
+      <section className="border-y border-[#E4E8EF] bg-[#F5F7FA]">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
+          <div className="flex flex-wrap items-baseline justify-between gap-4">
+            <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold tracking-[-0.02em] text-primary">
+              What we stand for
+            </h2>
+            <p className="max-w-[34ch] text-base text-[#5B6575]">
+              These three tests decide what we build and what we leave out.
             </p>
           </div>
+          <ol className="mt-12 grid gap-[22px] md:grid-cols-3">
+            {VALUES.map((v) => (
+              <li key={v.n} className="border-t-2 border-secondary pt-[22px]">
+                <span className="font-display text-[15px] font-bold text-secondary">
+                  {v.n}
+                </span>
+                <h3 className="mt-3.5 font-display text-[22px] font-semibold text-primary">
+                  {v.title}
+                </h3>
+                <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
+                  {v.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Value 1 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mb-6">
-                <Sparkles className="w-8 h-8 text-primary" />
+      {/* ---------------------------------------------------- Differentiators */}
+      <section className="bg-white">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
+          <h2 className="max-w-[18ch] font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
+            How we're different
+          </h2>
+          <p className="mt-4 max-w-[46ch] text-lg text-[#5B6575]">
+            Not just another fundraising page — the operating system for a team's
+            whole drive.
+          </p>
+          <div className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
+            {DIFFERENTIATORS.map((d) => (
+              <div key={d.title} className="border-t border-[#E4E8EF] pt-6">
+                <span className="font-display text-[12px] font-bold uppercase tracking-[0.14em] text-secondary">
+                  {d.label}
+                </span>
+                <h3 className="mt-2.5 font-display text-[20px] font-semibold text-primary">
+                  {d.title}
+                </h3>
+                <p className="mt-2 text-[15.5px] leading-relaxed text-[#5B6575]">
+                  {d.body}
+                </p>
               </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4">Simplicity First</h3>
-              <p className="text-foreground leading-relaxed">
-                Fundraising should be simple enough for a 12-year-old to launch a campaign.
-                If it's complicated, we redesign it. No exceptions.
-              </p>
-            </div>
-
-            {/* Value 2 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-secondary-100 rounded-xl flex items-center justify-center mb-6">
-                <Shield className="w-8 h-8 text-secondary" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4">Trust & Transparency</h3>
-              <p className="text-foreground leading-relaxed">
-                Every penny is tracked. Every fee is clear. No hidden charges, no surprises.
-                Donors and teams deserve complete transparency.
-              </p>
-            </div>
-
-            {/* Value 3 */}
-            <div className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-success-light rounded-xl flex items-center justify-center mb-6">
-                <Heart className="w-8 h-8 text-success" />
-              </div>
-              <h3 className="text-2xl font-bold text-foreground mb-4">Kids Come First</h3>
-              <p className="text-foreground leading-relaxed">
-                Every feature we build, every decision we make—we ask: "Does this help more
-                kids participate?" If not, we don't do it.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* How We're Different */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-foreground mb-4">How Bleacher Backers Is Different</h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            We're not just another fundraising platform. We're building the future of youth fundraising.
+      {/* ------------------------------------------------------------- Story */}
+      <section className="bg-primary text-white">
+        <div className="mx-auto max-w-[820px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
+          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-secondary-200">
+            Our story
+          </p>
+          <div className="mt-7 space-y-6 text-[17px] leading-relaxed text-primary-100">
+            <p>
+              Bleacher Backers started when our founder, a former high school
+              coach, watched talented athletes miss tournaments because their team
+              couldn't raise enough money. The process was stuck in the 1990s —
+              spreadsheets, cash counting, and endless phone calls.
+            </p>
+            <p>
+              Parents were writing checks, kids were selling candy nobody wanted,
+              and coaches were doing bookkeeping instead of planning practices.
+            </p>
+          </div>
+
+          <blockquote className="my-10 border-l-2 border-secondary-300 pl-6">
+            <p className="font-quote text-[clamp(26px,4vw,44px)] leading-[1.18] text-white">
+              “There has to be a better way,” we thought. So we built it.
+            </p>
+          </blockquote>
+
+          <p className="text-[17px] leading-relaxed text-primary-100">
+            We combined modern fintech, thoughtful automation, and real design
+            into the platform we wish we'd had on the sideline — one where:
+          </p>
+          <ul className="mt-6 space-y-3">
+            {[
+              "Campaigns launch in an afternoon, not a week",
+              "Outreach writes itself, personalized per contact",
+              "Every dollar is tracked transparently, in real time",
+              "Banking is built in, not bolted on",
+              "Players can run their own fundraising",
+            ].map((line) => (
+              <li key={line} className="flex gap-3 text-[16px] text-primary-100">
+                <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-secondary-300" aria-hidden />
+                {line}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-8 font-display text-[19px] font-semibold leading-snug text-white">
+            Because every kid deserves a chance to play, learn, and grow —
+            regardless of their family's ability to fundraise.
           </p>
         </div>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Feature 1 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">AI-Powered Outreach</h3>
-              <p className="text-foreground">
-                No other platform has AI that writes personalized messages for you. Click once,
-                get a perfect message. Send to hundreds in seconds.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center flex-shrink-0">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Built-In Banking</h3>
-              <p className="text-foreground">
-                Funds go directly into a secure campaign account. No waiting for payouts,
-                no complicated transfers. Just simple, transparent banking.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-success rounded-xl flex items-center justify-center flex-shrink-0">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">5-Minute Setup</h3>
-              <p className="text-foreground">
-                From signup to live campaign in 5 minutes. No approval delays, no paperwork,
-                no waiting. Just answer a few questions and go.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 4 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Individual Tracking</h3>
-              <p className="text-foreground">
-                Every team member gets their own link and dashboard. See exactly who raised what.
-                Gamify fundraising and watch the competition boost donations.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 5 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center flex-shrink-0">
-              <Target className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Real-Time Updates</h3>
-              <p className="text-foreground">
-                Watch donations roll in live. Get instant notifications. Share updates with
-                supporters. Everything happens in real-time.
-              </p>
-            </div>
-          </div>
-
-          {/* Feature 6 */}
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-success rounded-xl flex items-center justify-center flex-shrink-0">
-              <Heart className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">We Actually Care</h3>
-              <p className="text-foreground">
-                Real humans answer support emails. We respond in hours, not days.
-                Your success is our success.
-              </p>
-            </div>
-          </div>
-        </div>
       </section>
 
-      {/* Story Section */}
-      <section className="bg-gradient-to-br from-gray-900 to-gray-800 text-white py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">Our Story</h2>
-          </div>
-
-          <div className="space-y-6 text-lg text-muted-foreground leading-relaxed">
-            <p>
-              Bleacher Backers started when our founder, a former high school coach, watched talented athletes
-              miss tournaments because their team couldn't raise enough money. The fundraising process
-              was stuck in the 1990s—spreadsheets, cash counting, and endless phone calls.
-            </p>
-            <p>
-              Meanwhile, parents were writing checks, kids were selling candy bars nobody wanted,
-              and coaches were spending evenings doing bookkeeping instead of planning practices.
-            </p>
-            <p className="text-xl font-semibold text-white">
-              "There has to be a better way," we thought.
-            </p>
-            <p>
-              So we built it. Bleacher Backers combines modern fintech, AI, and beautiful design to create
-              the fundraising platform we wish existed when we were coaching. A platform where:
-            </p>
-            <ul className="list-disc list-inside space-y-2 ml-4">
-              <li>Campaigns launch in 5 minutes, not 5 days</li>
-              <li>AI writes your outreach messages for you</li>
-              <li>Funds are tracked transparently in real-time</li>
-              <li>Banking is built-in, not bolted on</li>
-              <li>Kids can manage their own fundraising efforts</li>
-            </ul>
-            <p>
-              Today, Bleacher Backers powers fundraising for hundreds of teams across the country.
-              We've helped raise millions of dollars, and we're just getting started.
-            </p>
-            <p className="text-xl font-semibold text-white">
-              Because every kid deserves a chance to play, learn, and grow—regardless of their
-              family's ability to fundraise.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-primary rounded-3xl p-12 text-center text-white">
-          <h2 className="text-4xl font-bold mb-4">Ready to Transform Your Fundraising?</h2>
-          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
-            Join hundreds of teams that are raising more money in less time with Bleacher Backers
+      {/* --------------------------------------------------------------- CTA */}
+      <section className="bg-secondary">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16">
+          <h2 className="font-display text-[clamp(34px,5.5vw,72px)] font-semibold leading-[1.0] tracking-[-0.02em] text-white">
+            Ready to transform your fundraising?
+          </h2>
+          <p className="mx-auto mt-5 max-w-[44ch] text-lg text-white/80">
+            Join hundreds of teams raising more, in less time, with Bleacher
+            Backers.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" asChild>
-              <Link href="/create-campaign">
-                Start Your Campaign
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="bg-white/10 border-white text-white hover:bg-white/20">
-              <Link href="/campaigns">
-                Browse Campaigns
-              </Link>
-            </Button>
+          <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-bold text-secondary transition-transform hover:-translate-y-0.5"
+            >
+              Start your campaign
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link
+              href="/campaigns"
+              className="inline-flex items-center justify-center rounded-full border border-white/70 px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Browse campaigns
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved. We never sell or share your data.</p>
-          </div>
+      {/* ------------------------------------------------------------ Footer */}
+      <footer className="bg-[#0A101E]">
+        <div className="mx-auto max-w-[1180px] px-5 py-10 text-center text-sm text-[#66738A] sm:px-8 lg:px-16">
+          <p>
+            © {new Date().getFullYear()} Bleacher Backers. All rights reserved. We
+            never sell or share your data.
+          </p>
         </div>
       </footer>
     </div>

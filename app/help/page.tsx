@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Send, Bot, User as UserIcon, Loader2, HelpCircle, MessageSquare } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -119,16 +119,16 @@ export default function HelpPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-primary-100 text-primary px-4 py-2 rounded-full mb-4">
-            <HelpCircle className="w-5 h-5" />
-            <span className="font-semibold">Help Center</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            How Can We Help You?
+        <div className="mb-12">
+          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
+            Help center
+          </p>
+          <h1 className="mt-3 font-display text-[clamp(34px,5vw,60px)] font-semibold leading-[1.02] tracking-[-0.02em] text-primary">
+            How can we help?
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ask our AI assistant anything about Rally. Get instant answers 24/7.
+          <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+            Ask the assistant anything about running a campaign — instant answers,
+            any time of day.
           </p>
         </div>
 
@@ -136,9 +136,9 @@ export default function HelpPage() {
           {/* Quick Links Sidebar */}
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-20">
-              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+              <h3 className="font-display text-lg font-semibold text-primary mb-4 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                Quick Questions
+                Quick questions
               </h3>
               <div className="space-y-2">
                 {quickQuestions.map((question, index) => (
@@ -167,7 +167,7 @@ export default function HelpPage() {
               <div className="mt-4">
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <Link href="/about">
-                    About Rally
+                    About Bleacher Backers
                   </Link>
                 </Button>
               </div>
@@ -268,7 +268,7 @@ export default function HelpPage() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Ask me anything about Rally..."
+                    placeholder="Ask me anything about your campaign..."
                     disabled={isLoading}
                     className="flex-1"
                   />
@@ -295,7 +295,7 @@ export default function HelpPage() {
         {/* Additional Help Resources */}
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-foreground mb-2">Getting Started</h3>
+            <h3 className="font-display text-lg font-semibold text-primary mb-2">Getting Started</h3>
             <p className="text-muted-foreground text-sm mb-4">
               Learn how to create your first campaign and start raising money
             </p>
@@ -305,9 +305,9 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-foreground mb-2">Browse Campaigns</h3>
+            <h3 className="font-display text-lg font-semibold text-primary mb-2">Browse Campaigns</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              See how other teams are using Rally to reach their goals
+              See how other teams are using Bleacher Backers to reach their goals
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link href="/campaigns">View Campaigns</Link>
@@ -315,9 +315,9 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-foreground mb-2">About Rally</h3>
+            <h3 className="font-display text-lg font-semibold text-primary mb-2">About Bleacher Backers</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Learn more about our mission and what makes Rally different
+              Learn more about our mission and what makes Bleacher Backers different
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link href="/about">Learn More</Link>

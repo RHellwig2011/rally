@@ -77,7 +77,7 @@ export function Navigation() {
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-sm">BB</span>
             </div>
-            <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
+            <span className="font-display text-xl font-bold tracking-[-0.01em] text-foreground">Bleacher Backers</span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
