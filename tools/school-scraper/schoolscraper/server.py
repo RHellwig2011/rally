@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Request, status
+from fastapi import Body, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import PlainTextResponse, Response
 
 from . import alexa as alexa_handler
@@ -15,6 +15,7 @@ from .crypto import Vault
 from .history import History
 from .models import AssessmentType
 from .quiz import QuizStore, prepare_quiz
+from .review import DraftReviewer
 from .scheduler import start_scheduler
 from .study import StudyHelper
 from .sync_runner import sync_user
@@ -65,7 +66,7 @@ def create_app(config: AppConfig) -> FastAPI:
     history = History(config.cache_path)
     quizzes = QuizStore(config.cache_path)
 
-    app = FastAPI(title="schoolscraper", version="0.3.0")
+    app = FastAPI(title="schoolscraper", version="0.4.0")
     app.state.config = config
     app.state.user_store = user_store
     app.state.cache = cache
@@ -98,7 +99,7 @@ def create_app(config: AppConfig) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        return {"ok": True, "version": "0.3.0"}
+        return {"ok": True, "version": "0.4.0"}
 
     @app.get("/api/status")
     def status_endpoint(authorization: str | None = Header(default=None)) -> dict[str, Any]:
@@ -174,6 +175,35 @@ def create_app(config: AppConfig) -> FastAPI:
             "summary": pack.summary,
             "flashcards": pack.flashcards,
             "practice_questions": pack.practice_questions,
+        }
+
+    @app.post("/api/users/{name}/review")
+    def review_endpoint(
+        name: str,
+        payload: dict[str, Any] = Body(...),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        """Critique the student's own draft. Body: {draft, rubric?, dedup_key?}.
+        Never returns rewritten/submittable text — only feedback."""
+        _require_token(authorization)
+        if not config.study.configured:
+            raise HTTPException(503, "Study helper not configured")
+        u = user_store.get(name)
+        if not u:
+            raise HTTPException(404, f"unknown user {name}")
+        draft = (payload or {}).get("draft") or ""
+        if not draft.strip():
+            raise HTTPException(422, "draft is required and must be non-empty")
+        rubric = (payload or {}).get("rubric")
+        dedup_key = (payload or {}).get("dedup_key")
+        a = cache.get(dedup_key, user=u.name) if dedup_key else None
+        reviewer = DraftReviewer(config.study)
+        result = reviewer.review(draft, assignment=a, rubric=rubric)
+        return {
+            "overall": result.overall,
+            "dimension_feedback": result.dimension_feedback,
+            "prioritized_next_steps": result.prioritized_next_steps,
+            "grade_estimate": result.grade_estimate,
         }
 
     @app.get("/api/users/{name}/calendar.ics")

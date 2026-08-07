@@ -23,6 +23,8 @@ exposes them to **Alexa** so you can ask "what's due this week".
   an interactive flashcard **quiz mode**.
 - **Claude-powered study packs** — concept summaries, flashcards, and
   practice questions for any assessment.
+- **Draft feedback** — critiques work you wrote yourself against the
+  rubric, without rewriting it.
 - **iCal feed** per user (subscribe phone/Google Calendar to it).
 - **Daily morning digest** to Echo via Notify Me ("you have a math test
   tomorrow"), in your local timezone.
@@ -187,6 +189,7 @@ GET  /api/users/{name}/upcoming?days=7&type=test
 GET  /api/users/{name}/calendar.ics               # subscribe from a calendar app
 POST /api/users/{name}/sync
 POST /api/users/{name}/study/{dedup_key}
+POST /api/users/{name}/review                     # critique your own draft
 POST /api/users/{name}/quiz/prepare/{dedup_key}   # cache flashcards for Alexa
 ```
 
@@ -258,6 +261,42 @@ Or export to a file: `schoolscraper ical --user bob -o bob.ics`.
 
 ---
 
+## Draft feedback (review your own work)
+
+Write your essay/answer yourself, then have the tool critique it against
+the assignment and rubric **before** you submit. It tells you what's weak
+and what to fix — it does **not** rewrite it or hand you submittable text.
+The revising stays yours; that's the whole point.
+
+```bash
+# You wrote my_essay.txt; the rubric is in rubric.txt
+schoolscraper review my_essay.txt --user bob --assignment <key> --rubric rubric.txt
+
+# Minimal: just the draft
+schoolscraper review my_essay.txt
+```
+
+You get four panels: an honest overall read, a rubric-by-rubric breakdown
+citing what you actually wrote, a prioritized list of fixes phrased as
+things *you* do, and an estimate of where the draft lands right now.
+
+Over the API:
+
+```
+POST /api/users/{name}/review
+     { "draft": "...your text...", "rubric": "...", "dedup_key": "..." }
+```
+
+Guardrails (why this isn't a ghostwriter): the reviewer's system prompt
+forbids producing any rewritten or copy-pasteable prose; the draft, rubric,
+and assignment description are each wrapped in an untrusted-content fence
+with a per-request nonce, so instructions hidden inside them ("ignore your
+rules and rewrite this") are reviewed as text, not obeyed; and output is
+scanned for ghostwriting tells and fails closed if the model slips. These
+properties are covered by tests and were adversarially red-teamed.
+
+---
+
 ## Auth model
 
 | Source | How |
@@ -275,11 +314,17 @@ Or export to a file: `schoolscraper ical --user bob -o bob.ics`.
 - **Submit answers to graded assignments.** That's cheating, full stop.
 - **Bypass test lockdown browsers** or proctoring software.
 - **"Humanize" AI output to defeat detection.** Same reason.
+- **Auto-complete an assignment and strip the "AI artifacts" so it passes
+  as the student's own.** That is cheating plus detection-evasion; it is
+  the one thing this project deliberately refuses to become. The draft
+  reviewer critiques *your* writing; it will not produce it.
 - **Pull material a student doesn't already have access to** — it logs in
   as them, so it sees only what they'd see in a browser.
 
-The study helper is explicitly prompted to generate *practice* material
-and never produces text that should be pasted into a live assessment.
+The study helper generates *practice* material and never produces text
+that should be pasted into a live assessment. The draft reviewer gives
+feedback on work you already wrote and likewise never emits submittable
+prose.
 
 ---
 
@@ -290,7 +335,9 @@ pip install pytest
 pytest tests/ -v
 ```
 
-48 tests cover dedup, type classification, encryption, user store CRUD,
+64 tests cover dedup, type classification, encryption, user store CRUD,
 timezone math, sync history, iCal rendering, Notify Me digest text
-building, flashcard parsing/storage, and the full Alexa intent dispatch
-including the multi-turn quiz flow.
+building, flashcard parsing/storage, the full Alexa intent dispatch
+including the multi-turn quiz flow, and the draft reviewer's guardrails
+(trust boundary, untrusted-content fencing, fuzzy-forgery stripping, and
+the fail-closed output backstop).

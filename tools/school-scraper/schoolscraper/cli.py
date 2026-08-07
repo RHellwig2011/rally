@@ -17,6 +17,7 @@ from .history import History
 from .ical import render as ical_render
 from .models import Assignment, AssessmentType
 from .quiz import QuizStore, prepare_quiz as _prepare_quiz
+from .review import DraftReviewer
 from .study import StudyHelper
 from .sync_runner import sync_user
 from .users import UserStore
@@ -167,6 +168,72 @@ def study(
         console.print(Panel(pack.summary, title="Summary", border_style="cyan"))
         console.print(Panel(pack.flashcards, title="Flashcards", border_style="green"))
         console.print(Panel(pack.practice_questions, title="Practice Questions", border_style="magenta"))
+
+
+@app.command()
+def review(
+    draft: str = typer.Argument(..., help="Path to a file containing YOUR draft"),
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    assignment: Optional[str] = typer.Option(
+        None, "--assignment", "-a", help="Dedup key from `list` to pull the prompt/description"
+    ),
+    rubric: Optional[str] = typer.Option(
+        None, "--rubric", "-r", help="Path to a file containing the grading rubric"
+    ),
+) -> None:
+    """Critique YOUR OWN draft against the assignment/rubric.
+
+    Reads a draft you wrote and tells you how to improve it. It does not
+    rewrite it or produce submittable text — the revising stays yours.
+    """
+    from pathlib import Path
+
+    cfg = load_config()
+    if not cfg.study.configured:
+        console.print("[red]ANTHROPIC_API_KEY not set; cannot review.[/red]")
+        raise typer.Exit(1)
+
+    draft_path = Path(draft)
+    if not draft_path.is_file():
+        console.print(f"[red]Draft file not found: {draft}[/red]")
+        raise typer.Exit(1)
+    draft_text = draft_path.read_text(encoding="utf-8")
+    if not draft_text.strip():
+        console.print("[red]Draft file is empty.[/red]")
+        raise typer.Exit(1)
+
+    rubric_text: Optional[str] = None
+    if rubric:
+        rubric_path = Path(rubric)
+        if not rubric_path.is_file():
+            console.print(f"[red]Rubric file not found: {rubric}[/red]")
+            raise typer.Exit(1)
+        rubric_text = rubric_path.read_text(encoding="utf-8")
+
+    a: Optional[Assignment] = None
+    if assignment:
+        target = user or DEFAULT_USER
+        a = cache_get_assignment(cfg, assignment, target)
+        if not a:
+            console.print(f"[red]No assignment with key {assignment} for user {target}.[/red]")
+            raise typer.Exit(1)
+
+    reviewer = DraftReviewer(cfg.study)
+    with console.status("Reviewing your draft..."):
+        result = reviewer.review(draft_text, assignment=a, rubric=rubric_text)
+
+    title = a.title if a else draft_path.name
+    console.rule(f"[bold]Review: {title}[/bold]")
+    console.print(Panel(result.overall, title="Overall", border_style="cyan"))
+    console.print(Panel(result.dimension_feedback, title="Against the rubric", border_style="green"))
+    console.print(
+        Panel(result.prioritized_next_steps, title="Fix first (you write it)", border_style="magenta")
+    )
+    console.print(Panel(result.grade_estimate, title="Where it lands now", border_style="yellow"))
+
+
+def cache_get_assignment(cfg, dedup_key: str, user: str) -> Optional[Assignment]:
+    return Cache(cfg.cache_path).get(dedup_key, user=user)
 
 
 @users_app.command("add")
