@@ -92,6 +92,11 @@ export async function GET(req: NextRequest) {
             availableBalance: true,
             disbursedTotal: true,
             pendingDisbursement: true,
+            _count: {
+              select: {
+                disbursementRequests: true,
+              }
+            }
           }
         },
         _count: {
@@ -156,7 +161,7 @@ export async function GET(req: NextRequest) {
           teamMemberCount: c._count.teamMembers,
           donationCount: c._count.donations,
           uniqueDonorCount: uniqueDonors.length,
-          disbursementRequestCount: 0, // TODO: Add disbursement request count
+          disbursementRequestCount: c.bankingAccount?._count.disbursementRequests ?? 0,
 
           // Dates
           startDate: c.startDate,
