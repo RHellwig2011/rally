@@ -15,7 +15,7 @@ from .crypto import Vault
 from .history import History
 from .models import AssessmentType
 from .quiz import QuizStore, prepare_quiz
-from .review import DraftReviewer
+from .review import REWRITE_REFUSAL, DraftReviewer
 from .scheduler import start_scheduler
 from .study import StudyHelper
 from .sync_runner import sync_user
@@ -198,8 +198,12 @@ def create_app(config: AppConfig) -> FastAPI:
         dedup_key = (payload or {}).get("dedup_key")
         a = cache.get(dedup_key, user=u.name) if dedup_key else None
         reviewer = DraftReviewer(config.study)
-        result = reviewer.review(draft, assignment=a, rubric=rubric)
+        try:
+            result = reviewer.review(draft, assignment=a, rubric=rubric)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
         return {
+            "notice": REWRITE_REFUSAL,
             "overall": result.overall,
             "dimension_feedback": result.dimension_feedback,
             "prioritized_next_steps": result.prioritized_next_steps,

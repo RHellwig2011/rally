@@ -17,7 +17,7 @@ from .history import History
 from .ical import render as ical_render
 from .models import Assignment, AssessmentType
 from .quiz import QuizStore, prepare_quiz as _prepare_quiz
-from .review import DraftReviewer
+from .review import REWRITE_REFUSAL, DraftReviewer
 from .study import StudyHelper
 from .sync_runner import sync_user
 from .users import UserStore
@@ -219,11 +219,16 @@ def review(
             raise typer.Exit(1)
 
     reviewer = DraftReviewer(cfg.study)
-    with console.status("Reviewing your draft..."):
-        result = reviewer.review(draft_text, assignment=a, rubric=rubric_text)
+    try:
+        with console.status("Reviewing your draft..."):
+            result = reviewer.review(draft_text, assignment=a, rubric=rubric_text)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
 
     title = a.title if a else draft_path.name
     console.rule(f"[bold]Review: {title}[/bold]")
+    console.print(f"[dim]{REWRITE_REFUSAL}[/dim]")
     console.print(Panel(result.overall, title="Overall", border_style="cyan"))
     console.print(Panel(result.dimension_feedback, title="Against the rubric", border_style="green"))
     console.print(
