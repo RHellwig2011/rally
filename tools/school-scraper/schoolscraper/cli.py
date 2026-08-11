@@ -18,6 +18,7 @@ from .ical import render as ical_render
 from .models import Assignment, AssessmentType
 from .quiz import QuizStore, prepare_quiz as _prepare_quiz
 from .review import REWRITE_REFUSAL, DraftReviewer
+from .scaffold import ScaffoldHelper
 from .study import StudyHelper
 from .sync_runner import sync_user
 from .users import UserStore
@@ -180,6 +181,9 @@ def review(
     rubric: Optional[str] = typer.Option(
         None, "--rubric", "-r", help="Path to a file containing the grading rubric"
     ),
+    rubric_text_opt: Optional[str] = typer.Option(
+        None, "--rubric-text", help="Paste the rubric inline instead of a file"
+    ),
 ) -> None:
     """Critique YOUR OWN draft against the assignment/rubric.
 
@@ -203,7 +207,12 @@ def review(
         raise typer.Exit(1)
 
     rubric_text: Optional[str] = None
-    if rubric:
+    if rubric and rubric_text_opt:
+        console.print("[red]Pass either --rubric (file) or --rubric-text, not both.[/red]")
+        raise typer.Exit(1)
+    if rubric_text_opt:
+        rubric_text = rubric_text_opt
+    elif rubric:
         rubric_path = Path(rubric)
         if not rubric_path.is_file():
             console.print(f"[red]Rubric file not found: {rubric}[/red]")
@@ -239,6 +248,47 @@ def review(
 
 def cache_get_assignment(cfg, dedup_key: str, user: str) -> Optional[Assignment]:
     return Cache(cfg.cache_path).get(dedup_key, user=user)
+
+
+@app.command()
+def outline(
+    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="What the work is about"),
+    kind: str = typer.Option("essay", "--kind", "-k", help="essay|lab report|presentation|..."),
+    user: Optional[str] = typer.Option(None, "--user", "-u"),
+    assignment: Optional[str] = typer.Option(
+        None, "--assignment", "-a", help="Dedup key from `list` to pull the prompt"
+    ),
+) -> None:
+    """Generate a planning scaffold: structure + guiding questions.
+
+    Gives you the skeleton (sections, their purpose, and the questions each
+    must answer) so you write the piece yourself. Produces no prose.
+    """
+    cfg = load_config()
+    if not cfg.study.configured:
+        console.print("[red]ANTHROPIC_API_KEY not set; cannot outline.[/red]")
+        raise typer.Exit(1)
+
+    a: Optional[Assignment] = None
+    if assignment:
+        target = user or DEFAULT_USER
+        a = cache_get_assignment(cfg, assignment, target)
+        if not a:
+            console.print(f"[red]No assignment with key {assignment} for user {target}.[/red]")
+            raise typer.Exit(1)
+
+    helper = ScaffoldHelper(cfg.study)
+    try:
+        with console.status("Building your outline..."):
+            result = helper.outline(topic=topic, kind=kind, assignment=a)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+
+    heading = a.title if a else (topic or kind)
+    console.rule(f"[bold]Outline: {heading}[/bold]")
+    console.print("[dim]This is a plan for you to fill in — it contains no writing to copy.[/dim]")
+    console.print(Panel(result.structure, title="Scaffold", border_style="cyan"))
 
 
 @users_app.command("add")
@@ -521,6 +571,16 @@ def alexa_model() -> None:
                             "quiz me", "quiz {Student}",
                             "quiz me on my next test", "start a quiz",
                             "start a quiz for {Student}", "test me",
+                        ],
+                    },
+                    {
+                        "name": "FreeAnswerIntent",
+                        "slots": [{"name": "Answer", "type": "AMAZON.SearchQuery"}],
+                        "samples": [
+                            "my answer is {Answer}",
+                            "the answer is {Answer}",
+                            "I think {Answer}",
+                            "{Answer}",
                         ],
                     },
                     {

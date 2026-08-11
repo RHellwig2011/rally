@@ -37,6 +37,15 @@ def _intent_request(intent_name, slots=None, attrs=None):
     }
 
 
+def _fake_grader(verdict_word, note="ok"):
+    from schoolscraper.grading import Verdict
+
+    def grade(*, question, reference, answer):
+        return Verdict(verdict=verdict_word, note=note)
+
+    return grade
+
+
 def test_quiz_me_starts_session(tmp_path):
     store, cache, quizzes = _setup(tmp_path)
     req = _intent_request("QuizMeIntent", {"Student": "Bob"})
@@ -48,6 +57,80 @@ def test_quiz_me_starts_session(tmp_path):
     assert attrs["quiz_active"] is True
     assert attrs["quiz_total"] == 2
     assert attrs["quiz_index"] == 1
+    assert attrs["quiz_grade_mode"] == "self"
+
+
+def test_quiz_me_auto_mode_prompts_for_answer(tmp_path):
+    store, cache, quizzes = _setup(tmp_path)
+    req = _intent_request("QuizMeIntent", {"Student": "Bob"})
+    resp = alexa.handle_request(
+        req, store=store, cache=cache, quizzes=quizzes, timezone="UTC",
+        grader=_fake_grader("correct"),
+    )
+    text = resp["response"]["outputSpeech"]["text"]
+    assert "Say your answer" in text
+    assert "yes or no" not in text
+    assert resp["sessionAttributes"]["quiz_grade_mode"] == "auto"
+    assert resp["sessionAttributes"]["quiz_pending_question"].startswith("What's")
+
+
+def test_free_answer_correct_scores_and_advances(tmp_path):
+    store, cache, quizzes = _setup(tmp_path)
+    grader = _fake_grader("correct", note="Spot on.")
+    start = alexa.handle_request(
+        _intent_request("QuizMeIntent", {"Student": "Bob"}),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=grader,
+    )
+    resp = alexa.handle_request(
+        _intent_request("FreeAnswerIntent", {"Answer": "the mitochondria"},
+                        attrs=start["sessionAttributes"]),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=grader,
+    )
+    text = resp["response"]["outputSpeech"]["text"]
+    assert "Correct!" in text
+    assert "Spot on." in text
+    assert "Mitochondrion." in text          # reveals full reference
+    assert "osmosis" in text.lower()          # advanced to next question
+    assert resp["sessionAttributes"]["quiz_score"] == 1
+
+
+def test_free_answer_incorrect_no_score(tmp_path):
+    store, cache, quizzes = _setup(tmp_path)
+    grader = _fake_grader("incorrect", note="Not the right organelle.")
+    start = alexa.handle_request(
+        _intent_request("QuizMeIntent", {"Student": "Bob"}),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=grader,
+    )
+    resp = alexa.handle_request(
+        _intent_request("FreeAnswerIntent", {"Answer": "the nucleus"},
+                        attrs=start["sessionAttributes"]),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=grader,
+    )
+    text = resp["response"]["outputSpeech"]["text"]
+    assert "Not quite." in text
+    assert resp["sessionAttributes"]["quiz_score"] == 0
+
+
+def test_free_answer_grader_error_falls_back(tmp_path):
+    store, cache, quizzes = _setup(tmp_path)
+
+    def boom(*, question, reference, answer):
+        raise RuntimeError("model down")
+
+    start = alexa.handle_request(
+        _intent_request("QuizMeIntent", {"Student": "Bob"}),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=boom,
+    )
+    resp = alexa.handle_request(
+        _intent_request("FreeAnswerIntent", {"Answer": "something"},
+                        attrs=start["sessionAttributes"]),
+        store=store, cache=cache, quizzes=quizzes, timezone="UTC", grader=boom,
+    )
+    text = resp["response"]["outputSpeech"]["text"]
+    assert "couldn't grade" in text
+    assert "yes or no" in text
+    # Still in the quiz, same question pending.
+    assert resp["sessionAttributes"]["quiz_active"] is True
 
 
 def test_quiz_yes_advances(tmp_path):

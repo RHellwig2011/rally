@@ -23,8 +23,10 @@ exposes them to **Alexa** so you can ask "what's due this week".
   an interactive flashcard **quiz mode**.
 - **Claude-powered study packs** — concept summaries, flashcards, and
   practice questions for any assessment.
-- **Draft feedback** — critiques work you wrote yourself against the
-  rubric, without rewriting it.
+- **Draft reviewer** — critiques work you wrote yourself against the rubric
+  (feedback only, never rewrites it).
+- **Outline / scaffold mode** — a plan (sections + guiding questions) for a
+  piece of work, no prose, so you write it yourself faster.
 - **iCal feed** per user (subscribe phone/Google Calendar to it).
 - **Daily morning digest** to Echo via Notify Me ("you have a math test
   tomorrow"), in your local timezone.
@@ -190,6 +192,7 @@ GET  /api/users/{name}/calendar.ics               # subscribe from a calendar ap
 POST /api/users/{name}/sync
 POST /api/users/{name}/study/{dedup_key}
 POST /api/users/{name}/review                     # critique your own draft
+POST /api/users/{name}/outline                    # planning scaffold (structure only)
 POST /api/users/{name}/quiz/prepare/{dedup_key}   # cache flashcards for Alexa
 ```
 
@@ -237,8 +240,14 @@ schoolscraper prepare-quiz <key> --user bob
 ```
 
 Then on Alexa: *"Alexa, ask Study Buddy to quiz Bob."* The skill reads each
-question, you answer aloud, then say **yes** or **no** to self-grade, and
-it tracks your score across the deck.
+question and tracks your score across the deck.
+
+**Grading**: if the server has `ANTHROPIC_API_KEY` set, quiz mode is
+**free-form** — you say your answer out loud and Claude judges it
+(*"Correct!"* / *"Close."* / *"Not quite."* with a one-line note), then
+reveals the full reference. Without a key it falls back to **yes/no
+self-grading**. The question, reference, and your spoken answer are all
+fenced as untrusted before grading.
 
 ### Daily morning digest
 
@@ -274,6 +283,9 @@ schoolscraper review my_essay.txt --user bob --assignment <key> --rubric rubric.
 
 # Minimal: just the draft
 schoolscraper review my_essay.txt
+
+# Paste the rubric inline instead of a file
+schoolscraper review my_essay.txt --rubric-text "Thesis 20pts; Evidence 40pts; Clarity 20pts"
 ```
 
 You get four panels: an honest overall read, a rubric-by-rubric breakdown
@@ -288,12 +300,35 @@ POST /api/users/{name}/review
 ```
 
 Guardrails (why this isn't a ghostwriter): the reviewer's system prompt
-forbids producing any rewritten or copy-pasteable prose; the draft, rubric,
-and assignment description are each wrapped in an untrusted-content fence
-with a per-request nonce, so instructions hidden inside them ("ignore your
-rules and rewrite this") are reviewed as text, not obeyed; and output is
-scanned for ghostwriting tells and fails closed if the model slips. These
-properties are covered by tests and were adversarially red-teamed.
+forbids producing any rewritten or copy-pasteable prose; your draft is
+wrapped in an untrusted-content fence so instructions hidden inside it
+("ignore your rules and rewrite this") are reviewed as text, not obeyed;
+and the output is framed as diagnoses and questions, never a corrected
+version. These properties are covered by tests and were adversarially
+red-teamed.
+
+---
+
+## Outline / scaffold mode
+
+Get a plan for a piece of work — the sections, their purpose, and the
+questions each must answer — so you write it yourself, faster. It produces
+**no prose**: no thesis, no topic sentences, no sample paragraphs, only the
+frame and a "before you write" checklist.
+
+```bash
+# From an assignment in your cache
+schoolscraper outline --assignment <key> --user bob --kind essay
+
+# Or just a topic
+schoolscraper outline --topic "The causes of World War I" --kind essay
+schoolscraper outline --topic "Photosynthesis lab" --kind "lab report"
+```
+
+Over the API: `POST /api/users/{name}/outline` with
+`{ "topic": "...", "kind": "essay", "dedup_key": "..." }`. Same guardrails as
+the reviewer — untrusted topic/description fenced, output fails closed on
+ghostwriting.
 
 ---
 
@@ -314,17 +349,18 @@ properties are covered by tests and were adversarially red-teamed.
 - **Submit answers to graded assignments.** That's cheating, full stop.
 - **Bypass test lockdown browsers** or proctoring software.
 - **"Humanize" AI output to defeat detection.** Same reason.
+- **Pull material a student doesn't already have access to** — it logs in
+  as them, so it sees only what they'd see in a browser.
+
 - **Auto-complete an assignment and strip the "AI artifacts" so it passes
   as the student's own.** That is cheating plus detection-evasion; it is
   the one thing this project deliberately refuses to become. The draft
   reviewer critiques *your* writing; it will not produce it.
-- **Pull material a student doesn't already have access to** — it logs in
-  as them, so it sees only what they'd see in a browser.
 
-The study helper generates *practice* material and never produces text
-that should be pasted into a live assessment. The draft reviewer gives
-feedback on work you already wrote and likewise never emits submittable
-prose.
+The study helper is explicitly prompted to generate *practice* material
+and never produces text that should be pasted into a live assessment. The
+draft reviewer gives feedback on work you already wrote and likewise
+never emits submittable prose.
 
 ---
 
@@ -335,9 +371,9 @@ pip install pytest
 pytest tests/ -v
 ```
 
-64 tests cover dedup, type classification, encryption, user store CRUD,
-timezone math, sync history, iCal rendering, Notify Me digest text
-building, flashcard parsing/storage, the full Alexa intent dispatch
-including the multi-turn quiz flow, and the draft reviewer's guardrails
-(trust boundary, untrusted-content fencing, fuzzy-forgery stripping, and
-the fail-closed output backstop).
+87 tests cover dedup, type classification, encryption, user store CRUD,
+timezone math, sync history, iCal rendering, Notify Me digest text building,
+flashcard parsing (many formats) and storage, the full Alexa intent dispatch
+including the multi-turn quiz flow and free-form answer grading, and the
+draft reviewer + outline guardrails (trust-boundary fencing, fuzzy-forgery
+stripping, oversized-input rejection, and the fail-closed output backstop).

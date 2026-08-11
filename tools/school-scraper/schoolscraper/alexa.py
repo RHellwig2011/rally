@@ -91,8 +91,13 @@ def handle_request(
     expected_skill_id: str = "",
     timezone: str = "America/New_York",
     quizzes: QuizStore | None = None,
+    grader: Any = None,
 ) -> dict[str, Any]:
-    """Parse an Alexa Skills Kit request envelope and produce a response."""
+    """Parse an Alexa Skills Kit request envelope and produce a response.
+
+    `grader`, if given, is a callable (question=, reference=, answer=) -> Verdict
+    that enables free-form spoken-answer grading in quiz mode; without it the
+    quiz falls back to yes/no self-grading."""
     session = body.get("session") or {}
     application = (session.get("application") or {}).get("applicationId") or ""
     if expected_skill_id and application != expected_skill_id:
@@ -118,6 +123,7 @@ def handle_request(
     return _dispatch_intent(
         name, intent, store=store, cache=cache,
         timezone=timezone, session_attrs=session_attrs, quizzes=quizzes,
+        grader=grader,
     )
 
 
@@ -130,10 +136,13 @@ def _dispatch_intent(
     timezone: str,
     session_attrs: dict[str, Any],
     quizzes: QuizStore | None,
+    grader: Any = None,
 ) -> dict[str, Any]:
     now = tz_now(timezone)
     in_quiz = bool(session_attrs.get("quiz_active"))
 
+    if in_quiz and name == "FreeAnswerIntent" and grader is not None:
+        return _quiz_grade_free(session_attrs, intent, grader)
     if in_quiz and name in ("AMAZON.YesIntent", "AMAZON.NoIntent"):
         return _quiz_advance(session_attrs, got_it=(name == "AMAZON.YesIntent"))
 
@@ -159,7 +168,7 @@ def _dispatch_intent(
     if name == "QuizMeIntent":
         if quizzes is None:
             return _speak("Quiz mode is not configured on this server.")
-        return _intent_quiz_me(intent, store, quizzes)
+        return _intent_quiz_me(intent, store, quizzes, grader is not None)
 
     log.info("Unknown intent %s", name)
     return _ask("I'm not sure how to help with that. Ask what's due this week?")
@@ -189,7 +198,7 @@ def _intent_upcoming(
 
 
 def _intent_quiz_me(
-    intent: dict[str, Any], store: UserStore, quizzes: QuizStore
+    intent: dict[str, Any], store: UserStore, quizzes: QuizStore, auto_grade: bool = False
 ) -> dict[str, Any]:
     user = _resolve_user(_get_slot(intent, "Student"), store)
     if user is None:
@@ -211,28 +220,63 @@ def _intent_quiz_me(
         "quiz_index": 1,
         "quiz_total": len(cards),
         "quiz_score": 0,
+        "quiz_grade_mode": "auto" if auto_grade else "self",
+        "quiz_pending_question": first.question,
         "quiz_pending_answer": first.answer,
         "quiz_remaining": [
             {"question": c.question, "answer": c.answer} for c in cards[1:]
         ],
     }
+    intro = f"Quizzing {user.display_name} on {title} from {course}. Question 1 of {len(cards)}: {first.question} "
+    if auto_grade:
+        return _ask(intro + "Say your answer out loud.", "What's your answer?", attrs=attrs)
     return _ask(
-        f"Quizzing {user.display_name} on {title} from {course}. "
-        f"Question 1 of {len(cards)}: {first.question} "
-        "Say your answer out loud, then say yes if you got it right, or no if not.",
+        intro + "Say your answer out loud, then say yes if you got it right, or no if not.",
         "Did you get it right? Say yes or no.",
         attrs=attrs,
     )
 
 
-def _quiz_advance(attrs: dict[str, Any], *, got_it: bool) -> dict[str, Any]:
+def _quiz_grade_free(
+    attrs: dict[str, Any], intent: dict[str, Any], grader: Any
+) -> dict[str, Any]:
+    answer = _get_slot(intent, "Answer") or ""
+    question = attrs.get("quiz_pending_question", "")
+    reference = attrs.get("quiz_pending_answer", "")
+    if not answer:
+        return _ask("I didn't catch your answer — say it again?", attrs=attrs)
+    try:
+        verdict = grader(question=question, reference=reference, answer=answer)
+    except Exception as e:  # noqa: BLE001 — grading is best-effort; fall back
+        log.warning("Grader failed: %s", e)
+        return _ask(
+            "I couldn't grade that one. Did you get it right? Say yes or no.",
+            "Say yes or no.",
+            attrs=attrs,
+        )
+    lead = _grade_lead(verdict)
+    return _quiz_advance(attrs, got_it=getattr(verdict, "is_correct", False), lead=lead)
+
+
+def _grade_lead(verdict: Any) -> str:
+    v = getattr(verdict, "verdict", "partial")
+    note = (getattr(verdict, "note", "") or "").strip()
+    prefix = {"correct": "Correct!", "partial": "Close.", "incorrect": "Not quite."}.get(v, "Close.")
+    return f"{prefix} {note}".strip()
+
+
+def _quiz_advance(attrs: dict[str, Any], *, got_it: bool, lead: str | None = None) -> dict[str, Any]:
     pending_answer = attrs.get("quiz_pending_answer", "")
     score = int(attrs.get("quiz_score", 0)) + (1 if got_it else 0)
     remaining = list(attrs.get("quiz_remaining", []))
     index = int(attrs.get("quiz_index", 1))
     total = int(attrs.get("quiz_total", 0))
+    auto = attrs.get("quiz_grade_mode") == "auto"
 
-    feedback = ("Nice work! " if got_it else "No worries. ")
+    if lead is not None:
+        feedback = lead.rstrip() + " "
+    else:
+        feedback = "Nice work! " if got_it else "No worries. "
     feedback += f"The full answer was: {pending_answer}"
 
     if not remaining:
@@ -250,12 +294,14 @@ def _quiz_advance(attrs: dict[str, Any], *, got_it: bool) -> dict[str, Any]:
     new_attrs.update(
         quiz_score=score,
         quiz_index=index + 1,
+        quiz_pending_question=nxt["question"],
         quiz_pending_answer=nxt["answer"],
         quiz_remaining=remaining,
     )
+    tail = "Say your answer." if auto else "Say your answer, then say yes or no."
     return _ask(
         f"{feedback} Question {index + 1} of {total}: {nxt['question']}",
-        "Say your answer, then say yes or no.",
+        tail,
         attrs=new_attrs,
     )
 

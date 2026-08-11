@@ -14,8 +14,10 @@ from .config import AppConfig
 from .crypto import Vault
 from .history import History
 from .models import AssessmentType
+from .grading import AnswerGrader
 from .quiz import QuizStore, prepare_quiz
 from .review import REWRITE_REFUSAL, DraftReviewer
+from .scaffold import ScaffoldHelper
 from .scheduler import start_scheduler
 from .study import StudyHelper
 from .sync_runner import sync_user
@@ -65,8 +67,10 @@ def create_app(config: AppConfig) -> FastAPI:
     cache = Cache(config.cache_path)
     history = History(config.cache_path)
     quizzes = QuizStore(config.cache_path)
+    # Free-form spoken-answer grading in quiz mode, when Claude is configured.
+    grader = AnswerGrader(config.study).grade if config.study.configured else None
 
-    app = FastAPI(title="schoolscraper", version="0.4.0")
+    app = FastAPI(title="schoolscraper", version="0.5.0")
     app.state.config = config
     app.state.user_store = user_store
     app.state.cache = cache
@@ -99,7 +103,7 @@ def create_app(config: AppConfig) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        return {"ok": True, "version": "0.4.0"}
+        return {"ok": True, "version": "0.5.0"}
 
     @app.get("/api/status")
     def status_endpoint(authorization: str | None = Header(default=None)) -> dict[str, Any]:
@@ -210,6 +214,31 @@ def create_app(config: AppConfig) -> FastAPI:
             "grade_estimate": result.grade_estimate,
         }
 
+    @app.post("/api/users/{name}/outline")
+    def outline_endpoint(
+        name: str,
+        payload: dict[str, Any] = Body(...),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        """Planning scaffold. Body: {topic?, kind?, dedup_key?}. Structure and
+        guiding questions only — never prose."""
+        _require_token(authorization)
+        if not config.study.configured:
+            raise HTTPException(503, "Study helper not configured")
+        u = user_store.get(name)
+        if not u:
+            raise HTTPException(404, f"unknown user {name}")
+        topic = (payload or {}).get("topic")
+        kind = (payload or {}).get("kind") or "essay"
+        dedup_key = (payload or {}).get("dedup_key")
+        a = cache.get(dedup_key, user=u.name) if dedup_key else None
+        helper = ScaffoldHelper(config.study)
+        try:
+            result = helper.outline(topic=topic, kind=kind, assignment=a)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        return {"structure": result.structure}
+
     @app.get("/api/users/{name}/calendar.ics")
     def calendar(name: str) -> Response:
         u = user_store.get(name)
@@ -257,6 +286,7 @@ def create_app(config: AppConfig) -> FastAPI:
             expected_skill_id=config.server.alexa_skill_id,
             timezone=config.server.timezone,
             quizzes=quizzes,
+            grader=grader,
         )
 
     return app
