@@ -39,18 +39,36 @@ class Card:
     answer: str
 
 
+# Line-anchored question/answer markers, tolerant of the many shapes Claude
+# emits: "Q:", "Q.", "Q1:", "Question:", "**Q:**" (bold stripped first),
+# leading bullets ("- ", "* ", "• "), and list numbering ("1. Q: ...").
+_Q_SPLIT = re.compile(
+    r"(?m)^[ \t>*\-•]*(?:\d+[.)]\s*)?Q(?:uestion)?\s*\d*[:.)]\s*",
+    re.IGNORECASE,
+)
+_A_SPLIT = re.compile(
+    r"(?m)^[ \t>*\-•]*A(?:nswer)?\s*\d*[:.)]\s*",
+    re.IGNORECASE,
+)
+
+
 def _parse_cards(text: str) -> list[Card]:
-    """Parse 'Q: ... / A: ...' or 'Q: ...\\nA: ...' patterns from Claude."""
+    """Parse question/answer pairs from Claude flashcard output.
+
+    Handles Q:/A:, Question:/Answer:, Q1:/A1:, markdown-bold variants, and
+    bulleted or numbered lists. Robust to multi-line answers.
+    """
+    if not text:
+        return []
+    # Strip markdown emphasis so "**Q:**" and "__Answer:__" match cleanly.
+    text = text.replace("**", "").replace("__", "")
     cards: list[Card] = []
-    # Split on "Q:" delimiters; keep first segment as preamble
-    chunks = re.split(r"(?:^|\n)\s*(?:\d+[\.\)]\s*)?Q[:\.]?\s*", text)
-    for chunk in chunks[1:]:
-        m = re.split(r"\n?\s*A[:\.]?\s*", chunk, maxsplit=1)
-        if len(m) != 2:
+    for chunk in _Q_SPLIT.split(text)[1:]:  # [0] is any preamble before Q1
+        parts = _A_SPLIT.split(chunk, maxsplit=1)
+        if len(parts) != 2:
             continue
-        q = m[0].strip().rstrip("/").strip()
-        a = m[1].split("\nQ:")[0].strip().rstrip("/").strip()
-        # Trim trailing slashes used as separators
+        q = parts[0].strip().strip("/").strip()
+        a = parts[1].strip().strip("/").strip()
         if q and a:
             cards.append(Card(question=q, answer=a))
     return cards

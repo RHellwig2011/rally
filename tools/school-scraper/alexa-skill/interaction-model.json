@@ -7,6 +7,30 @@
         { "name": "AMAZON.StopIntent", "samples": [] },
         { "name": "AMAZON.CancelIntent", "samples": [] },
         { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.YesIntent", "samples": [] },
+        { "name": "AMAZON.NoIntent", "samples": [] },
+        {
+          "name": "QuizMeIntent",
+          "slots": [{ "name": "Student", "type": "StudentName" }],
+          "samples": [
+            "quiz me",
+            "quiz {Student}",
+            "quiz me on my next test",
+            "start a quiz",
+            "start a quiz for {Student}",
+            "test me"
+          ]
+        },
+        {
+          "name": "FreeAnswerIntent",
+          "slots": [{ "name": "Answer", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "my answer is {Answer}",
+            "the answer is {Answer}",
+            "I think {Answer}",
+            "{Answer}"
+          ]
+        },
         {
           "name": "UpcomingWorkIntent",
           "slots": [

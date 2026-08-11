@@ -30,6 +30,42 @@ def test_parse_cards_empty():
     assert _parse_cards("") == []
 
 
+def test_parse_cards_markdown_bold():
+    text = "**Q:** What is 2+2?\n**A:** Four.\n\n**Q:** Capital of France?\n**A:** Paris."
+    cards = _parse_cards(text)
+    assert len(cards) == 2
+    assert cards[1].question.startswith("Capital")
+    assert cards[1].answer == "Paris."
+
+
+def test_parse_cards_question_answer_words():
+    text = "Question: Define osmosis.\nAnswer: Water crossing a membrane.\n"
+    cards = _parse_cards(text)
+    assert len(cards) == 1
+    assert cards[0].question.startswith("Define")
+    assert "membrane" in cards[0].answer
+
+
+def test_parse_cards_numbered_markers():
+    text = "Q1: First term?\nA1: Alpha.\nQ2: Second term?\nA2: Beta."
+    cards = _parse_cards(text)
+    assert len(cards) == 2
+    assert cards[0].answer == "Alpha."
+
+
+def test_parse_cards_bullets():
+    text = "- Q: One?\n- A: Uno.\n* Q: Two?\n* A: Dos."
+    cards = _parse_cards(text)
+    assert len(cards) == 2
+
+
+def test_parse_cards_multiline_answer():
+    text = "Q: List the steps.\nA: First do this.\nThen do that.\nFinally finish.\n"
+    cards = _parse_cards(text)
+    assert len(cards) == 1
+    assert "Finally finish" in cards[0].answer
+
+
 def test_quiz_store_round_trip(tmp_path):
     store = QuizStore(str(tmp_path / "q.db"))
     cards = [Card(question="q1", answer="a1"), Card(question="q2", answer="a2")]
