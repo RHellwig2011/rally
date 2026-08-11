@@ -1,0 +1,48 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "Study Buddy",
+          "summary": "Ask what's due and get study help.",
+          "description": "Connects to your home school-scraper service to tell you what assignments, quizzes, and tests are coming up across Schoology and PowerSchool. Works for multiple students in the household.",
+          "examplePhrases": [
+            "Alexa, open Study Buddy",
+            "Alexa, ask Study Buddy what's due this week",
+            "Alexa, ask Study Buddy what tests Bob has tomorrow"
+          ],
+          "keywords": ["school", "homework", "study", "schoology", "powerschool"],
+          "smallIconUri": "",
+          "largeIconUri": ""
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "Requires a self-hosted endpoint; not for public certification.",
+      "category": "EDUCATION_AND_REFERENCE",
+      "distributionCountries": ["US"]
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://REPLACE-WITH-YOUR-CLOUDFLARE-HOST/alexa",
+          "sslCertificateType": "Wildcard"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": true,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": {
+        "en-US": {
+          "privacyPolicyUrl": "https://example.com/privacy",
+          "termsOfUseUrl": "https://example.com/terms"
+        }
+      }
+    }
+  }
+}

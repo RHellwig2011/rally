@@ -1,0 +1,26 @@
+[Unit]
+Description=School Scraper study tool service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=schoolscraper
+Group=schoolscraper
+WorkingDirectory=/opt/schoolscraper
+EnvironmentFile=/etc/schoolscraper/schoolscraper.env
+ExecStart=/opt/schoolscraper/.venv/bin/schoolscraper serve
+Restart=on-failure
+RestartSec=10s
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/schoolscraper
+LockPersonality=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

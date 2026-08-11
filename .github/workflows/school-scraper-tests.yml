@@ -1,0 +1,35 @@
+name: school-scraper tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "tools/school-scraper/**"
+      - ".github/workflows/school-scraper-tests.yml"
+  pull_request:
+    paths:
+      - "tools/school-scraper/**"
+      - ".github/workflows/school-scraper-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: tools/school-scraper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: tools/school-scraper/requirements.txt
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run tests
+        run: pytest tests/ -v
