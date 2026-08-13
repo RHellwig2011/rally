@@ -31,3 +31,11 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/compiled/
+
+# Credential inventories / operational notes. These have held real secrets
+# (plaintext JWT_SECRET, NEXTAUTH_SECRET, and a database DSN with password)
+# and were tracked on a public remote. A repository is not a password manager.
+NEW_CREDENTIALS_TRACKER.md
+API_KEYS_AND_STATUS.csv
+*CREDENTIALS*
+*credentials*.csv

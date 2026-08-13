@@ -1,7 +1,21 @@
 #!/usr/bin/env node
 import Stripe from 'stripe';
 
-const secretKey = 'sk_test_51SXrMrQeHzG5tp9GBCYUPVnC8ecleW12pp0Y9AxRXFTrUnWkt0oDZDldXQoxkhi2U1qH0WXAKQ2vLNp0asA0C36J00HqBbNseO';
+// Read from the environment — never hardcode. This file is committed, and a
+// literal key here is a published key.
+//   STRIPE_SECRET_KEY=sk_test_... node scripts/quick-stripe-test.mjs
+// or, to use the value already in .env:
+//   node --env-file=.env scripts/quick-stripe-test.mjs
+const secretKey = process.env.STRIPE_SECRET_KEY;
+
+if (!secretKey) {
+  console.error(
+    'STRIPE_SECRET_KEY is not set.\n' +
+      '  STRIPE_SECRET_KEY=sk_test_... node scripts/quick-stripe-test.mjs\n' +
+      '  (or: node --env-file=.env scripts/quick-stripe-test.mjs)'
+  );
+  process.exit(1);
+}
 
 console.log('🔧 Quick Stripe Test\n');
 
