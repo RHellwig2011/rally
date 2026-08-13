@@ -18,15 +18,32 @@ import { isSuppressed, filterSuppressed } from '@/lib/suppression';
 let twilioClient: ReturnType<typeof twilio> | null = null;
 
 function getClient(): ReturnType<typeof twilio> | null {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const apiKeySid = process.env.TWILIO_API_KEY_SID;
+  const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+  // The Account SID (AC…) is required either way — an API Key is scoped to it.
+  if (!accountSid) {
     return null;
   }
-  if (!twilioClient) {
-    twilioClient = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+
+  if (twilioClient) {
+    return twilioClient;
   }
+
+  // Prefer API Key auth (SK… + secret): scoped and revocable without touching
+  // the account's primary auth token. Fall back to the auth token when no key
+  // is configured. If neither secret is present, Twilio is not configured and
+  // callers degrade gracefully.
+  if (apiKeySid && apiKeySecret) {
+    twilioClient = twilio(apiKeySid, apiKeySecret, { accountSid });
+  } else if (authToken) {
+    twilioClient = twilio(accountSid, authToken);
+  } else {
+    return null;
+  }
+
   return twilioClient;
 }
 
