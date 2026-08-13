@@ -54,6 +54,8 @@ export async function middleware(request: NextRequest) {
     "/auth/reset-password",
     "/test-donation",
     "/api/csrf-token",
+    // Uptime monitors and deploy smoke tests call this with no credentials.
+    "/api/health",
     "/api/campaigns/public",
     "/api/campaigns/check-slug",
     "/api/donations",
