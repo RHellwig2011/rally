@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Heart, Info, Medal, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,53 +56,53 @@ export default function PublicLeaderboardPage({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        setIsLoading(true);
-        setError(null);
+  const load = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        // Resolve slug -> campaign via the existing public route.
-        const campaignRes = await fetch(`/api/campaigns/slug/${params.slug}`);
-        const campaignJson = await campaignRes.json();
+      // Resolve slug -> campaign via the existing public route.
+      const campaignRes = await fetch(`/api/campaigns/slug/${params.slug}`);
+      const campaignJson = await campaignRes.json();
 
-        if (!campaignRes.ok || !campaignJson.success) {
-          setError(campaignJson.error || "Campaign not found");
-          return;
-        }
-
-        const c = campaignJson.campaign;
-        setCampaign({
-          id: c.id,
-          slug: c.slug,
-          organizationName: c.organizationName,
-          teamName: c.teamName,
-          logoUrl: c.logoUrl,
-          bannerImageUrl: c.bannerImageUrl,
-        });
-
-        const lbRes = await fetch(
-          `/api/campaigns/${c.id}/leaderboard?scope=public`
-        );
-        const lbJson = await lbRes.json();
-
-        if (!lbRes.ok || !lbJson.success) {
-          setError(lbJson.error || "Failed to load the leaderboard");
-          return;
-        }
-
-        setEntries(lbJson.leaderboard);
-        setPublicLimit(lbJson.publicLimit ?? 10);
-      } catch (err) {
-        console.error("Failed to load leaderboard:", err);
-        setError("Failed to load the leaderboard");
-      } finally {
-        setIsLoading(false);
+      if (!campaignRes.ok || !campaignJson.success) {
+        setError(campaignJson.error || "Campaign not found");
+        return;
       }
-    }
 
-    load();
+      const c = campaignJson.campaign;
+      setCampaign({
+        id: c.id,
+        slug: c.slug,
+        organizationName: c.organizationName,
+        teamName: c.teamName,
+        logoUrl: c.logoUrl,
+        bannerImageUrl: c.bannerImageUrl,
+      });
+
+      const lbRes = await fetch(
+        `/api/campaigns/${c.id}/leaderboard?scope=public`
+      );
+      const lbJson = await lbRes.json();
+
+      if (!lbRes.ok || !lbJson.success) {
+        setError(lbJson.error || "Failed to load the leaderboard");
+        return;
+      }
+
+      setEntries(lbJson.leaderboard);
+      setPublicLimit(lbJson.publicLimit ?? 10);
+    } catch (err) {
+      console.error("Failed to load leaderboard:", err);
+      setError("Failed to load the leaderboard");
+    } finally {
+      setIsLoading(false);
+    }
   }, [params.slug]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (isLoading) {
     return (
@@ -125,9 +125,14 @@ export default function PublicLeaderboardPage({
           <p className="text-muted-foreground mb-4">
             {error || "This campaign does not exist or has been removed."}
           </p>
-          <Button asChild>
-            <Link href="/">Go Home</Link>
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="outline" onClick={load}>
+              Try again
+            </Button>
+            <Button asChild>
+              <Link href="/">Go Home</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -143,8 +148,8 @@ export default function PublicLeaderboardPage({
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg leading-none">
-                  R
+                <span className="text-white font-display font-bold text-sm leading-none">
+                  BB
                 </span>
               </div>
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
@@ -161,7 +166,10 @@ export default function PublicLeaderboardPage({
 
       {/* Banner */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 h-48 relative">
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* pb-12 offsets the centered content upward so it clears the card
+            that -mt-10 pulls up over this banner. Without it the card's top
+            edge crops the bottom of the team name below. */}
+        <div className="absolute inset-0 flex items-center justify-center pb-12">
           <div className="text-center text-white px-4">
             <Trophy className="w-10 h-10 mx-auto mb-3" />
             <h1 className="text-3xl sm:text-4xl font-bold">Top Fundraisers</h1>
@@ -173,7 +181,10 @@ export default function PublicLeaderboardPage({
       </div>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 pb-16">
+      {/* `relative z-10` for the same reason as app/raise/[slug]/page.tsx: the
+          `relative` banner would otherwise paint over the -mt-10 overlap and
+          hide this card's header row. */}
+      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 pb-16">
         <Card className="shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
@@ -253,7 +264,14 @@ export default function PublicLeaderboardPage({
                             {formatCurrency(entry.amountRaised)}
                           </span>
                         </div>
-                        <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          role="progressbar"
+                          aria-valuenow={relative}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`${entry.name}'s total relative to the leader`}
+                          className="mt-2 h-2 bg-muted rounded-full overflow-hidden"
+                        >
                           <div
                             className="h-full bg-primary rounded-full"
                             style={{ width: `${relative}%` }}

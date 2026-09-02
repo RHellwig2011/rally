@@ -134,8 +134,18 @@ function formatContact(contact: {
 }
 
 /**
+ * Page size for the contact list. Deliberately large: the outreach page fetches
+ * this endpoint with no query parameters and builds its recipient picker from
+ * the result, so a small default would silently shrink a coach's send list. 500
+ * matches the per-request recipient cap the send-outreach routes enforce.
+ */
+const DEFAULT_LIST_LIMIT = 500;
+const MAX_LIST_LIMIT = 1000;
+
+/**
  * GET /api/campaigns/[campaignId]/contacts
- * List all contacts belonging to the campaign's team members
+ * List all contacts belonging to the campaign's team members.
+ * Supports ?limit=&offset= query parameters.
  */
 export async function GET(
   req: NextRequest,
@@ -149,25 +159,47 @@ export async function GET(
       return auth.response;
     }
 
-    const contacts = await prisma.contact.findMany({
-      where: {
-        teamMember: {
-          campaignId,
-          deletedAt: null,
-        },
+    // Clamped pagination, mirroring app/api/admin/transactions.
+    const searchParams = req.nextUrl.searchParams;
+    const parsedLimit = parseInt(searchParams.get("limit") || String(DEFAULT_LIST_LIMIT), 10);
+    const limit = Number.isNaN(parsedLimit)
+      ? DEFAULT_LIST_LIMIT
+      : Math.min(Math.max(parsedLimit, 1), MAX_LIST_LIMIT);
+    const parsedOffset = parseInt(searchParams.get("offset") || "0", 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    const where = {
+      teamMember: {
+        campaignId,
+        deletedAt: null,
       },
-      include: {
-        teamMember: {
-          select: { id: true, name: true },
+    };
+
+    const [contacts, total] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        include: {
+          teamMember: {
+            select: { id: true, name: true },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.contact.count({ where }),
+    ]);
 
     return NextResponse.json(
       {
         success: true,
         contacts: contacts.map(formatContact),
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + contacts.length < total,
+        },
       },
       { status: 200 }
     );

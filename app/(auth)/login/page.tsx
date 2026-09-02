@@ -1,16 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/lib/store/authStore";
 
-export default function LoginPage() {
+/**
+ * Is `redirect` a path on this site, and only this site?
+ *
+ * A leading "/" is not sufficient. "//evil.com" is a scheme-relative URL, and
+ * browsers (plus Next's router) also normalise backslashes to forward slashes,
+ * so "/\evil.com" and "/\/evil.com" resolve off-origin exactly the same way.
+ * Reject any backslash anywhere rather than trying to enumerate the shapes.
+ */
+function isSameSitePath(redirect: string) {
+  return (
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    !redirect.includes("\\")
+  );
+}
+
+/**
+ * Where a signed-in user lands. `?redirect=` wins when it is a same-site path;
+ * otherwise route by role. CAMPAIGN_LEADERs and everyone else go to /campaigns,
+ * which is reachable whether or not they run a campaign yet.
+ */
+function destinationFor(role: string | undefined, redirect: string | null) {
+  if (redirect && isSameSitePath(redirect)) {
+    return redirect;
+  }
+  if (role === "ADMIN" || role === "BANK_ADMIN") return "/admin";
+  if (role === "PLAYER") return "/player";
+  return "/campaigns";
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const message = searchParams?.get("message");
+  const created = searchParams?.get("created");
+  // Signup normally signs people straight in; ?created=1 only survives when
+  // that follow-up call failed, so the copy has to own the extra step.
+  const successMessage = created
+    ? "Welcome to Bleacher Backers. One more step: sign in with the password you just chose."
+    : message;
   const setUser = useAuthStore((state) => state.setUser);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,8 +78,7 @@ export default function LoginPage() {
         setUser(data.user);
       }
 
-      // Redirect to dashboard or home
-      router.push("/create-campaign");
+      router.push(destinationFor(data.user?.role, searchParams?.get("redirect") ?? null));
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
@@ -66,8 +103,20 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {successMessage && (
+              <div
+                role="status"
+                className="bg-success-light border border-success text-success-dark px-4 py-3 rounded-lg text-sm"
+              >
+                {successMessage}
+              </div>
+            )}
+
             {error && (
-              <div className="bg-warning-light border border-warning text-warning px-4 py-3 rounded-lg text-sm">
+              <div
+                role="alert"
+                className="bg-warning-light border border-warning text-warning-dark px-4 py-3 rounded-lg text-sm"
+              >
                 {error}
               </div>
             )}
@@ -137,5 +186,14 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  // useSearchParams() needs a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

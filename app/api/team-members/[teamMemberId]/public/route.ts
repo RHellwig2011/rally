@@ -36,6 +36,7 @@ export async function GET(
             primaryColor: true,
             status: true,
             endDate: true,
+            platformFeePercent: true,
           },
         },
         user: {

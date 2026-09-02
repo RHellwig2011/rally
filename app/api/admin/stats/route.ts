@@ -33,9 +33,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Parse query parameters for date range
+    // Parse and clamp query parameters for date range. `days` drives both the
+    // trend window and the previous-period comparison, so an unclamped value
+    // (?days=abc -> NaN -> Invalid Date, or ?days=100000) either breaks the
+    // queries outright or makes them scan the whole donation table.
     const searchParams = req.nextUrl.searchParams;
-    const days = parseInt(searchParams.get('days') || '30');
+    const parsedDays = parseInt(searchParams.get('days') || '30', 10);
+    const days = Number.isNaN(parsedDays) ? 30 : Math.min(Math.max(parsedDays, 1), 365);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -144,26 +148,26 @@ export async function GET(req: NextRequest) {
       donation_count: bigint;
     }>>`
       SELECT
-        DATE("createdAt") as date,
+        ("createdAt" AT TIME ZONE 'UTC')::date as date,
         SUM("grossAmount") as total_amount,
         COUNT(*) as donation_count
       FROM "Donation"
       WHERE status = 'COMPLETED'
         AND "createdAt" >= ${startDate}
-      GROUP BY DATE("createdAt")
+      GROUP BY ("createdAt" AT TIME ZONE 'UTC')::date
       ORDER BY date ASC
     `;
 
-    // Get unique donors count
-    const uniqueDonors = await prisma.donation.findMany({
-      where: {
-        status: 'COMPLETED',
-      },
-      select: {
-        donorEmail: true,
-      },
-      distinct: ['donorEmail'],
-    });
+    // Get unique donors count. Counted in the database: the findMany({distinct})
+    // this replaces pulled every distinct donor email on the platform into
+    // memory purely to read .length. Raw SQL because Prisma cannot express
+    // COUNT(DISTINCT ...); camelCase identifiers must be quoted (no @map).
+    const uniqueDonorRows = await prisma.$queryRaw<Array<{ donor_count: bigint }>>`
+      SELECT COUNT(DISTINCT "donorEmail") as donor_count
+      FROM "Donation"
+      WHERE status = 'COMPLETED'
+    `;
+    const uniqueDonors = Number(uniqueDonorRows[0]?.donor_count || 0);
 
     // Calculate growth metrics (compare to previous period)
     const previousPeriodStart = new Date(startDate);
@@ -241,7 +245,7 @@ export async function GET(req: NextRequest) {
         pendingDisbursements: disbursementsByStatus.PENDING?.count || 0,
         pendingDisbursementAmount: disbursementsByStatus.PENDING?.amount || 0,
 
-        uniqueDonors: uniqueDonors.length,
+        uniqueDonors,
         activeUsers: usersByRole.CAMPAIGN_LEADER || 0,
         totalUsers: userStats.reduce((sum, s) => sum + s._count, 0),
 

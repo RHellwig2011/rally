@@ -133,6 +133,39 @@ export async function filterSuppressed<
   return { allowed, suppressed };
 }
 
+/**
+ * filterSuppressed issues one DB query per recipient inside a single unbounded
+ * Promise.all. Feeding it a whole roster at once opens hundreds of simultaneous
+ * connections and can exhaust the pool, so partitionSuppressed hands it bounded
+ * batches instead.
+ */
+export const SUPPRESSION_LOOKUP_BATCH = 25;
+
+/**
+ * Pool-safe filterSuppressed. This is the helper every fan-out send path should
+ * use; call filterSuppressed directly only for a handful of recipients whose
+ * count is already bounded.
+ */
+export async function partitionSuppressed<
+  T extends { email?: string | null; phone?: string | null }
+>(
+  recipients: T[],
+  channel: SuppressionChannel,
+  programId?: string | null
+): Promise<FilterSuppressedResult<T>> {
+  const allowed: T[] = [];
+  const suppressed: T[] = [];
+
+  for (let i = 0; i < recipients.length; i += SUPPRESSION_LOOKUP_BATCH) {
+    const batch = recipients.slice(i, i + SUPPRESSION_LOOKUP_BATCH);
+    const result = await filterSuppressed(batch, channel, programId);
+    allowed.push(...result.allowed);
+    suppressed.push(...result.suppressed);
+  }
+
+  return { allowed, suppressed };
+}
+
 export interface RecordOptOutInput {
   email?: string | null;
   phone?: string | null;

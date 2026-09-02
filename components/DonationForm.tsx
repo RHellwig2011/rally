@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -13,18 +14,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Heart, CheckCircle2 } from "lucide-react";
+import { Loader2, Heart, CheckCircle2, Share2 } from "lucide-react";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
-);
+const STRIPE_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+
+// Only surface the test-card hint on a test-mode key; on a live key it would
+// read as an invitation to try a card that will be declined.
+const IS_STRIPE_TEST_MODE = STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_");
+
+// No key configured means Stripe.js can never load. Resolve that up front so
+// the wrapper can explain itself instead of rendering a form that can't submit.
+const stripePromise = STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 interface DonationFormProps {
   campaignId: string;
   campaignName: string;
   teamMemberId?: string;
   platformFeePercent?: number;
+  /** Campaign slug, used for the "back to campaign" link after a gift. */
+  campaignSlug?: string;
+  /** Player the gift is credited to, named on the thank-you screen. */
+  playerName?: string;
+  /** Preselected amount in dollars, e.g. from a ?amount=25 quick link. */
+  initialAmount?: number;
 }
 
 const SUGGESTED_AMOUNTS = [25, 50, 100, 250, 500];
@@ -34,13 +50,28 @@ function DonationFormInner({
   campaignName,
   teamMemberId,
   platformFeePercent = 10,
+  campaignSlug,
+  playerName,
+  initialAmount,
 }: DonationFormProps) {
   const stripe = useStripe();
   const elements = useElements();
-  const { csrfToken } = useCsrfToken();
+  const { csrfToken, loading: csrfLoading } = useCsrfToken();
 
-  const [amount, setAmount] = useState<string>("");
-  const [customAmount, setCustomAmount] = useState<string>("");
+  // A quick link carrying a suggested amount preselects that chip; anything
+  // off the preset list drops into the custom field instead.
+  const presetInitial =
+    initialAmount && SUGGESTED_AMOUNTS.includes(initialAmount)
+      ? initialAmount
+      : null;
+  const customInitial = initialAmount && !presetInitial ? initialAmount : null;
+
+  const [amount, setAmount] = useState<string>(
+    presetInitial ? presetInitial.toString() : ""
+  );
+  const [customAmount, setCustomAmount] = useState<string>(
+    customInitial ? customInitial.toString() : ""
+  );
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorMessage, setDonorMessage] = useState("");
@@ -49,7 +80,8 @@ function DonationFormInner({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [showCustom, setShowCustom] = useState(false);
+  const [showCustom, setShowCustom] = useState(Boolean(customInitial));
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   const selectedAmount = showCustom ? parseFloat(customAmount) || 0 : parseFloat(amount) || 0;
 
@@ -65,6 +97,34 @@ function DonationFormInner({
       ? selectedAmount - platformFee
       : selectedAmount - platformFee - processingFee
   );
+
+  // Share the page the donor just gave through — the player's page when the
+  // gift was credited to one, otherwise the team page.
+  const handleShare = async () => {
+    if (typeof window === "undefined" || !campaignSlug) return;
+    const path = teamMemberId
+      ? `/raise/${campaignSlug}/player/${teamMemberId}`
+      : `/raise/${campaignSlug}`;
+    const url = `${window.location.origin}${path}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: campaignName, url });
+        return;
+      } catch (err) {
+        // A cancelled share sheet is not a failure worth reporting.
+        if ((err as Error)?.name === "AbortError") return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareNotice("Link copied — paste it in a text to someone else who'd chip in");
+    } catch {
+      setShareNotice("We couldn't copy the link — you can copy it from the address bar");
+    }
+    setTimeout(() => setShareNotice(null), 4000);
+  };
 
   const handleAmountSelect = (value: number) => {
     setAmount(value.toString());
@@ -181,38 +241,84 @@ function DonationFormInner({
         <CardContent className="pt-6">
           <div className="text-center">
             <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-foreground mb-2">Thank You!</h3>
-            <p className="text-foreground mb-4">
-              Your ${selectedAmount.toFixed(2)} donation to <strong>{campaignName}</strong> has
-              been processed successfully.
+            <h3 className="text-2xl font-bold text-foreground mb-2">
+              You&apos;re on the team now — thank you!
+            </h3>
+            <p className="text-foreground mb-2">
+              We charged ${totalCharged.toFixed(2)}. A receipt is on its way to{" "}
+              <strong>{donorEmail}</strong>. <strong>{campaignName}</strong> keeps $
+              {netToCampaign.toFixed(2)}.
             </p>
-            <div className="bg-white rounded-lg p-4 text-sm text-left">
-              <div className="flex justify-between mb-2">
-                <span className="text-muted-foreground">Donation Amount:</span>
-                <span className="font-semibold">${selectedAmount.toFixed(2)}</span>
+            {playerName && (
+              <p className="text-foreground mb-2">
+                Your gift is credited to <strong>{playerName}</strong>.
+              </p>
+            )}
+
+            {/* The fee math is here for anyone who wants it, but it is not the
+                first thing a donor should read after paying. */}
+            <details className="mt-4 text-left">
+              <summary className="cursor-pointer text-sm font-medium text-foreground">
+                See the breakdown
+              </summary>
+              <div className="bg-white rounded-lg p-4 mt-2 text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">Your gift:</span>
+                  <span className="font-semibold">${selectedAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">
+                    Card processing{coverFees ? " (covered by you)" : ""}:
+                  </span>
+                  <span className="text-muted-foreground">
+                    {coverFees ? "+" : "-"}${processingFee.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">
+                    Bleacher Backers keeps ({platformFeePercent}%):
+                  </span>
+                  <span className="text-muted-foreground">-${platformFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">Charged to your card:</span>
+                  <span className="font-semibold">${totalCharged.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t">
+                  <span className="font-semibold">The team receives:</span>
+                  <span className="font-bold text-success">${netToCampaign.toFixed(2)}</span>
+                </div>
               </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-muted-foreground">Platform Fee ({platformFeePercent}%):</span>
-                <span className="text-muted-foreground">-${platformFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-muted-foreground">
-                  Processing Fee{coverFees ? " (covered by you)" : ""}:
-                </span>
-                <span className="text-muted-foreground">
-                  {coverFees ? "+" : "-"}${processingFee.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-muted-foreground">Total Charged:</span>
-                <span className="font-semibold">${totalCharged.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t">
-                <span className="font-semibold">Net to Campaign:</span>
-                <span className="font-bold text-success">${netToCampaign.toFixed(2)}</span>
-              </div>
+            </details>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-center">
+              {campaignSlug && (
+                <Button onClick={handleShare}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share this fundraiser
+                </Button>
+              )}
+              {campaignSlug && (
+                <Button variant="outline" asChild>
+                  <Link href={`/raise/${campaignSlug}`}>Leave a cheer</Link>
+                </Button>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-4">A receipt has been sent to {donorEmail}</p>
+            {shareNotice && (
+              <p role="status" className="mt-2 text-xs text-muted-foreground">
+                {shareNotice}
+              </p>
+            )}
+            {campaignSlug && (
+              <p className="mt-4 text-sm">
+                <Link
+                  href={`/raise/${campaignSlug}`}
+                  className="text-muted-foreground underline"
+                >
+                  Back to campaign
+                </Link>
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -224,7 +330,7 @@ function DonationFormInner({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Heart className="w-5 h-5 text-warning" />
-          Make a Donation
+          Back this team
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -238,6 +344,7 @@ function DonationFormInner({
                   key={value}
                   type="button"
                   variant={amount === value.toString() && !showCustom ? "default" : "outline"}
+                  aria-pressed={amount === value.toString() && !showCustom}
                   onClick={() => handleAmountSelect(value)}
                   className="h-12 text-base font-semibold"
                 >
@@ -247,6 +354,7 @@ function DonationFormInner({
               <Button
                 type="button"
                 variant={showCustom ? "default" : "outline"}
+                aria-pressed={showCustom}
                 onClick={handleCustomClick}
                 className="h-12 text-base font-semibold"
               >
@@ -279,18 +387,18 @@ function DonationFormInner({
           {/* Fee Breakdown */}
           {selectedAmount > 0 && (
             <div className="bg-muted rounded-lg p-4 text-sm">
-              <p className="font-semibold mb-2">Donation Breakdown:</p>
+              <p className="font-semibold mb-2">Where your gift goes:</p>
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Your donation:</span>
+                  <span className="text-muted-foreground">Your gift:</span>
                   <span className="font-semibold">${selectedAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Platform fee ({platformFeePercent}%):</span>
+                  <span>Bleacher Backers keeps ({platformFeePercent}%):</span>
                   <span>-${platformFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Processing fee (~3%):</span>
+                  <span>Card processing:</span>
                   <span>{coverFees ? `+$${processingFee.toFixed(2)}` : `-$${processingFee.toFixed(2)}`}</span>
                 </div>
                 {coverFees && (
@@ -300,7 +408,7 @@ function DonationFormInner({
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t border-border">
-                  <span className="font-semibold">Goes to campaign:</span>
+                  <span className="font-semibold">Goes to the team:</span>
                   <span className="font-bold text-primary">${netToCampaign.toFixed(2)}</span>
                 </div>
               </div>
@@ -313,7 +421,7 @@ function DonationFormInner({
                     className="w-4 h-4 text-primary border-border rounded focus:ring-primary cursor-pointer"
                   />
                   <span className="text-foreground">
-                    Cover the processing fee (${processingFee.toFixed(2)}) so more goes to the team
+                    Add ${processingFee.toFixed(2)} so the team isn&apos;t charged the card fee
                   </span>
                 </label>
               </div>
@@ -323,7 +431,7 @@ function DonationFormInner({
           {/* Donor Information */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="donorEmail">Email Address *</Label>
+              <Label htmlFor="donorEmail">Email for your receipt *</Label>
               <Input
                 id="donorEmail"
                 type="email"
@@ -334,7 +442,9 @@ function DonationFormInner({
                 required
                 className="mt-2 h-12"
               />
-              <p className="text-xs text-muted-foreground mt-1">For donation receipt</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                We&apos;ll send a receipt. We won&apos;t add you to a mailing list.
+              </p>
             </div>
 
             <div>
@@ -343,7 +453,7 @@ function DonationFormInner({
                 id="donorName"
                 type="text"
                 autoComplete="name"
-                placeholder="John Doe"
+                placeholder="How should we list you? (e.g. The Martinez family)"
                 value={donorName}
                 onChange={(e) => setDonorName(e.target.value)}
                 className="mt-2 h-12"
@@ -395,14 +505,22 @@ function DonationFormInner({
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Test mode: use card 4242 4242 4242 4242, any future date, any CVC.
+            <p className="text-xs text-muted-foreground mt-2">
+              Paid securely through Stripe. We never see or store your card.
             </p>
+            {IS_STRIPE_TEST_MODE && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Test mode: use card 4242 4242 4242 4242, any future date, any CVC.
+              </p>
+            )}
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-warning-light border border-warning rounded-lg p-3 text-sm text-warning-dark">
+            <div
+              role="alert"
+              className="bg-warning-light border border-warning rounded-lg p-3 text-sm text-warning-dark"
+            >
               {error}
             </div>
           )}
@@ -410,7 +528,13 @@ function DonationFormInner({
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isLoading || !stripe || selectedAmount < 1 || !donorEmail}
+            disabled={
+              isLoading ||
+              csrfLoading ||
+              !stripe ||
+              selectedAmount < 1 ||
+              !donorEmail
+            }
             className="w-full h-12 text-lg"
             size="lg"
           >
@@ -427,9 +551,6 @@ function DonationFormInner({
             )}
           </Button>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Your payment information is secure and encrypted. We never store your card details.
-          </p>
         </form>
       </CardContent>
     </Card>
@@ -437,6 +558,22 @@ function DonationFormInner({
 }
 
 export function DonationForm(props: DonationFormProps) {
+  if (!stripePromise) {
+    return (
+      <Card>
+        <CardContent className="pt-6 text-center">
+          <p className="font-semibold text-foreground mb-1">
+            Donations are temporarily unavailable
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Online giving isn&apos;t switched on right now. Please check back
+            shortly, or reach out to the team directly to contribute.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Elements stripe={stripePromise}>
       <DonationFormInner {...props} />

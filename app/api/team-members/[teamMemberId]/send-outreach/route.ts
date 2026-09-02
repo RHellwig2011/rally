@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { sendEmail } from '@/lib/services/email';
 import { sendSMS, sendBulkSMS, sendVideoSMS } from '@/lib/services/sms';
-import { filterSuppressed } from '@/lib/suppression';
+import { partitionSuppressed } from '@/lib/suppression';
 
 // The outreach UI always posts every recipient row as
 // { name, email, phone } and leaves the unused channel as "". Zod's
@@ -82,12 +82,19 @@ const sendOutreachSchema = z.object({
  * recipient names are caller-supplied, so raw interpolation lets someone
  * inject arbitrary markup (links, hidden content, spoofed branding) into mail
  * sent from our verified domain.
+ *
+ * Quotes are escaped too, not just angle brackets: several interpolation sites
+ * below sit INSIDE a double-quoted attribute (src="...", href="..."), where a
+ * bare `"` closes the attribute and opens an injection point without ever
+ * needing a `<`.
  */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -251,26 +258,36 @@ export async function POST(
 
     const programId = teamMember.campaign.programId ?? null;
 
+    // Re-parse the (already http/https-validated) URL and re-serialise it, so
+    // what lands inside src="..." is the canonical, percent-encoded form rather
+    // than whatever byte sequence the caller typed.
+    const videoUrl = validatedData.videoUrl
+      ? new URL(validatedData.videoUrl).toString()
+      : undefined;
+
     // Track results
     const emailResults: Array<{ to: string; success: boolean; error?: string; suppressed?: boolean }> = [];
     const smsResults: Array<{ to: string; success: boolean; error?: string; suppressed?: boolean }> = [];
 
-    // Recipients come straight from the request body, so this route is the
-    // last place we can enforce opt-outs before dispatch. Everything is routed
-    // through filterSuppressed; suppressed people are reported back honestly
-    // rather than silently dropped.
-    const emailRecipients = validatedData.recipients.filter((r) => !!r.email);
-    const { allowed: allowedEmailRecipients, suppressed: suppressedEmailRecipients } =
-      await filterSuppressed(
-        // Keep phone on the object: an ALL-channel opt-out recorded against a
-        // phone number should also stop email to the same person.
-        emailRecipients.map((r) => ({ ...r, email: r.email! })),
-        'EMAIL',
-        programId
-      );
-
     // Send emails
     if (validatedData.type === 'email' || validatedData.type === 'both') {
+      // Recipients come straight from the request body, so this route is the
+      // last place we can enforce opt-outs before dispatch. Everything is
+      // routed through partitionSuppressed (batched, so a 500-recipient send
+      // cannot open 500 simultaneous connections); suppressed people are
+      // reported back honestly rather than silently dropped. Scoped to this
+      // branch so an SMS-only send does not pay for email lookups it will
+      // never use.
+      const emailRecipients = validatedData.recipients.filter((r) => !!r.email);
+      const { allowed: allowedEmailRecipients, suppressed: suppressedEmailRecipients } =
+        await partitionSuppressed(
+          // Keep phone on the object: an ALL-channel opt-out recorded against a
+          // phone number should also stop email to the same person.
+          emailRecipients.map((r) => ({ ...r, email: r.email! })),
+          'EMAIL',
+          programId
+        );
+
       for (const recipient of suppressedEmailRecipients) {
         emailResults.push({
           to: recipient.email,
@@ -283,9 +300,12 @@ export async function POST(
       for (const recipient of allowedEmailRecipients) {
         if (!recipient.email) continue;
 
+        // Function replacer: a recipient name containing `$&`, `$\`` or
+        // `$'` would otherwise be expanded by String.prototype.replace and
+        // splice parts of the template into the message body.
         const personalizedMessage = validatedData.message.replace(
-          '{name}',
-          recipient.name || 'there'
+          /\{name\}/g,
+          () => recipient.name || 'there'
         );
 
         const htmlBody = `
@@ -306,10 +326,10 @@ export async function POST(
 ${escapeHtml(personalizedMessage)}
               </div>
 
-              ${validatedData.videoUrl ? `
+              ${videoUrl ? `
               <div style="margin: 30px 0; text-align: center;">
                 <video controls style="max-width: 100%; border-radius: 8px;" poster="">
-                  <source src="${escapeHtml(validatedData.videoUrl)}" type="video/mp4">
+                  <source src="${escapeHtml(videoUrl)}" type="video/mp4">
                   Your browser doesn't support video playback.
                 </video>
               </div>
@@ -402,7 +422,7 @@ ${escapeHtml(personalizedMessage)}
     // Send SMS
     if (validatedData.type === 'sms' || validatedData.type === 'both') {
       const { allowed: allowedSmsRecipients, suppressed: suppressedSmsRecipients } =
-        await filterSuppressed(
+        await partitionSuppressed(
           validatedData.recipients.filter((r) => !!r.phone),
           'SMS',
           programId
@@ -419,15 +439,17 @@ ${escapeHtml(personalizedMessage)}
 
       const smsMessages = allowedSmsRecipients
         .map(recipient => {
+          // Function replacer — see the email branch above: `$` sequences in
+          // a recipient name are literal text, not replacement patterns.
           const personalizedMessage = validatedData.message.replace(
-            '{name}',
-            recipient.name || 'there'
+            /\{name\}/g,
+            () => recipient.name || 'there'
           );
 
           return {
             to: recipient.phone!,
             message: `${personalizedMessage}\n\nSupport me here: ${fundraisingLink}`,
-            mediaUrl: validatedData.videoUrl ? [validatedData.videoUrl] : undefined,
+            mediaUrl: videoUrl ? [videoUrl] : undefined,
           };
         });
 

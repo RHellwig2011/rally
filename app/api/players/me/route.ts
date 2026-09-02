@@ -26,9 +26,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get all team memberships for this user
+    // Get all team memberships for this user. Team members are soft-deleted
+    // only, so without deletedAt: null a player removed from a roster keeps
+    // seeing that campaign — and its totals keep feeding their stats.
     const teamMemberships = await prisma.teamMember.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, deletedAt: null },
       include: {
         campaign: {
           select: {

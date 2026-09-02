@@ -8,6 +8,16 @@ import {
 } from "@/lib/utils/rate-limiter";
 import { checkCsrf } from "@/lib/csrf";
 
+// Hard ceiling applied at parse time, before PlatformSettings is consulted.
+// Also the fallback max when no settings row exists.
+const MAX_DONATION_DOLLARS_CEILING = 1_000_000; // $1,000,000
+
+// Fallback bounds in cents, used when the singleton PlatformSettings row is
+// missing or leaves a limit unset. These mirror the schema defaults on
+// PlatformSettings.min/maxDonationAmountCents.
+const FALLBACK_MIN_DONATION_CENTS = BigInt(100); // $1
+const FALLBACK_MAX_DONATION_CENTS = BigInt(MAX_DONATION_DOLLARS_CEILING * 100);
+
 // Validation schema for donations
 const createDonationSchema = z.object({
   campaignId: z.string().min(1, "Campaign ID is required"),
@@ -16,7 +26,11 @@ const createDonationSchema = z.object({
   donorName: z.string().optional(),
   donorPhone: z.string().optional(),
   message: z.string().optional(),
-  amount: z.number().min(1, "Minimum donation is $1"),
+  // Structural bounds only — the authoritative limits come from
+  // PlatformSettings below. `.finite()` matters: without it Infinity and NaN
+  // pass z.number(), and Math.round(Infinity * 100) reaches BigInt() as a
+  // non-integer and throws a 500 instead of a validation error.
+  amount: z.number().finite().positive().max(MAX_DONATION_DOLLARS_CEILING, "Donation amount is too large"),
   isAnonymous: z.boolean().optional().default(false),
   coverFees: z.boolean().optional().default(false),
   referralCode: z.string().optional(),
@@ -81,6 +95,37 @@ export async function POST(req: NextRequest) {
 
     // Convert dollar amount to cents
     const grossAmountInCents = Math.round(validatedData.amount * 100);
+
+    // Enforce the platform's configured donation limits. The settings row is a
+    // singleton; if an install has not created it yet, fall back to the same
+    // bounds the schema defaults to rather than accepting any amount.
+    const settings = await prisma.platformSettings.findFirst({
+      select: { minDonationAmountCents: true, maxDonationAmountCents: true },
+    });
+    const minDonationCents =
+      settings?.minDonationAmountCents ?? FALLBACK_MIN_DONATION_CENTS;
+    const maxDonationCents =
+      settings?.maxDonationAmountCents ?? FALLBACK_MAX_DONATION_CENTS;
+
+    if (BigInt(grossAmountInCents) < minDonationCents) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Minimum donation is $${Number(minDonationCents) / 100}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (BigInt(grossAmountInCents) > maxDonationCents) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Maximum donation is $${Number(maxDonationCents) / 100}`,
+        },
+        { status: 400 }
+      );
+    }
 
     // Calculate fees
     const platformFeePercent = campaign.platformFeePercent || 10;
@@ -152,6 +197,9 @@ export async function POST(req: NextRequest) {
       amount: chargedAmountInCents,
       campaignId: validatedData.campaignId,
       donorEmail: validatedData.donorEmail,
+      // The PENDING donation row created just above is the natural key: exactly
+      // one intent belongs to it, so a retried request reuses that intent.
+      idempotencyKey: `donation-${donation.id}`,
       metadata: {
         donationId: donation.id,
         campaignName: `${campaign.organizationName} ${campaign.teamName}`,

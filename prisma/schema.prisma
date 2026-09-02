@@ -419,7 +419,12 @@ model Donation {
 
   // Payment details
   paymentProvider   PaymentProvider @default(SIMULATED)
-  paymentIntentId   String?
+  // Unique so a redelivered Stripe webhook can never insert a second donation
+  // for the same payment intent and credit the campaign twice; lib/banking.ts
+  // processDonation relies on the resulting P2002 as its last line of defence.
+  // Safe on a nullable column: Postgres treats NULLs as distinct, so the many
+  // simulated/legacy donations with no payment intent are all still legal.
+  paymentIntentId   String?         @unique
   paymentMethod     PaymentMethod   @default(CARD)
   paymentMethodLast4 String?
 

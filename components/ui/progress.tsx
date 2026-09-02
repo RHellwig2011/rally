@@ -12,7 +12,15 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
     const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
     return (
-      <div ref={ref} className={cn("relative", className)} {...props}>
+      <div
+        ref={ref}
+        role="progressbar"
+        aria-valuenow={Math.round(percentage)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className={cn("relative", className)}
+        {...props}
+      >
         <div className="h-3 w-full overflow-hidden rounded-full bg-accent">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"

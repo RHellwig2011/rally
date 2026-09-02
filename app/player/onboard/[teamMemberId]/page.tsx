@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +30,6 @@ interface TeamMemberInfo {
 
 export default function TeamMemberOnboardingPage() {
   const params = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const teamMemberId = params?.teamMemberId as string;
   const token = searchParams?.get('token');
@@ -41,6 +41,8 @@ export default function TeamMemberOnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showSecondParent, setShowSecondParent] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [alreadyOnboarded, setAlreadyOnboarded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -77,10 +79,9 @@ export default function TeamMemberOnboardingPage() {
 
       const data = await response.json();
 
+      setTeamMemberInfo(data);
       if (data.teamMember.onboardingCompleted) {
-        setError('You have already completed the onboarding process!');
-      } else {
-        setTeamMemberInfo(data);
+        setAlreadyOnboarded(true);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load invitation information');
@@ -124,13 +125,11 @@ export default function TeamMemberOnboardingPage() {
         throw new Error(data.error || 'Failed to complete onboarding');
       }
 
-      const data = await response.json();
-      setSuccess(true);
+      await response.json();
 
-      // Redirect to campaign page after 3 seconds
-      setTimeout(() => {
-        router.push(`/raise/${data.teamMember.campaignSlug}`);
-      }, 3000);
+      // No auto-redirect: the fundraising link is the whole point of this
+      // screen, and bouncing to the team page three seconds later loses it.
+      setSuccess(true);
 
     } catch (err: any) {
       setError(err.message || 'Failed to complete onboarding');
@@ -140,6 +139,22 @@ export default function TeamMemberOnboardingPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // The player's own page — what family should actually receive.
+  const fundraisingLink = () =>
+    typeof window === 'undefined' || !teamMemberInfo
+      ? ''
+      : `${window.location.origin}/raise/${teamMemberInfo.campaign.slug}/player/${teamMemberId}`;
+
+  const copyFundraisingLink = async () => {
+    try {
+      await navigator.clipboard.writeText(fundraisingLink());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      setCopied(false);
+    }
   };
 
   if (loading) {
@@ -169,6 +184,41 @@ export default function TeamMemberOnboardingPage() {
     );
   }
 
+  if (alreadyOnboarded && teamMemberInfo) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-success mb-2">
+              <CheckCircle2 className="h-8 w-8" />
+              <CardTitle className="font-display">You&apos;re already on the team</CardTitle>
+            </div>
+            <CardDescription className="text-base">
+              Here&apos;s your page. Share it with family and the gifts come to you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button className="w-full" size="lg" onClick={copyFundraisingLink}>
+              {copied ? 'Link copied' : 'Copy my fundraising link'}
+            </Button>
+            <Button variant="outline" className="w-full" asChild>
+              <Link
+                href={`/raise/${teamMemberInfo.campaign.slug}/player/${teamMemberId}`}
+              >
+                See my page
+              </Link>
+            </Button>
+            <Button variant="ghost" className="w-full" asChild>
+              <Link href={`/raise/${teamMemberInfo.campaign.slug}`}>
+                See the team page
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -179,13 +229,21 @@ export default function TeamMemberOnboardingPage() {
               <CardTitle className="font-display">All Set!</CardTitle>
             </div>
             <CardDescription className="text-base">
-              Great job completing your profile! Your parents will be notified, and you're ready to start fundraising.
+              Ask a parent to text your page to family tonight. That&apos;s the
+              whole job.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Redirecting you to your campaign page...
-            </p>
+          <CardContent className="space-y-3">
+            <Button className="w-full" size="lg" onClick={copyFundraisingLink}>
+              {copied ? 'Link copied' : 'Copy my fundraising link'}
+            </Button>
+            {teamMemberInfo && (
+              <Button variant="outline" className="w-full" asChild>
+                <Link href={`/raise/${teamMemberInfo.campaign.slug}`}>
+                  See the team page
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -250,9 +308,11 @@ export default function TeamMemberOnboardingPage() {
               </div>
 
               <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4">
-                <h3 className="font-semibold text-secondary-900 mb-2">What We Need From You</h3>
+                <h3 className="font-semibold text-secondary-900 mb-2">
+                  Just a parent we can update when gifts come in
+                </h3>
                 <p className="text-sm text-secondary-800 mb-3">
-                  To get started, we need to collect some contact information:
+                  Two minutes, then you&apos;re done:
                 </p>
                 <ul className="space-y-2 text-sm text-secondary-800">
                   <li className="flex items-start gap-2">

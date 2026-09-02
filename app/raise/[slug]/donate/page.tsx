@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useCallback, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DonationForm from "@/components/DonationForm";
@@ -16,63 +17,75 @@ interface Campaign {
   platformFeePercent: number;
 }
 
-export default function DonatePage({ params }: { params: { slug: string } }) {
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading campaign...</p>
+      </div>
+    </div>
+  );
+}
+
+function DonatePageContent({ params }: { params: { slug: string } }) {
+  const searchParams = useSearchParams();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoadingCampaign, setIsLoadingCampaign] = useState(true);
   const [campaignError, setCampaignError] = useState<string | null>(null);
 
+  // Quick-amount links from the campaign page arrive as ?amount=25.
+  const amountParam = searchParams?.get("amount");
+  const parsedAmount = amountParam ? parseFloat(amountParam) : NaN;
+  const initialAmount =
+    Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined;
+
   // Fetch campaign data
-  useEffect(() => {
-    async function fetchCampaign() {
-      try {
-        setIsLoadingCampaign(true);
-        const response = await fetch(`/api/campaigns/slug/${params.slug}`);
-        const data = await response.json();
+  const fetchCampaign = useCallback(async () => {
+    try {
+      setIsLoadingCampaign(true);
+      setCampaignError(null);
+      const response = await fetch(`/api/campaigns/slug/${params.slug}`);
+      const data = await response.json();
 
-        if (!response.ok || !data.success) {
-          setCampaignError(data.error || "Campaign not found");
-          return;
-        }
-
-        // Convert string amounts to numbers if needed
-        const campaignData: Campaign = {
-          id: data.campaign.id,
-          slug: data.campaign.slug,
-          organizationName: data.campaign.organizationName,
-          teamName: data.campaign.teamName,
-          goalAmount: typeof data.campaign.goalAmount === 'string'
-            ? parseInt(data.campaign.goalAmount)
-            : data.campaign.goalAmount,
-          currentAmount: typeof data.campaign.currentAmount === 'string'
-            ? parseInt(data.campaign.currentAmount)
-            : data.campaign.currentAmount,
-          platformFeePercent: data.campaign.platformFeePercent || 10,
-        };
-
-        setCampaign(campaignData);
-      } catch (err) {
-        console.error("Failed to fetch campaign:", err);
-        setCampaignError("Failed to load campaign");
-      } finally {
-        setIsLoadingCampaign(false);
+      if (!response.ok || !data.success) {
+        setCampaignError(data.error || "Campaign not found");
+        return;
       }
-    }
 
-    if (params.slug) {
-      fetchCampaign();
+      // Convert string amounts to numbers if needed
+      const campaignData: Campaign = {
+        id: data.campaign.id,
+        slug: data.campaign.slug,
+        organizationName: data.campaign.organizationName,
+        teamName: data.campaign.teamName,
+        goalAmount: typeof data.campaign.goalAmount === 'string'
+          ? parseInt(data.campaign.goalAmount)
+          : data.campaign.goalAmount,
+        currentAmount: typeof data.campaign.currentAmount === 'string'
+          ? parseInt(data.campaign.currentAmount)
+          : data.campaign.currentAmount,
+        platformFeePercent: data.campaign.platformFeePercent || 10,
+      };
+
+      setCampaign(campaignData);
+    } catch (err) {
+      console.error("Failed to fetch campaign:", err);
+      setCampaignError("Failed to load campaign");
+    } finally {
+      setIsLoadingCampaign(false);
     }
   }, [params.slug]);
 
+  useEffect(() => {
+    if (params.slug) {
+      fetchCampaign();
+    }
+  }, [params.slug, fetchCampaign]);
+
   // Loading state
   if (isLoadingCampaign) {
-    return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading campaign...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   // Error state
@@ -82,9 +95,14 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <p className="text-muted-foreground mb-4">{campaignError || "This campaign does not exist."}</p>
-          <Button asChild>
-            <Link href="/">Go Home</Link>
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="outline" onClick={fetchCampaign}>
+              Try again
+            </Button>
+            <Button asChild>
+              <Link href="/">Go Home</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -124,7 +142,9 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
         <DonationForm
           campaignId={campaign.id}
           campaignName={`${campaign.organizationName} ${campaign.teamName}`}
+          campaignSlug={campaign.slug || params.slug}
           platformFeePercent={campaign.platformFeePercent}
+          initialAmount={initialAmount}
         />
 
         <p className="text-xs text-center text-muted-foreground mt-6">
@@ -134,5 +154,13 @@ export default function DonatePage({ params }: { params: { slug: string } }) {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function DonatePage({ params }: { params: { slug: string } }) {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <DonatePageContent params={params} />
+    </Suspense>
   );
 }

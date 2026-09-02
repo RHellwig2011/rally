@@ -7,9 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/lib/store/authStore";
+
+/**
+ * Mirrors the role routing in app/(auth)/login/page.tsx. Kept in step by hand:
+ * signup lands people in the same place a fresh sign-in would.
+ */
+function destinationFor(role: string | undefined) {
+  if (role === "ADMIN" || role === "BANK_ADMIN") return "/admin";
+  if (role === "PLAYER") return "/player";
+  return "/campaigns";
+}
 
 export default function SignupPage() {
   const router = useRouter();
+  const setUser = useAuthStore((state) => state.setUser);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -60,8 +72,36 @@ export default function SignupPage() {
         throw new Error(data.error || "Signup failed");
       }
 
-      // Show success message and redirect to login
-      router.push("/login?message=Account created! Please sign in.");
+      // They just chose a password — making them type it again on a login
+      // screen is a step for nothing. Sign them in with the same credentials
+      // and only fall back to /login if that second call fails.
+      try {
+        const loginResponse = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        const loginData = await loginResponse.json();
+
+        if (loginResponse.ok) {
+          if (loginData.user) {
+            setUser(loginData.user);
+          }
+          router.push(destinationFor(loginData.user?.role));
+          router.refresh();
+          return;
+        }
+      } catch (loginErr) {
+        console.error("Auto sign-in after signup failed:", loginErr);
+      }
+
+      // ?created=1 rather than a raw sentence in the query string; login owns
+      // the copy.
+      router.push("/login?created=1");
     } catch (err: any) {
       setError(err.message || "Failed to create account");
     } finally {
@@ -80,13 +120,17 @@ export default function SignupPage() {
           </div>
           <CardTitle className="font-display text-2xl font-semibold text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Start your fundraising campaign today
+            For coaches and team parents. Players usually join from a link the
+            coach sends.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-warning-light border border-warning text-warning px-4 py-3 rounded-lg text-sm">
+              <div
+                role="alert"
+                className="bg-warning-light border border-warning text-warning-dark px-4 py-3 rounded-lg text-sm"
+              >
                 {error}
               </div>
             )}

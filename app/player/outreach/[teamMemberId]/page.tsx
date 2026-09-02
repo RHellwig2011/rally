@@ -41,6 +41,7 @@ export default function PlayerOutreachPage() {
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [sentSummary, setSentSummary] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [campaignId, setCampaignId] = useState('');
 
@@ -174,6 +175,7 @@ export default function PlayerOutreachPage() {
     setSending(true);
     setError('');
     setSuccess(false);
+    setSentSummary(null);
 
     // Validate
     if (!message) {
@@ -222,12 +224,13 @@ export default function PlayerOutreachPage() {
       const data = await response.json();
       setSuccess(true);
 
-      // Show summary
       const emailSent = data.summary.email.sent;
       const smsSent = data.summary.sms.sent;
-      const total = emailSent + smsSent;
-
-      alert(`Success! Sent ${total} messages:\n${emailSent > 0 ? `- ${emailSent} emails\n` : ''}${smsSent > 0 ? `- ${smsSent} SMS messages` : ''}`);
+      const parts = [
+        emailSent > 0 ? `${emailSent} email${emailSent === 1 ? '' : 's'}` : null,
+        smsSent > 0 ? `${smsSent} text${smsSent === 1 ? '' : 's'}` : null,
+      ].filter(Boolean);
+      setSentSummary(parts.length > 0 ? parts.join(' and ') : null);
 
       // Reset form
       setMessage('');
@@ -262,7 +265,8 @@ export default function PlayerOutreachPage() {
           <Alert className="mb-6 bg-success-light border-success">
             <CheckCircle2 className="h-4 w-4 text-success" />
             <AlertDescription className="text-success-dark">
-              Your messages were sent successfully! Keep sharing to reach your goal.
+              Sent{sentSummary ? ` — ${sentSummary}` : ''}! Text three more people
+              when you can.
             </AlertDescription>
           </Alert>
         )}
@@ -420,7 +424,7 @@ export default function PlayerOutreachPage() {
           <CardContent className="space-y-4">
             {recipients.map((recipient, index) => (
               <div key={index} className="flex gap-3 items-start">
-                <div className="flex-1 grid grid-cols-3 gap-2">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input
                     placeholder="Name"
                     value={recipient.name}

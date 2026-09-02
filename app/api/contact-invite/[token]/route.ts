@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkCsrf } from "@/lib/csrf";
 import { checkRateLimit } from "@/lib/utils/rate-limit";
+import {
+  normalizeEmail,
+  normalizePhone,
+  partitionSuppressed,
+} from "@/lib/suppression";
 import { z } from "zod";
 
 /**
@@ -52,15 +57,16 @@ const submitSchema = z.object({
   consentAttested: z.boolean(),
 });
 
-/** Lowercase + trim. Returns null for blanks so DB nulls stay clean. */
-function normalizeEmail(email?: string | null): string | null {
-  if (!email) return null;
-  const trimmed = email.trim().toLowerCase();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-/** Strip everything that is not a digit. Returns null for blanks. */
-function normalizePhone(phone?: string | null): string | null {
+/**
+ * The digits exactly as submitted, country code included — this is the STORAGE
+ * shape for Contact.phone, not a matching key. Every comparison (opt-out,
+ * dedupe) runs through lib/suppression.ts#normalizePhone instead, so this
+ * endpoint decides "has this person opted out?" with byte-for-byte the same
+ * normalization recordOptOut wrote the row with. Diverging here is a TCPA
+ * problem, not a cosmetic one: a "+1 (555) 010-1234" opt-out must still block a
+ * "5550101234" submission.
+ */
+function toStoredPhone(phone?: string | null): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   return digits.length > 0 ? digits : null;
@@ -322,7 +328,7 @@ export async function POST(
 
     validated.contacts.forEach((raw, index) => {
       const email = normalizeEmail(raw.email);
-      const phone = normalizePhone(raw.phone);
+      const phone = toStoredPhone(raw.phone);
 
       if (!email && !phone) {
         invalid.push({ index, reason: "Each contact needs an email or a phone number" });
@@ -362,39 +368,19 @@ export async function POST(
     }
 
     // --- Suppression: never resurrect an opted-out contact ------------------
-    const emails = candidates.map((c) => c.email).filter((e): e is string => !!e);
-    const phones = candidates.map((c) => c.phone).filter((p): p is string => !!p);
-
-    // Global opt-outs (programId null) always apply; program-scoped opt-outs
-    // apply only to this campaign's program.
-    const programScope = campaign.programId
-      ? [{ programId: null }, { programId: campaign.programId }]
-      : [{ programId: null }];
-
-    const optOuts =
-      emails.length > 0 || phones.length > 0
-        ? await prisma.contactOptOut.findMany({
-            where: {
-              AND: [
-                { OR: programScope },
-                {
-                  OR: [
-                    ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
-                    ...(phones.length > 0 ? [{ phone: { in: phones } }] : []),
-                  ],
-                },
-              ],
-            },
-            select: { email: true, phone: true },
-          })
-        : [];
-
-    const suppressedEmails = new Set(
-      optOuts.map((o) => normalizeEmail(o.email)).filter((e): e is string => !!e)
+    // Delegated to lib/suppression.ts rather than matched against a locally
+    // normalized set: that module's SQL is what recordOptOut writes against, so
+    // this is the only way the two sides are guaranteed to agree. Channel "ALL"
+    // matches an opt-out row on ANY channel, which is what this endpoint wants
+    // — someone who told us to stop must not be re-added to a roster at all.
+    // Global opt-outs (programId null) always apply; program-scoped ones apply
+    // only to this campaign's program, which partitionSuppressed handles.
+    const { suppressed: suppressedCandidates } = await partitionSuppressed(
+      candidates,
+      "ALL",
+      campaign.programId ?? null
     );
-    const suppressedPhones = new Set(
-      optOuts.map((o) => normalizePhone(o.phone)).filter((p): p is string => !!p)
-    );
+    const suppressedIndexes = new Set(suppressedCandidates.map((c) => c.index));
 
     // --- Dedupe against contacts already on file for this player ------------
     const existing = await prisma.contact.findMany({
@@ -418,20 +404,20 @@ export async function POST(
     const batchPhones = new Set<string>();
 
     for (const c of candidates) {
-      const isSuppressed =
-        (c.email && suppressedEmails.has(c.email)) ||
-        (c.phone && suppressedPhones.has(c.phone));
-
-      if (isSuppressed) {
+      if (suppressedIndexes.has(c.index)) {
         // Silently skipped for the submitter's purposes, but reported back as
         // a count so the page can be honest that not everyone was added.
         suppressed.push({ index: c.index, email: c.email, phone: c.phone });
         continue;
       }
 
+      // Compare on the canonical (last-10-digit) form so "+1 555 010 1234" and
+      // "5550101234" are recognised as the same person already on file.
+      const phoneKey = normalizePhone(c.phone);
+
       const isDuplicate =
         (c.email && (existingEmails.has(c.email) || batchEmails.has(c.email))) ||
-        (c.phone && (existingPhones.has(c.phone) || batchPhones.has(c.phone)));
+        (phoneKey && (existingPhones.has(phoneKey) || batchPhones.has(phoneKey)));
 
       if (isDuplicate) {
         duplicates.push({ index: c.index, email: c.email, phone: c.phone });
@@ -439,7 +425,7 @@ export async function POST(
       }
 
       if (c.email) batchEmails.add(c.email);
-      if (c.phone) batchPhones.add(c.phone);
+      if (phoneKey) batchPhones.add(phoneKey);
       toCreate.push(c);
     }
 

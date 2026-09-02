@@ -3,6 +3,7 @@ import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { checkCsrf } from "@/lib/csrf";
+import { partitionSuppressed } from "@/lib/suppression";
 
 // Validation schema
 const createUpdateSchema = z.object({
@@ -43,15 +44,19 @@ export async function POST(
 
     const { campaignId } = params;
 
-    // Check campaign authorization
+    // Check campaign authorization. Only the fields this handler needs — the
+    // previous version pulled every COMPLETED donation for the campaign into
+    // memory just to notify donors, which is unbounded work on the read path.
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        organizationName: true,
+        teamName: true,
+        programId: true,
+        primaryLeaderId: true,
         guardians: { select: { id: true } },
-        donations: {
-          where: { status: 'COMPLETED' },
-          select: { donorEmail: true, donorName: true }
-        }
       }
     });
 
@@ -99,40 +104,60 @@ export async function POST(
     });
 
     // Send email notifications to donors if requested
-    if (validatedData.notifyDonors && campaign.donations.length > 0) {
+    if (validatedData.notifyDonors) {
       try {
         const { sendCampaignUpdate } = await import('@/lib/email');
 
-        // Get unique donor emails
-        const uniqueDonors = new Map<string, string>();
-        campaign.donations.forEach(d => {
-          if (!uniqueDonors.has(d.donorEmail)) {
-            uniqueDonors.set(d.donorEmail, d.donorName || 'Supporter');
-          }
+        // Distinct donor addresses, deduped by the database rather than by
+        // loading every donation row.
+        const donorRows = await prisma.donation.findMany({
+          where: { campaignId, status: 'COMPLETED' },
+          select: { donorEmail: true },
+          distinct: ['donorEmail'],
         });
 
-        const campaignUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/raise/${campaign.slug}`;
-
-        // Send emails (in background, don't wait)
-        const emailPromises = Array.from(uniqueDonors.entries()).map(([email, name]) =>
-          sendCampaignUpdate({
-            toEmail: email,
-            campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-            updateTitle: validatedData.title,
-            updateContent: validatedData.content,
-            campaignUrl,
-          }).catch(err => {
-            console.error(`Failed to send update to ${email}:`, err);
-          })
+        // Compliance gate: every send path runs its recipients through the
+        // suppression layer first. A donor who unsubscribed is still a donor,
+        // so without this they keep receiving campaign updates. Scoped to the
+        // campaign's program so a program-level opt-out is honoured alongside
+        // the global ones; this fails closed (a lookup error throws to the
+        // catch below and nothing is sent).
+        const { allowed, suppressed } = await partitionSuppressed(
+          donorRows.map(d => ({ email: d.donorEmail })),
+          'EMAIL',
+          campaign.programId
         );
 
-        // Don't wait for emails, but track count
-        Promise.all(emailPromises).then(() => {
-          prisma.campaignUpdate.update({
-            where: { id: update.id },
-            data: { sentToEmails: uniqueDonors.size }
-          }).catch(console.error);
-        });
+        if (suppressed.length > 0) {
+          console.log(
+            `Campaign update ${update.id}: skipped ${suppressed.length} suppressed donor address(es)`
+          );
+        }
+
+        if (allowed.length > 0) {
+          const campaignUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/raise/${campaign.slug}`;
+
+          // Send emails (in background, don't wait)
+          const emailPromises = allowed.map(({ email }) =>
+            sendCampaignUpdate({
+              toEmail: email,
+              campaignName: `${campaign.organizationName} ${campaign.teamName}`,
+              updateTitle: validatedData.title,
+              updateContent: validatedData.content,
+              campaignUrl,
+            }).catch(err => {
+              console.error(`Failed to send update to ${email}:`, err);
+            })
+          );
+
+          // Don't wait for emails, but track count
+          Promise.all(emailPromises).then(() => {
+            prisma.campaignUpdate.update({
+              where: { id: update.id },
+              data: { sentToEmails: allowed.length }
+            }).catch(console.error);
+          });
+        }
 
       } catch (emailError) {
         console.error('Failed to send campaign updates:', emailError);
@@ -174,7 +199,13 @@ export async function POST(
   }
 }
 
+// Generous default so existing callers, which send no query parameters, keep
+// seeing a campaign's whole update history.
+const DEFAULT_LIST_LIMIT = 100;
+const MAX_LIST_LIMIT = 200;
+
 // GET - Get all updates for a campaign
+// Supports ?limit=&offset= query parameters.
 export async function GET(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
@@ -182,21 +213,86 @@ export async function GET(
   try {
     const { campaignId } = params;
 
-    const updates = await prisma.campaignUpdate.findMany({
-      where: {
-        campaignId,
-        status: 'PUBLISHED',
+    // Middleware only proves a session exists; it never grants access to a
+    // particular campaign. Authorize here the same way the sibling campaign
+    // routes (stats, analytics) do — this endpoint exposes an update's body and
+    // its recipient count, which is not another team's business.
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserFromToken(sessionToken);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        primaryLeaderId: true,
+        guardians: { select: { id: true } },
       },
-      include: {
-        author: {
-          select: {
-            firstName: true,
-            lastName: true,
-          }
-        }
-      },
-      orderBy: { publishedAt: 'desc' },
     });
+
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some(g => g.id === user.id) ||
+      user.role === "ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized" },
+        { status: 403 }
+      );
+    }
+
+    // Clamped pagination, mirroring app/api/admin/transactions.
+    const searchParams = req.nextUrl.searchParams;
+    const parsedLimit = parseInt(searchParams.get("limit") || String(DEFAULT_LIST_LIMIT), 10);
+    const limit = Number.isNaN(parsedLimit)
+      ? DEFAULT_LIST_LIMIT
+      : Math.min(Math.max(parsedLimit, 1), MAX_LIST_LIMIT);
+    const parsedOffset = parseInt(searchParams.get("offset") || "0", 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    const where = {
+      campaignId,
+      status: 'PUBLISHED' as const,
+    };
+
+    const [updates, total] = await Promise.all([
+      prisma.campaignUpdate.findMany({
+        where,
+        include: {
+          author: {
+            select: {
+              firstName: true,
+              lastName: true,
+            }
+          }
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.campaignUpdate.count({ where }),
+    ]);
 
     return NextResponse.json(
       {
@@ -208,7 +304,13 @@ export async function GET(
           authorName: `${u.author.firstName} ${u.author.lastName}`,
           publishedAt: u.publishedAt,
           sentToEmails: u.sentToEmails,
-        }))
+        })),
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + updates.length < total,
+        }
       },
       { status: 200 }
     );

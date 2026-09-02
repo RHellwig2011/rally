@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   DollarSign,
-  TrendingUp,
   Wallet,
   ArrowUpRight,
   Users,
@@ -62,6 +61,17 @@ import { useCsrfToken } from "@/hooks/useCsrfToken";
 // formatCurrency expects cents, so convert before formatting.
 const toCents = (dollars: unknown) => Math.round(Number(dollars ?? 0) * 100);
 
+// The status enum is stored verbatim; coaches should never read it raw.
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft — not accepting gifts yet",
+  ACTIVE: "Live",
+  PAUSED: "Paused — gifts are on hold",
+  COMPLETED: "Wrapped up",
+  ARCHIVED: "Archived",
+};
+
+const statusLabel = (status: string) => STATUS_LABELS[status] || status;
+
 const PURPOSE_LABELS: Record<string, string> = {
   EQUIPMENT: "Equipment & Supplies",
   TRAVEL: "Travel & Lodging",
@@ -99,6 +109,10 @@ export default function DashboardPage({
   const [selectedNewStatus, setSelectedNewStatus] = useState<string | null>(null);
   const [statusChangeReason, setStatusChangeReason] = useState("");
   const [statusHistory, setStatusHistory] = useState<any[]>([]);
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [disbursementNotice, setDisbursementNotice] = useState<string | null>(null);
+  const [disbursementError, setDisbursementError] = useState<string | null>(null);
   const [disbursementForm, setDisbursementForm] = useState({
     amount: "",
     purpose: "",
@@ -184,6 +198,8 @@ export default function DashboardPage({
   const handleDisbursementRequest = async () => {
     try {
       setIsSubmittingDisbursement(true);
+      setDisbursementError(null);
+      setDisbursementNotice(null);
       const res = await fetch(`/api/campaigns/${params.campaignId}/disbursements`, {
         method: 'POST',
         headers: {
@@ -206,16 +222,48 @@ export default function DashboardPage({
         throw new Error((result.error || 'Failed to submit disbursement request') + details);
       }
 
-      alert('Disbursement request submitted successfully!');
+      setDisbursementNotice(
+        "Request sent. We'll email you when it's approved — usually a few days."
+      );
       setIsRequestDialogOpen(false);
       setDisbursementForm({ amount: "", purpose: "", description: "" });
       refreshDisbursements();
     } catch (err) {
       console.error('Error submitting disbursement request:', err);
-      alert(err instanceof Error ? err.message : 'Failed to submit disbursement request');
+      setDisbursementError(
+        err instanceof Error ? err.message : 'Failed to submit disbursement request'
+      );
     } finally {
       setIsSubmittingDisbursement(false);
     }
+  };
+
+  // "Share Campaign" used to be a plain link to the public page. Coaches want
+  // the URL in their thumbs, not another tab.
+  const handleShareCampaign = async () => {
+    if (typeof window === 'undefined' || !data) return;
+    const url = `${window.location.origin}/raise/${data.campaign.slug}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${data.campaign.organizationName} ${data.campaign.teamName}`,
+          url,
+        });
+        return;
+      } catch (err) {
+        // A cancelled share sheet is not a failure worth reporting.
+        if ((err as Error)?.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareNotice('Link copied — paste it in your team text thread');
+    } catch {
+      setShareNotice("We couldn't copy the link — copy it from the address bar");
+    }
+    setTimeout(() => setShareNotice(null), 4000);
   };
 
   const openStatusChangeDialog = (newStatus: string) => {
@@ -259,7 +307,7 @@ export default function DashboardPage({
       setIsStatusDialogOpen(false);
       setSelectedNewStatus(null);
       setStatusChangeReason("");
-      alert(`Campaign status updated to ${selectedNewStatus}!`);
+      alert(`Campaign status updated to ${statusLabel(selectedNewStatus)}.`);
 
       // Refresh status history
       fetchStatusHistory();
@@ -430,9 +478,9 @@ export default function DashboardPage({
             <div className="flex justify-between items-center h-16">
               <Link href="/" className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">R</span>
+                  <span className="text-white font-display font-bold text-sm leading-none">BB</span>
                 </div>
-                <span className="text-2xl font-bold text-foreground">Rally</span>
+                <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
               </Link>
             </div>
           </div>
@@ -517,9 +565,9 @@ export default function DashboardPage({
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
+                <span className="text-white font-display font-bold text-sm leading-none">BB</span>
               </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
+              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" asChild>
@@ -555,7 +603,7 @@ export default function DashboardPage({
                     disabled={isChangingStatus || data.campaign.status === 'ARCHIVED'}
                   >
                     {getStatusIcon(data.campaign.status)}
-                    <span className="ml-2">{data.campaign.status}</span>
+                    <span className="ml-2">{statusLabel(data.campaign.status)}</span>
                     {data.campaign.status !== 'ARCHIVED' && (
                       <ChevronDown className="ml-1 w-4 h-4" />
                     )}
@@ -687,8 +735,9 @@ export default function DashboardPage({
                     <DialogDescription>
                       {selectedNewStatus && (
                         <>
-                          Change status from <span className="font-semibold">{data.campaign.status}</span> to{' '}
-                          <span className="font-semibold">{selectedNewStatus}</span>
+                          Change status from{' '}
+                          <span className="font-semibold">{statusLabel(data.campaign.status)}</span> to{' '}
+                          <span className="font-semibold">{statusLabel(selectedNewStatus)}</span>
                         </>
                       )}
                     </DialogDescription>
@@ -949,68 +998,96 @@ export default function DashboardPage({
             )}
           </div>
 
+          {/* Three things a volunteer coach actually does next; everything
+              else is real but secondary, so it sits under "More". */}
           <div className="flex flex-wrap items-center gap-4">
-            <Button size="sm" asChild>
-              <Link href={`/raise/${data.campaign.slug}`}>
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Campaign
-              </Link>
+            <Button size="sm" onClick={handleShareCampaign}>
+              <Share2 className="w-4 h-4 mr-2" />
+              Share the team page
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href={`/dashboard/${params.campaignId}/roster`}>
                 <Users className="w-4 h-4 mr-2" />
-                Manage Roster
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/posters`}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Posters
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/analytics`}>
-                <BarChart3 className="w-4 h-4 mr-2" />
-                View Analytics
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/messages`}>
-                <Sparkles className="w-4 h-4 mr-2" />
-                AI Messages
+                Add players
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href={`/dashboard/${params.campaignId}/outreach`}>
                 <Send className="w-4 h-4 mr-2" />
-                Mass Outreach
+                Text / email families
               </Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/cheer-wall`}>
-                <Heart className="w-4 h-4 mr-2" />
-                Cheer Wall
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/leaderboard`}>
-                <Trophy className="w-4 h-4 mr-2" />
-                Leaderboard
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/${params.campaignId}/alumni`}>
-                <GraduationCap className="w-4 h-4 mr-2" />
-                Alumni
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <a href={`/api/campaigns/${params.campaignId}/export?type=donations`} download>
-                <Download className="w-4 h-4 mr-2" />
-                Export Data
-              </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMoreActions(!showMoreActions)}
+              aria-expanded={showMoreActions}
+            >
+              More
+              <ChevronDown
+                className={`w-4 h-4 ml-1 transition-transform ${showMoreActions ? 'rotate-180' : ''}`}
+              />
             </Button>
           </div>
+
+          {shareNotice && (
+            <p role="status" className="mt-2 text-sm text-muted-foreground">
+              {shareNotice}
+            </p>
+          )}
+
+          {showMoreActions && (
+            <div className="flex flex-wrap items-center gap-4 mt-4">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/raise/${data.campaign.slug}`}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Open public page
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/posters`}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Posters
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/analytics`}>
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  View Analytics
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/messages`}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Message ideas
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/cheer-wall`}>
+                  <Heart className="w-4 h-4 mr-2" />
+                  Cheer Wall
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/leaderboard`}>
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Leaderboard
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/${params.campaignId}/alumni`}>
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Alumni
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href={`/api/campaigns/${params.campaignId}/export?type=donations`} download>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Data
+                </a>
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Overview Cards */}
@@ -1026,9 +1103,8 @@ export default function DashboardPage({
               <div className="text-3xl font-bold text-foreground">
                 {formatCurrency(toCents(banking ? banking.totalRaised : data.campaign.totalRaised))}
               </div>
-              <p className="text-sm text-success mt-1 flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                +12% from last week
+              <p className="text-sm text-muted-foreground mt-1">
+                Given to this campaign
               </p>
             </CardContent>
           </Card>
@@ -1036,15 +1112,17 @@ export default function DashboardPage({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Platform Fee
+                Donors
               </CardTitle>
-              <BarChart3 className="w-5 h-5 text-muted-foreground" />
+              <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">
-                {banking ? formatCurrency(toCents(banking.platformFeesCollected)) : "—"}
+                {data.stats.donorCount}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">(10%)</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.stats.donorCount === 1 ? 'Person has given' : 'People have given'}
+              </p>
             </CardContent>
           </Card>
 
@@ -1150,9 +1228,6 @@ export default function DashboardPage({
                     <Users className="w-5 h-5" />
                     Recent Donations
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
-                    View All
-                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1165,12 +1240,15 @@ export default function DashboardPage({
                     <p className="text-muted-foreground mb-4">
                       Share your campaign link to start receiving donations
                     </p>
-                    <Button asChild variant="outline">
-                      <Link href={`/raise/${data.campaign.slug}`}>
-                        <Share2 className="w-4 h-4 mr-2" />
-                        View Public Page
-                      </Link>
+                    <Button variant="outline" onClick={handleShareCampaign}>
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share your campaign link
                     </Button>
+                    {shareNotice && (
+                      <p role="status" className="mt-2 text-sm text-muted-foreground">
+                        {shareNotice}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1226,6 +1304,13 @@ export default function DashboardPage({
                   </p>
                 </div>
 
+                {disbursementNotice && (
+                  <Alert variant="success">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>{disbursementNotice}</AlertDescription>
+                  </Alert>
+                )}
+
                 <Dialog
                   open={isRequestDialogOpen}
                   onOpenChange={setIsRequestDialogOpen}
@@ -1233,12 +1318,12 @@ export default function DashboardPage({
                   <DialogTrigger asChild>
                     <Button className="w-full" size="lg">
                       <Wallet className="w-4 h-4 mr-2" />
-                      Request Disbursement
+                      Send money to the team account
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                      <DialogTitle>Request Fund Disbursement</DialogTitle>
+                      <DialogTitle>Use campaign funds</DialogTitle>
                       <DialogDescription>
                         Available Balance:{" "}
                         {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
@@ -1311,13 +1396,21 @@ export default function DashboardPage({
                             <div className="flex items-start gap-2">
                               <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
                               <p className="text-sm text-yellow-900">
-                                This request requires guardian approval (Threshold:
-                                $500+)
+                                Gifts over $500 need a parent/guardian to approve.
+                                We&apos;ll email them.
                               </p>
                             </div>
                           </div>
                         )}
                     </div>
+                    {disbursementError && (
+                      <p
+                        role="alert"
+                        className="rounded-lg border border-warning bg-warning-light px-3 py-2 text-sm text-warning-dark"
+                      >
+                        {disbursementError}
+                      </p>
+                    )}
                     <DialogFooter>
                       <Button
                         variant="outline"
@@ -1347,10 +1440,7 @@ export default function DashboardPage({
                   </DialogContent>
                 </Dialog>
 
-                <Button variant="outline" className="w-full">
-                  <Download className="w-4 h-4 mr-2" />
-                  View All Transactions
-                </Button>
+
               </CardContent>
             </Card>
 

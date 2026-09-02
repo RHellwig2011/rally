@@ -491,13 +491,23 @@ export async function sendDonationReceipt(params: {
   toEmail: string;
   donorName: string;
   campaignName: string;
-  amount: number;
+  /**
+   * CENTS, matching the `Donation.grossAmount` column and Stripe's
+   * `paymentIntent.amount`. Named for the unit because it silently was not:
+   * every call site passed dollars into a body that divided by 100, so a $50
+   * donation was receipted as "$0.50".
+   */
+  amountInCents: number;
   donationDate: Date;
   taxDeductible: boolean;
 }) {
-  const { toEmail, donorName, campaignName, amount, donationDate, taxDeductible } = params;
+  const { toEmail, donorName, campaignName, amountInCents, donationDate, taxDeductible } = params;
 
   const subject = `Thank you for your donation to ${campaignName}`;
+
+  // Formatted once: the same figure appears three times across the HTML and
+  // text bodies, and they must not be able to drift apart.
+  const formattedAmount = `$${(amountInCents / 100).toFixed(2)}`;
 
   const html = `
 <!DOCTYPE html>
@@ -524,12 +534,12 @@ export async function sendDonationReceipt(params: {
 
       <p>Thank you for your generous donation to <strong>${campaignName}</strong>!</p>
 
-      <div class="amount">$${(amount / 100).toFixed(2)}</div>
+      <div class="amount">${formattedAmount}</div>
 
       <div class="receipt">
         <h3>Receipt Details</h3>
         <p><strong>Campaign:</strong> ${campaignName}</p>
-        <p><strong>Amount:</strong> $${(amount / 100).toFixed(2)}</p>
+        <p><strong>Amount:</strong> ${formattedAmount}</p>
         <p><strong>Date:</strong> ${donationDate.toLocaleDateString()}</p>
         <p><strong>Tax Deductible:</strong> ${taxDeductible ? 'Yes' : 'No'}</p>
       </div>
@@ -557,7 +567,7 @@ Thank you for your generous donation to ${campaignName}!
 
 Receipt Details:
 - Campaign: ${campaignName}
-- Amount: $${(amount / 100).toFixed(2)}
+- Amount: ${formattedAmount}
 - Date: ${donationDate.toLocaleDateString()}
 - Tax Deductible: ${taxDeductible ? 'Yes' : 'No'}
 

@@ -51,25 +51,32 @@ export async function createPaymentIntent({
   campaignId,
   donorEmail,
   metadata = {},
+  idempotencyKey,
 }: {
   amount: number; // Amount in cents
   campaignId: string;
   donorEmail: string;
   metadata?: Record<string, string>;
+  // Deterministic key derived from the PENDING donation row, so a retry after a
+  // timeout reuses the original intent instead of leaving an orphaned one.
+  idempotencyKey?: string;
 }): Promise<Stripe.PaymentIntent> {
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount,
-    currency: 'usd',
-    automatic_payment_methods: {
-      enabled: true,
+  const paymentIntent = await stripe.paymentIntents.create(
+    {
+      amount,
+      currency: 'usd',
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      receipt_email: donorEmail,
+      metadata: {
+        campaignId,
+        donorEmail,
+        ...metadata,
+      },
     },
-    receipt_email: donorEmail,
-    metadata: {
-      campaignId,
-      donorEmail,
-      ...metadata,
-    },
-  });
+    idempotencyKey ? { idempotencyKey } : undefined
+  );
 
   return paymentIntent;
 }
@@ -150,17 +157,24 @@ export async function createPayout({
   accountId,
   amount,
   metadata = {},
+  idempotencyKey,
 }: {
   accountId: string;
   amount: number; // Amount in cents
   metadata?: Record<string, string>;
+  // Deterministic key derived from the disbursement request, so a retry after a
+  // timeout returns the original transfer instead of paying the team twice.
+  idempotencyKey?: string;
 }): Promise<Stripe.Transfer> {
-  return await stripe.transfers.create({
-    amount,
-    currency: 'usd',
-    destination: accountId,
-    metadata,
-  });
+  return await stripe.transfers.create(
+    {
+      amount,
+      currency: 'usd',
+      destination: accountId,
+      metadata,
+    },
+    idempotencyKey ? { idempotencyKey } : undefined
+  );
 }
 
 /**

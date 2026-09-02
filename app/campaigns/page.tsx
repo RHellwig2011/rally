@@ -52,15 +52,99 @@ type MissingCategories = Exclude<
   (typeof CAMPAIGN_CATEGORIES)[number]
 >;
 type AssertAllCategoriesListed = MissingCategories extends never ? true : never;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// eslint-disable-next-line no-unused-vars -- compile-time exhaustiveness check
 const _allCategoriesListed: AssertAllCategoriesListed = true;
 
 const categories = ["All", ...CAMPAIGN_CATEGORIES];
+
+function CampaignCard({ campaign }: { campaign: Campaign }) {
+  const goalAmount = parseInt(campaign.goalAmount);
+  const currentAmount = parseInt(campaign.currentAmount);
+  const percentage = calculatePercentage(currentAmount, goalAmount);
+
+  return (
+    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary-200">
+      <div className="relative h-48 overflow-hidden">
+        {campaign.bannerImageUrl ? (
+          // A real uploaded team photo always wins.
+          <img
+            src={campaign.bannerImageUrl}
+            alt={campaign.teamName}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          // No photo yet: designed illustrated artwork, with the team's own
+          // logo floated on top when they have one.
+          <>
+            <SportArtwork
+              seed={`${campaign.organizationName} ${campaign.teamName}`}
+              category={campaign.category}
+              className="transition-transform duration-300 group-hover:scale-105"
+            />
+            {campaign.logoUrl && (
+              <img
+                src={campaign.logoUrl}
+                alt={campaign.teamName}
+                className="absolute inset-0 m-auto h-20 w-20 rounded-lg border border-white/30 object-cover shadow-lg"
+              />
+            )}
+          </>
+        )}
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-foreground">
+          {campaign.category}
+        </div>
+      </div>
+
+      <CardHeader>
+        <CardTitle className="text-xl group-hover:text-primary transition-colors">
+          {campaign.organizationName} {campaign.teamName}
+        </CardTitle>
+        <p className="text-muted-foreground line-clamp-2 text-sm">
+          {campaign.description}
+        </p>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Progress */}
+        <div>
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-2xl font-bold text-foreground">
+              {formatCurrency(currentAmount)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              of {formatCurrency(goalAmount)}
+            </span>
+          </div>
+          <Progress value={currentAmount} max={goalAmount} className="h-2" />
+          <div className="flex items-center justify-between mt-2 text-sm">
+            <span className="font-semibold text-primary">{percentage}% funded</span>
+            {campaign._count && (
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {campaign._count.donations} donations
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* View Campaign Button */}
+        <Button className="w-full group" asChild>
+          <Link href={`/raise/${campaign.slug}`}>
+            <Heart className="w-4 h-4 mr-2 group-hover:fill-current" />
+            Support This Campaign
+            <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filteredCampaigns, setFilteredCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState<"newest" | "trending" | "ending">("trending");
@@ -76,14 +160,18 @@ export default function CampaignsPage() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const response = await fetch('/api/campaigns/public');
       const data = await response.json();
 
       if (data.success) {
         setCampaigns(data.campaigns);
+      } else {
+        setLoadError(true);
       }
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -149,90 +237,8 @@ export default function CampaignsPage() {
       .slice(0, 3);
   };
 
-  const CampaignCard = ({ campaign }: { campaign: Campaign }) => {
-    const goalAmount = parseInt(campaign.goalAmount);
-    const currentAmount = parseInt(campaign.currentAmount);
-    const percentage = calculatePercentage(currentAmount, goalAmount);
-
-    return (
-      <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary-200">
-        <div className="relative h-48 overflow-hidden">
-          {campaign.bannerImageUrl ? (
-            // A real uploaded team photo always wins.
-            <img
-              src={campaign.bannerImageUrl}
-              alt={campaign.teamName}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            // No photo yet: designed illustrated artwork, with the team's own
-            // logo floated on top when they have one.
-            <>
-              <SportArtwork
-                seed={`${campaign.organizationName} ${campaign.teamName}`}
-                category={campaign.category}
-                className="transition-transform duration-300 group-hover:scale-105"
-              />
-              {campaign.logoUrl && (
-                <img
-                  src={campaign.logoUrl}
-                  alt={campaign.teamName}
-                  className="absolute inset-0 m-auto h-20 w-20 rounded-lg border border-white/30 object-cover shadow-lg"
-                />
-              )}
-            </>
-          )}
-          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-foreground">
-            {campaign.category}
-          </div>
-        </div>
-
-        <CardHeader>
-          <CardTitle className="text-xl group-hover:text-primary transition-colors">
-            {campaign.organizationName} {campaign.teamName}
-          </CardTitle>
-          <p className="text-muted-foreground line-clamp-2 text-sm">
-            {campaign.description}
-          </p>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {/* Progress */}
-          <div>
-            <div className="flex items-baseline justify-between mb-2">
-              <span className="text-2xl font-bold text-foreground">
-                {formatCurrency(currentAmount)}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                of {formatCurrency(goalAmount)}
-              </span>
-            </div>
-            <Progress value={currentAmount} max={goalAmount} className="h-2" />
-            <div className="flex items-center justify-between mt-2 text-sm">
-              <span className="font-semibold text-primary">{percentage}% funded</span>
-              {campaign._count && (
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  {campaign._count.donations} donors
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* View Campaign Button */}
-          <Button className="w-full group" asChild>
-            <Link href={`/raise/${campaign.slug}`}>
-              <Heart className="w-4 h-4 mr-2 group-hover:fill-current" />
-              Support This Campaign
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
   const featuredCampaigns = getFeaturedCampaigns();
+  const isFiltering = Boolean(searchQuery) || selectedCategory !== "All";
 
   return (
     <div className="min-h-screen bg-muted">
@@ -277,7 +283,8 @@ export default function CampaignsPage() {
             <div className="relative max-w-2xl">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
               <Input
-                type="text"
+                type="search"
+                aria-label="Search campaigns"
                 placeholder="Search campaigns by team name, organization, or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -288,8 +295,10 @@ export default function CampaignsPage() {
         </div>
       </section>
 
-      {/* Featured Campaigns */}
-      {featuredCampaigns.length > 0 && (
+      {/* Featured Campaigns — a "trending" rail alongside filtered results
+          reads as part of the result set, so it steps aside once the visitor
+          starts narrowing. */}
+      {!isFiltering && featuredCampaigns.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-8">
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="flex items-center gap-2 mb-6">
@@ -328,8 +337,11 @@ export default function CampaignsPage() {
 
             {/* Sort Options */}
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-foreground">Sort:</span>
+              <label htmlFor="campaign-sort" className="font-semibold text-foreground">
+                Sort:
+              </label>
               <select
+                id="campaign-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -342,18 +354,21 @@ export default function CampaignsPage() {
           </div>
         </div>
 
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filteredCampaigns.length}</span> campaigns
-          </p>
-        </div>
-
         {/* Campaigns Grid */}
         {loading ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading campaigns...</p>
+          </div>
+        ) : loadError ? (
+          <div className="text-center py-20 bg-white rounded-2xl shadow-md">
+            <h3 className="text-2xl font-bold text-foreground mb-2">
+              We couldn&apos;t load campaigns
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Something went wrong on our end. Give it another try.
+            </p>
+            <Button onClick={fetchCampaigns}>Retry</Button>
           </div>
         ) : filteredCampaigns.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl shadow-md">
@@ -368,11 +383,20 @@ export default function CampaignsPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredCampaigns.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
-            ))}
-          </div>
+          <>
+            {/* Results Count */}
+            <div className="mb-6">
+              <p className="text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{filteredCampaigns.length}</span> campaigns
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredCampaigns.map((campaign) => (
+                <CampaignCard key={campaign.id} campaign={campaign} />
+              ))}
+            </div>
+          </>
         )}
       </section>
 

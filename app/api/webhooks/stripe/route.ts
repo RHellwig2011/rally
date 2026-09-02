@@ -134,7 +134,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
           toEmail: existingDonation.donorEmail,
           donorName: existingDonation.donorName || 'Donor',
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-          amount: Number(existingDonation.grossAmount) / 100,
+          amountInCents: Number(existingDonation.grossAmount),
           donationDate: existingDonation.createdAt,
           taxDeductible: false,
         });
@@ -180,7 +180,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
           toEmail: donorEmail,
           donorName: donorName || 'Donor',
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-          amount: paymentIntent.amount / 100,
+          amountInCents: paymentIntent.amount,
           donationDate: new Date(),
           taxDeductible: false,
         });
@@ -206,10 +206,20 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   });
 
   if (donation) {
-    await prisma.donation.update({
-      where: { id: donation.id },
+    // Conditional claim, mirroring completeDonation: Stripe can deliver this
+    // event out of order relative to payment_intent.succeeded, and an
+    // unconditional write would flip an already-COMPLETED donation to FAILED
+    // while leaving its credits applied.
+    const failed = await prisma.donation.updateMany({
+      where: { id: donation.id, status: "PENDING" },
       data: { status: "FAILED" },
     });
+
+    if (failed.count === 0) {
+      console.log("Donation was not PENDING; failure not recorded:", donation.id);
+      return;
+    }
+
     console.log("Donation marked as failed:", donation.id);
   }
 }
@@ -222,6 +232,17 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 
   if (!charge.payment_intent) {
     console.error("No payment intent associated with charge:", charge.id);
+    return;
+  }
+
+  // refundDonation reverses the donation in full — the gross, the net, and the
+  // platform fee. A partial refund would therefore claw back more than Stripe
+  // actually returned, so it is left for manual handling rather than applied
+  // incorrectly.
+  if (charge.amount_refunded < charge.amount) {
+    console.warn(
+      `Partial refund on charge ${charge.id} (${charge.amount_refunded} of ${charge.amount}) is not supported; no credits reversed`
+    );
     return;
   }
 

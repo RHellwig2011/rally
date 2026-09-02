@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
 import Link from "next/link";
 import {
   ArrowLeft,
   Mail,
   MessageSquare,
-  Upload,
   Send,
   Users,
   Check,
   X,
-  Download,
   Sparkles,
   Plus,
 } from "lucide-react";
@@ -62,9 +60,13 @@ interface SendOutreachResult {
   message?: string;
 }
 
+// Matches the contacts endpoint's own page size and its per-request cap.
+const CONTACTS_PAGE_SIZE = 500;
+// Backstop so a runaway pagination response cannot spin this loop forever.
+const CONTACTS_MAX_FETCH = 10_000;
+
 export default function OutreachPage() {
   const params = useParams();
-  const router = useRouter();
   const { csrfToken } = useCsrfToken();
   const campaignId = params?.campaignId as string;
 
@@ -76,6 +78,7 @@ export default function OutreachPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [sendResult, setSendResult] = useState<SendOutreachResult | null>(null);
 
   useEffect(() => {
@@ -107,21 +110,49 @@ export default function OutreachPage() {
   const fetchContacts = async () => {
     try {
       setContactsError(null);
-      const response = await fetch(`/api/campaigns/${campaignId}/contacts`);
-      const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        setContacts([]);
-        setContactsError(
-          response.status === 401
-            ? "Your session has expired. Please sign in again to load contacts."
-            : data.error || "Could not load contacts. Please try again."
+      // The contacts endpoint is paginated (500 per page), so page through it
+      // until hasMore is false. Fetching once would silently drop contacts 501+
+      // from the recipient picker — a coach with a large roster would send to a
+      // truncated list with nothing on screen saying so.
+      const collected: any[] = [];
+      let offset = 0;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const response = await fetch(
+          `/api/campaigns/${campaignId}/contacts?limit=${CONTACTS_PAGE_SIZE}&offset=${offset}`
         );
-        return;
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          setContacts([]);
+          setContactsError(
+            response.status === 401
+              ? "Your session has expired. Please sign in again to load contacts."
+              : data.error || "Could not load contacts. Please try again."
+          );
+          return;
+        }
+
+        const page: any[] = data.contacts || [];
+        collected.push(...page);
+
+        if (!data.pagination?.hasMore || page.length === 0) {
+          break;
+        }
+        offset += page.length;
+
+        if (collected.length >= CONTACTS_MAX_FETCH) {
+          console.warn(
+            `Stopped loading contacts at ${collected.length}; the campaign has more than the picker will show.`
+          );
+          break;
+        }
       }
 
       setContacts(
-        data.contacts.map((c: any) => ({
+        collected.map((c: any) => ({
           ...c,
           selected: true,
         }))
@@ -153,15 +184,16 @@ export default function OutreachPage() {
     const selectedContacts = contacts.filter((c) => c.selected);
 
     if (selectedContacts.length === 0) {
-      alert("Please select at least one contact");
+      setSendError("Pick at least one person to send to.");
       return;
     }
 
     if (!message.trim()) {
-      alert("Please enter a message");
+      setSendError("Write a short message first.");
       return;
     }
 
+    setSendError(null);
     setSending(true);
 
     try {
@@ -187,7 +219,7 @@ export default function OutreachPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        alert(data.error || "Failed to send messages");
+        setSendError(data.error || "Failed to send messages");
         return;
       }
 
@@ -201,27 +233,15 @@ export default function OutreachPage() {
         message: data.message,
       };
 
+      // The coach stays put after a send. Yanking them to the dashboard two
+      // seconds later hides the result they just asked for.
       setSendResult(result);
-
-      // Only leave the page when everything actually went out. Navigating away
-      // from a run with failures is how a coach never learns the appeal was
-      // not delivered.
-      if (result.sent > 0 && result.failed === 0 && result.skipped === 0) {
-        setTimeout(() => {
-          router.push(`/dashboard/${campaignId}`);
-        }, 2000);
-      }
     } catch (error) {
       console.error("Failed to send:", error);
-      alert("Failed to send messages. Please try again.");
+      setSendError("Failed to send messages. Please try again.");
     } finally {
       setSending(false);
     }
-  };
-
-  const importCSV = () => {
-    // This would trigger a file upload dialog
-    alert("CSV import feature coming soon! For now, add contacts manually.");
   };
 
   if (loading) {
@@ -277,10 +297,10 @@ export default function OutreachPage() {
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
                 <Send className="w-8 h-8 text-primary" />
-                Mass Outreach
+                Ask families for support
               </h1>
               <p className="text-muted-foreground">
-                Send emails or SMS messages to your contacts
+                Send one email or text. People can unsubscribe any time.
               </p>
             </div>
           </div>
@@ -294,10 +314,12 @@ export default function OutreachPage() {
                   <Check className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground">Messages Sent Successfully!</h3>
+                  <h3 className="font-bold text-foreground">
+                    Sent to {sendResult.sent}{" "}
+                    {sendResult.sent === 1 ? "person" : "people"}.
+                  </h3>
                   <p className="text-sm text-foreground">
-                    Your message was sent to {sendResult.sent} contact
-                    {sendResult.sent !== 1 ? "s" : ""}. Redirecting...
+                    Want to send a thank-you later? You&apos;re done for now.
                   </p>
                 </div>
               </div>
@@ -462,23 +484,14 @@ export default function OutreachPage() {
                     ))}
                   </div>
 
-                  <div className="pt-4 border-t space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={importCSV}
-                      className="w-full"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Import CSV
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Contact
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Template
+                  {/* Import CSV / Add Contact / Download Template were stubs.
+                      Contacts come from the roster, so point there instead. */}
+                  <div className="pt-4 border-t">
+                    <Button variant="outline" size="sm" className="w-full" asChild>
+                      <Link href={`/dashboard/${campaignId}/roster`}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add people on the roster
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -583,7 +596,7 @@ export default function OutreachPage() {
                       id="subject"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      placeholder="Enter email subject..."
+                      placeholder={`Help the ${campaign.teamName} get to regionals`}
                     />
                   </div>
                 )}
@@ -599,10 +612,14 @@ export default function OutreachPage() {
                     rows={messageType === "email" ? 12 : 6}
                     placeholder={
                       messageType === "email"
-                        ? "Enter your email message..."
-                        : "Enter your SMS message..."
+                        ? `Hi {name},\n\nOur ${campaign.teamName} are raising money for the season. Any amount helps, and every gift goes straight to the team. Thank you!`
+                        : `Hi {name} — our ${campaign.teamName} are fundraising this season. Any amount helps!`
                     }
                   />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Type <code>{"{name}"}</code> anywhere and we&apos;ll swap in each
+                    person&apos;s name when the message goes out.
+                  </p>
                   <div className="flex justify-between items-center mt-2 text-sm">
                     <span className="text-muted-foreground">{message.length} characters</span>
                     {messageType === "sms" && (
@@ -664,6 +681,15 @@ export default function OutreachPage() {
                     )}
                   </Button>
                 </div>
+
+                {sendError && (
+                  <div
+                    role="alert"
+                    className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  >
+                    {sendError}
+                  </div>
+                )}
 
                 {messageType === "sms" && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">

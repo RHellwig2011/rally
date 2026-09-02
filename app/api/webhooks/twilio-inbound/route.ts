@@ -52,6 +52,16 @@ function twiml(message?: string): NextResponse {
  * ALLOW_UNSIGNED_WEBHOOKS=true opt-in that is inert in production — the same
  * precedent as app/api/webhooks/stripe/route.ts. The absence of a secret is
  * never itself permission to skip verification.
+ *
+ * TWILIO_AUTH_TOKEN specifically, and not whatever credential outbound SMS
+ * happens to use. Twilio computes X-Twilio-Signature as an HMAC-SHA1 over the
+ * URL and sorted params keyed by the account Auth Token, so an API Key
+ * (TWILIO_API_KEY_SID/SECRET) cannot validate it — twilio.validateRequest()
+ * takes the Auth Token and nothing else. lib/services/sms.ts prefers API Keys
+ * for OUTBOUND, which means an API-key-only deployment sends fine while every
+ * inbound STOP is refused here and no opt-out is ever recorded. That failure is
+ * invisible from the sending side, so GET /api/health reports it as
+ * sms.inboundWebhook = "unverifiable"; see .env.example.
  */
 function verifySignature(
   request: NextRequest,
@@ -74,8 +84,11 @@ function verifySignature(
 
   if (!authToken) {
     console.error(
-      "TWILIO_AUTH_TOKEN is not configured — refusing inbound SMS webhook. " +
-        "Set TWILIO_AUTH_TOKEN, or ALLOW_UNSIGNED_WEBHOOKS=true outside production to test locally."
+      "TWILIO_AUTH_TOKEN is not configured — refusing inbound SMS webhook, so " +
+        "this STOP was NOT recorded. An API Key cannot stand in here: Twilio " +
+        "signs inbound webhooks with the account Auth Token. Set " +
+        "TWILIO_AUTH_TOKEN (in addition to any API Key used for sending), or " +
+        "ALLOW_UNSIGNED_WEBHOOKS=true outside production to test locally."
     );
     return { ok: false, reason: "TWILIO_AUTH_TOKEN is not configured" };
   }

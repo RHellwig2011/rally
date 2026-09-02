@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash, timingSafeEqual } from "crypto";
 
 const CSRF_TOKEN_LENGTH = 32;
 const CSRF_COOKIE_NAME = "csrf_token";
@@ -18,10 +18,15 @@ export function generateCsrfToken(): string {
 }
 
 /**
- * Hash a CSRF token for comparison
+ * Hash a CSRF token for comparison.
+ *
+ * Returns the raw digest rather than hex so it can be fed straight to
+ * timingSafeEqual, and so both operands are always the same 32 bytes no matter
+ * what length the caller submitted — timingSafeEqual throws on a length
+ * mismatch, and that throw would itself leak the length.
  */
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+function hashToken(token: string): Buffer {
+  return createHash("sha256").update(token).digest();
 }
 
 /**
@@ -40,11 +45,10 @@ export function verifyCsrfToken(request: NextRequest): boolean {
     return false;
   }
 
-  // Use timing-safe comparison
-  const cookieHash = hashToken(cookieToken);
-  const headerHash = hashToken(headerToken);
-
-  return cookieHash === headerHash;
+  // Genuine constant-time comparison. `===` on the hex digests returned early
+  // on the first differing character, which is the timing leak hashing was
+  // meant to close in the first place.
+  return timingSafeEqual(hashToken(cookieToken), hashToken(headerToken));
 }
 
 /**

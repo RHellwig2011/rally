@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,6 +85,9 @@ export default function ContributePage() {
   const [info, setInfo] = useState<InviteInfo | null>(null);
 
   const [rows, setRows] = useState<ContactRow[]>([emptyRow()]);
+  // Last name is rarely needed to text grandma, so it stays folded away until
+  // a parent asks for it. Tracked per row.
+  const [showLastName, setShowLastName] = useState<Record<number, boolean>>({});
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -133,9 +137,8 @@ export default function ContributePage() {
   };
 
   // A row counts as filled once it has an email or a phone - the same rule the
-  // API enforces, so the button state matches what the server will accept.
+  // API enforces, so the submit-time validation matches what the server accepts.
   const filledRows = rows.filter((r) => r.email.trim() || r.phone.trim());
-  const canSubmit = filledRows.length > 0 && consent && !submitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,7 +196,10 @@ export default function ContributePage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-muted p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div role="status" className="flex items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="sr-only">Loading this invitation…</span>
+        </div>
       </main>
     );
   }
@@ -209,8 +215,16 @@ export default function ContributePage() {
             </div>
             <CardTitle className="text-center text-xl">Link unavailable</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <p className="text-center text-sm text-muted-foreground">{loadError}</p>
+            <p className="text-center text-sm text-muted-foreground">
+              These links expire, and each one only works for one player. Ask
+              your coach or team leader for a new link and it will pick up right
+              where this one left off.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/">Go to Bleacher Backers</Link>
+            </Button>
           </CardContent>
         </Card>
       </main>
@@ -231,12 +245,12 @@ export default function ContributePage() {
               <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-success-light">
                 <CheckCircle2 className="h-6 w-6 text-success-dark" />
               </div>
-              <CardTitle className="text-center text-xl">Thank you!</CardTitle>
+              <CardTitle className="text-center text-xl">
+                Nice &mdash; {info.player.firstName} is closer.
+              </CardTitle>
               <CardDescription className="text-center">
-                {result.added === 1
-                  ? "1 supporter was added"
-                  : `${result.added} supporters were added`}{" "}
-                for {info.player.firstName}.
+                We&apos;ll only message these people about this fundraiser, and
+                every note has an unsubscribe.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -247,7 +261,7 @@ export default function ContributePage() {
                   </p>
                   {after.quotaMet ? (
                     <p className="mt-1 text-sm text-success-dark">
-                      {info.player.firstName} has met the team goal.
+                      That&apos;s the list the coach asked for. Thank you.
                     </p>
                   ) : (
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -326,7 +340,14 @@ export default function ContributePage() {
                   </span>
                 )}
               </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-accent">
+              <div
+                role="progressbar"
+                aria-valuenow={Math.min(info.contacts.submitted, quota)}
+                aria-valuemin={0}
+                aria-valuemax={quota}
+                aria-label="Supporters added toward the team goal"
+                className="mt-2 h-2 w-full overflow-hidden rounded-full bg-accent"
+              >
                 <div
                   className="h-full rounded-full bg-primary transition-all duration-500"
                   style={{
@@ -347,7 +368,7 @@ export default function ContributePage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">
-                    Supporter {index + 1}
+                    Someone who loves {info.player.firstName}
                   </CardTitle>
                   {rows.length > 1 && (
                     <button
@@ -362,29 +383,45 @@ export default function ContributePage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor={`firstName-${index}`} className="text-xs">
-                      First name
-                    </Label>
-                    <Input
-                      id={`firstName-${index}`}
-                      value={row.firstName}
-                      onChange={(e) => updateRow(index, "firstName", e.target.value)}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`lastName-${index}`} className="text-xs">
-                      Last name
-                    </Label>
-                    <Input
-                      id={`lastName-${index}`}
-                      value={row.lastName}
-                      onChange={(e) => updateRow(index, "lastName", e.target.value)}
-                      autoComplete="off"
-                    />
-                  </div>
+                <p className="text-xs text-muted-foreground">
+                  Add an email or a phone number &mdash; either one works.
+                </p>
+
+                <div className="space-y-1">
+                  <Label htmlFor={`firstName-${index}`} className="text-xs">
+                    Name
+                  </Label>
+                  <Input
+                    id={`firstName-${index}`}
+                    placeholder="Grandma Rosa"
+                    value={row.firstName}
+                    onChange={(e) => updateRow(index, "firstName", e.target.value)}
+                    autoComplete="off"
+                  />
+                  {showLastName[index] ? (
+                    <div className="space-y-1 pt-2">
+                      <Label htmlFor={`lastName-${index}`} className="text-xs">
+                        Last name{" "}
+                        <span className="font-normal text-muted-foreground">(optional)</span>
+                      </Label>
+                      <Input
+                        id={`lastName-${index}`}
+                        value={row.lastName}
+                        onChange={(e) => updateRow(index, "lastName", e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowLastName((prev) => ({ ...prev, [index]: true }))
+                      }
+                      className="text-xs font-medium text-primary underline"
+                    >
+                      Add last name
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -431,9 +468,6 @@ export default function ContributePage() {
                   />
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Add an email or a phone number &mdash; either one works.
-                </p>
               </CardContent>
             </Card>
           ))}
@@ -478,7 +512,9 @@ export default function ContributePage() {
             </Alert>
           )}
 
-          <Button type="submit" className="w-full" disabled={!canSubmit}>
+          {/* Deliberately not disabled on an incomplete form: a dead button
+              explains nothing. handleSubmit names the missing piece instead. */}
+          <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

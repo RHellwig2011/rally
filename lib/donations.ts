@@ -85,16 +85,57 @@ export async function runMoneyTransaction<T>(
  *
  * Returns the completed donation, or null if it was already completed (or
  * does not exist).
+ *
+ * FAILED is an accepted starting state alongside PENDING. Stripe does not
+ * order webhook deliveries, so a `payment_intent.payment_failed` for an
+ * earlier attempt can land after the `payment_intent.succeeded` that actually
+ * collected the money; claiming only PENDING would strand that real payment as
+ * FAILED with no credits. Recovering from FAILED is still exactly-once — the
+ * conditional claim can only be won by one caller, and COMPLETED and REFUNDED
+ * are deliberately excluded so credits are never applied twice.
+ *
+ * A FAILED row is additionally checked for an existing DEPOSIT ledger entry
+ * before it is claimed. Before handlePaymentFailed used a conditional claim, an
+ * out-of-order `payment_intent.payment_failed` could flip an already-COMPLETED
+ * donation to FAILED *without* reversing its credits. Those legacy rows are
+ * already counted in Campaign.currentAmount and the banking balances, so
+ * completing them again would double-credit; the DEPOSIT row is the durable
+ * evidence that the credits were applied, and its presence makes this a no-op.
  */
 export async function completeDonation(
   donationId: string,
   options: { paymentMethodLast4?: string | null } = {}
 ) {
   return runMoneyTransaction(async (tx) => {
+    // Legacy-double-credit guard, checked before the claim. Only FAILED rows
+    // can carry credits already (a PENDING donation has never been credited),
+    // so this costs one indexed lookup on the recovery path and nothing on the
+    // normal one. A donation whose DEPOSIT row exists has already moved money
+    // into the banking account; treat it as already completed.
+    const current = await tx.donation.findUnique({
+      where: { id: donationId },
+      select: { status: true },
+    });
+
+    if (current?.status === "FAILED") {
+      const priorDeposit = await tx.transaction.findFirst({
+        where: { donationId, type: "DEPOSIT" },
+        select: { id: true },
+      });
+
+      if (priorDeposit) {
+        console.error(
+          `Donation ${donationId} is FAILED but already has a DEPOSIT ledger row; ` +
+            `refusing to credit it a second time. Reconcile this row by hand.`
+        );
+        return null;
+      }
+    }
+
     // Conditional update is the concurrency guard: only one caller ever
-    // transitions PENDING -> COMPLETED and applies the balance credits.
+    // transitions PENDING/FAILED -> COMPLETED and applies the balance credits.
     const transitioned = await tx.donation.updateMany({
-      where: { id: donationId, status: "PENDING" },
+      where: { id: donationId, status: { in: ["PENDING", "FAILED"] } },
       data: {
         status: "COMPLETED",
         ...(options.paymentMethodLast4 && {

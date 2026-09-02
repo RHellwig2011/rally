@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  DollarSign,
   Heart,
   Share2,
   Copy,
@@ -49,6 +48,7 @@ interface PlayerPageData {
     primaryColor: string;
     status: string;
     endDate: Date | null;
+    platformFeePercent: number;
   };
   referralCode: string;
   recentDonations: Array<{
@@ -72,19 +72,15 @@ export default function PlayerFundraisingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showDonateForm, setShowDonateForm] = useState(false);
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/raise/${params?.slug}/player/${params?.teamMemberId}?ref=${data?.referralCode || ''}`
     : '';
 
-  useEffect(() => {
-    fetchPlayerData();
-  }, [params?.teamMemberId]);
-
-  const fetchPlayerData = async () => {
+  const fetchPlayerData = useCallback(async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const res = await fetch(
         `/api/team-members/${params?.teamMemberId}/public`
       );
@@ -101,12 +97,21 @@ export default function PlayerFundraisingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [params?.teamMemberId]);
 
-  const copyShareLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    fetchPlayerData();
+  }, [fetchPlayerData]);
+
+  // Only claim success once the clipboard write actually resolved.
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy share link:", err);
+    }
   };
 
   const shareToSocial = (platform: string) => {
@@ -128,7 +133,13 @@ export default function PlayerFundraisingPage() {
         break;
     }
 
-    if (url) {
+    if (!url) return;
+
+    // mailto:/sms: hand off to the OS handler — a popup window would be blocked
+    // or left behind as a blank tab. Web shares stay in a popup.
+    if (platform === 'email' || platform === 'sms') {
+      window.location.href = url;
+    } else {
       window.open(url, '_blank', 'width=600,height=400');
     }
   };
@@ -148,10 +159,15 @@ export default function PlayerFundraisingPage() {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center">
-          <p className="text-warning mb-4">{error || "Player not found"}</p>
-          <Button onClick={() => router.push(`/raise/${params?.slug}`)}>
-            Go to Campaign Page
-          </Button>
+          <p className="text-warning-dark mb-4">{error || "Player not found"}</p>
+          <div className="flex items-center justify-center gap-3">
+            <Button variant="outline" onClick={fetchPlayerData}>
+              Try again
+            </Button>
+            <Button onClick={() => router.push(`/raise/${params?.slug}`)}>
+              Go to Campaign Page
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -177,7 +193,11 @@ export default function PlayerFundraisingPage() {
               <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
             </Link>
             <Button
-              onClick={() => setShowDonateForm(true)}
+              onClick={() =>
+                document
+                  .getElementById("donate")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
               size="lg"
               className="bg-primary hover:bg-primary/90"
             >
@@ -279,7 +299,14 @@ export default function PlayerFundraisingPage() {
                       </span>
                     </div>
                     {data.teamMember.personalGoal && (
-                      <div className="w-full bg-accent rounded-full h-4 mb-1">
+                      <div
+                        role="progressbar"
+                        aria-valuenow={Math.min(percentage, 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${data.teamMember.name}'s fundraising progress`}
+                        className="w-full bg-accent rounded-full h-4 mb-1"
+                      >
                         <div
                           className="bg-gradient-to-r from-primary to-secondary rounded-full h-4 transition-all flex items-center justify-end pr-2"
                           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -293,7 +320,7 @@ export default function PlayerFundraisingPage() {
                       </div>
                     )}
                     <p className="text-sm text-muted-foreground">
-                      {data.stats.donationCount} {data.stats.donationCount === 1 ? 'donation' : 'donations'} • {data.stats.clickCount} page views
+                      {data.stats.donationCount} {data.stats.donationCount === 1 ? 'donation' : 'donations'}
                     </p>
                   </div>
 
@@ -461,7 +488,7 @@ export default function PlayerFundraisingPage() {
           {/* Sidebar - Donate Box */}
           <div className="lg:col-span-1">
             <div className="sticky top-20">
-              <Card className="shadow-lg">
+              <Card id="donate" className="shadow-lg scroll-mt-20">
                 <CardContent className="p-6">
                   <h3 className="text-xl font-bold text-foreground mb-4">
                     Support {data.teamMember.name}
@@ -469,7 +496,10 @@ export default function PlayerFundraisingPage() {
                   <DonationForm
                     campaignId={data.campaign.id}
                     campaignName={`${data.campaign.teamName} - ${data.campaign.organizationName}`}
+                    campaignSlug={data.campaign.slug}
                     teamMemberId={data.teamMember.id}
+                    playerName={data.teamMember.name}
+                    platformFeePercent={data.campaign.platformFeePercent}
                   />
                 </CardContent>
               </Card>
@@ -502,7 +532,7 @@ export default function PlayerFundraisingPage() {
       {/* Footer */}
       <footer className="bg-foreground text-white py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-muted-foreground">
+          <p className="text-white/70">
             Powered by <span className="font-bold text-white">Bleacher Backers</span> - Fundraising Reimagined
           </p>
         </div>

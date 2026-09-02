@@ -3,7 +3,12 @@ import { checkCsrf } from "@/lib/csrf";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/email";
+import { runMoneyTransaction } from "@/lib/donations";
 import { z } from "zod";
+
+// Sentinel distinguishing the in-transaction funds guard (a 400) from a genuine
+// server fault (a 500) once the throw has unwound to the catch block.
+const INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS";
 
 // Validation schema for creating disbursement request
 const createDisbursementSchema = z.object({
@@ -104,23 +109,7 @@ export async function POST(
       );
     }
 
-    // Check available balance
-    const amountInCents = Math.round(validatedData.amount * 100);
-    const availableBalance = campaign.bankingAccount.availableBalance;
-
-    if (amountInCents > availableBalance) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Insufficient funds",
-          details: {
-            requested: validatedData.amount,
-            available: Number(availableBalance) / 100,
-          }
-        },
-        { status: 400 }
-      );
-    }
+    const amountInCents = BigInt(Math.round(validatedData.amount * 100));
 
     // Check for pending disbursements
     const pendingDisbursements = await prisma.disbursementRequest.count({
@@ -154,38 +143,50 @@ export async function POST(
       });
     }
 
-    // Create disbursement request
-    const disbursementRequest = await prisma.disbursementRequest.create({
-      data: {
-        campaignId: campaign.id,
-        bankingAccount: { connect: { id: campaign.bankingAccount.id } },
-        requestedByUser: { connect: { id: user.id } },
-        requestedAmount: BigInt(amountInCents),
-        purpose: validatedData.purpose,
-        description: validatedData.description,
-        receiptsUrls: [],
-        status: 'PENDING',
-      },
-      include: {
-        requestedByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+    // Create the request and reserve the funds in one atomic step. The balance
+    // is re-read and the reservation applied under the same lock, so two
+    // concurrent requests cannot each pass a check against a balance that only
+    // covers one of them. The comparison is against the UNRESERVED balance —
+    // availableBalance still includes money already spoken for by PENDING and
+    // APPROVED requests, which is what pendingDisbursement tracks.
+    const bankingAccountId = campaign.bankingAccount.id;
+    const disbursementRequest = await runMoneyTransaction(async (tx) => {
+      const account = await tx.bankingAccount.update({
+        where: { id: bankingAccountId },
+        data: {
+          pendingDisbursement: {
+            increment: amountInCents
           }
         }
-      }
-    });
+      });
 
-    // Update pending disbursement amount
-    await prisma.bankingAccount.update({
-      where: { id: campaign.bankingAccount.id },
-      data: {
-        pendingDisbursement: {
-          increment: BigInt(amountInCents)
-        }
+      // A throw here rolls back the reservation as well as the create below.
+      if (account.pendingDisbursement > account.availableBalance) {
+        throw new Error(INSUFFICIENT_FUNDS);
       }
+
+      return tx.disbursementRequest.create({
+        data: {
+          campaignId: campaign.id,
+          bankingAccount: { connect: { id: bankingAccountId } },
+          requestedByUser: { connect: { id: user.id } },
+          requestedAmount: amountInCents,
+          purpose: validatedData.purpose,
+          description: validatedData.description,
+          receiptsUrls: [],
+          status: 'PENDING',
+        },
+        include: {
+          requestedByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            }
+          }
+        }
+      });
     });
 
     // Send notification to bank admin
@@ -224,6 +225,15 @@ export async function POST(
 
   } catch (error) {
     console.error('Disbursement request error:', error);
+
+    // The in-transaction funds guard is an expected business failure, not a
+    // server fault.
+    if (error instanceof Error && error.message === INSUFFICIENT_FUNDS) {
+      return NextResponse.json(
+        { success: false, error: "Insufficient funds" },
+        { status: 400 }
+      );
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

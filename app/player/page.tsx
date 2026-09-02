@@ -61,7 +61,7 @@ export default function PlayerDashboard() {
   const [data, setData] = useState<PlayerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlayerData();
@@ -90,16 +90,39 @@ export default function PlayerDashboard() {
     }
   };
 
-  const copyReferralLink = (code: string, slug: string) => {
-    const link = `${window.location.origin}/raise/${slug}?ref=${code}`;
-    navigator.clipboard.writeText(link);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  /**
+   * The player's own page — "Support Maya", not the team landing page. The
+   * public route resolves a team member by id or fundLinkCode, and ?ref keeps
+   * click attribution the way the public player page builds it.
+   */
+  const personalLink = (
+    slug: string,
+    teamMemberId: string,
+    code?: string | null
+  ) =>
+    `${window.location.origin}/raise/${slug}/player/${teamMemberId}${
+      code ? `?ref=${code}` : ''
+    }`;
+
+  const copyPersonalLink = (
+    teamMemberId: string,
+    slug: string,
+    code?: string | null
+  ) => {
+    navigator.clipboard.writeText(personalLink(slug, teamMemberId, code));
+    setCopiedId(teamMemberId);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const shareOnSocial = (platform: string, code: string, slug: string, teamName: string) => {
-    const link = `${window.location.origin}/raise/${slug}?ref=${code}`;
-    const message = `Help me reach my fundraising goal for ${teamName}!`;
+  const shareOnSocial = (
+    platform: string,
+    teamMemberId: string,
+    slug: string,
+    teamName: string,
+    code?: string | null
+  ) => {
+    const link = personalLink(slug, teamMemberId, code);
+    const message = `I'm raising money for ${teamName}. A gift of any size helps — thank you!`;
 
     let shareUrl = '';
     switch (platform) {
@@ -168,7 +191,7 @@ export default function PlayerDashboard() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Welcome back, {data.user.firstName}! 👋
           </h1>
-          <p className="text-muted-foreground">Track your fundraising progress and share your links</p>
+          <p className="text-muted-foreground">Share your page. That&apos;s how gifts show up.</p>
         </div>
 
         {/* Overall Stats */}
@@ -206,7 +229,7 @@ export default function PlayerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Link Clicks
+                People who opened my page
               </CardTitle>
               <MousePointer className="w-5 h-5 text-secondary" />
             </CardHeader>
@@ -214,7 +237,7 @@ export default function PlayerDashboard() {
               <div className="text-3xl font-bold text-foreground">
                 {data.stats.totalClicks}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">Total engagement</p>
+              <p className="text-sm text-muted-foreground mt-1">Across all campaigns</p>
             </CardContent>
           </Card>
 
@@ -308,12 +331,14 @@ export default function PlayerDashboard() {
                         {/* Referral Stats */}
                         {membership.referral && (
                           <div className="bg-muted rounded-lg p-4">
-                            <div className="grid grid-cols-3 gap-4 mb-4">
+                            <div className="grid grid-cols-2 gap-4">
                               <div className="text-center">
                                 <p className="text-2xl font-bold text-foreground">
                                   {membership.referral.clickCount}
                                 </p>
-                                <p className="text-xs text-muted-foreground">Clicks</p>
+                                <p className="text-xs text-muted-foreground">
+                                  People who opened my page
+                                </p>
                               </div>
                               <div className="text-center">
                                 <p className="text-2xl font-bold text-success">
@@ -321,99 +346,92 @@ export default function PlayerDashboard() {
                                 </p>
                                 <p className="text-xs text-muted-foreground">Donations</p>
                               </div>
-                              <div className="text-center">
-                                <p className="text-2xl font-bold text-primary">
-                                  {membership.referral.donationCount > 0
-                                    ? ((membership.referral.donationCount / membership.referral.clickCount) * 100).toFixed(1)
-                                    : 0}%
-                                </p>
-                                <p className="text-xs text-muted-foreground">Conversion</p>
-                              </div>
                             </div>
 
-                            {/* Share Links */}
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  value={`${window.location.origin}/raise/${membership.campaign.slug}?ref=${membership.referral.code}`}
-                                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-white"
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    copyReferralLink(membership.referral!.code, membership.campaign.slug)
-                                  }
-                                >
-                                  {copiedCode === membership.referral.code ? (
-                                    <>
-                                      <Check className="w-4 h-4 mr-1" />
-                                      Copied
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-4 h-4 mr-1" />
-                                      Copy
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'facebook',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Facebook
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'twitter',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Twitter
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'email',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Email
-                                </Button>
-                              </div>
-                            </div>
                           </div>
                         )}
+
+                        {/* Share block. Lives outside the referral check: the
+                            player's page exists whether or not a Referral row
+                            was ever created, and sharing it is the whole job. */}
+                        <div className="bg-muted rounded-lg p-4 space-y-3">
+                          <p className="text-sm font-medium text-foreground">
+                            My fundraising page
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={personalLink(
+                                membership.campaign.slug,
+                                membership.id,
+                                membership.referral?.code
+                              )}
+                              className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-white"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                copyPersonalLink(
+                                  membership.id,
+                                  membership.campaign.slug,
+                                  membership.referral?.code
+                                )
+                              }
+                            >
+                              {copiedId === membership.id ? (
+                                <>
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-4 h-4 mr-1" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            {(['facebook', 'twitter', 'email'] as const).map((platform) => (
+                              <Button
+                                key={platform}
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 capitalize"
+                                onClick={() =>
+                                  shareOnSocial(
+                                    platform,
+                                    membership.id,
+                                    membership.campaign.slug,
+                                    membership.campaign.teamName,
+                                    membership.referral?.code
+                                  )
+                                }
+                              >
+                                <Share2 className="w-4 h-4 mr-1" />
+                                {platform}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* The two things a player does next */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <Button variant="outline" asChild>
+                            <Link href={`/player/outreach/${membership.id}`}>
+                              Text / email family
+                            </Link>
+                          </Button>
+                          <Button variant="outline" asChild>
+                            <Link href={`/player/profile/${membership.id}`}>
+                              Edit my page
+                            </Link>
+                          </Button>
+                        </div>
+
                       </div>
                     </CardContent>
                   </Card>

@@ -4,7 +4,7 @@ import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { sendSMS, formatPhoneNumber } from "@/lib/services/sms";
-import { filterSuppressed } from "@/lib/suppression";
+import { partitionSuppressed } from "@/lib/suppression";
 import { checkCsrf } from "@/lib/csrf";
 
 // Validation schema for creating an outreach campaign
@@ -28,32 +28,11 @@ interface OutreachContact {
 }
 
 /**
- * lib/suppression.ts#filterSuppressed issues one DB query per recipient inside
- * a single unbounded Promise.all. Feeding it a whole roster at once opens
- * hundreds of simultaneous connections and can exhaust the pool, so we hand it
- * bounded batches instead.
+ * Default page size for the GET list below. Generous on purpose: existing
+ * clients send no limit and must keep seeing a campaign's whole history.
  */
-const SUPPRESSION_LOOKUP_BATCH = 25;
-
-async function partitionSuppressed<
-  T extends { email?: string | null; phone?: string | null }
->(
-  recipients: T[],
-  channel: "EMAIL" | "SMS",
-  programId: string | null
-): Promise<{ allowed: T[]; suppressed: T[] }> {
-  const allowed: T[] = [];
-  const suppressed: T[] = [];
-
-  for (let i = 0; i < recipients.length; i += SUPPRESSION_LOOKUP_BATCH) {
-    const batch = recipients.slice(i, i + SUPPRESSION_LOOKUP_BATCH);
-    const result = await filterSuppressed(batch, channel, programId);
-    allowed.push(...result.allowed);
-    suppressed.push(...result.suppressed);
-  }
-
-  return { allowed, suppressed };
-}
+const DEFAULT_LIST_LIMIT = 100;
+const MAX_LIST_LIMIT = 200;
 
 /**
  * POST /api/outreach/campaigns
@@ -127,6 +106,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: "SMS body is required for SMS campaigns" },
         { status: 400 }
+      );
+    }
+
+    if (validatedData.scheduledFor) {
+      // A schedule in the past is a client bug, not a request to send now.
+      if (new Date(validatedData.scheduledFor).getTime() <= Date.now()) {
+        return NextResponse.json(
+          { success: false, error: "scheduledFor must be a future date and time" },
+          { status: 400 }
+        );
+      }
+
+      // TODO: implement the scheduled-outreach worker (a /api/cron/* job that
+      // picks up OutreachCampaign rows with status SCHEDULED and a due
+      // scheduledFor, then calls sendOutreachMessages). Until it exists a
+      // SCHEDULED row is never dispatched, so accepting one here would tell a
+      // coach their appeal is queued and then silently never send it. Fail
+      // loudly instead; the send-now path (no scheduledFor) is unaffected.
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Scheduled outreach is not available yet. Send now by omitting scheduledFor.",
+        },
+        { status: 501 }
       );
     }
 
@@ -332,9 +336,11 @@ async function sendOutreachMessages(
     try {
       // Replace placeholders in email
       const firstName = contact.firstName || "Friend";
+      // Function replacers: contact names are user-supplied, so a `$&`/`$\``/
+      // `$'` sequence must be inserted literally rather than expanded.
       const personalizedBody = campaignData.emailBody!
-        .replace(/\{firstName\}/g, firstName)
-        .replace(/\{donationLink\}/g, donationLink);
+        .replace(/\{firstName\}/g, () => firstName)
+        .replace(/\{donationLink\}/g, () => donationLink);
 
       const result = await sendEmail({
         to: contact.email,
@@ -416,9 +422,10 @@ async function sendOutreachMessages(
       }
 
       const firstName = contact.firstName || "Friend";
+      // Function replacers — see the email branch above.
       const personalizedBody = campaignData.smsBody!
-        .replace(/\{firstName\}/g, firstName)
-        .replace(/\{donationLink\}/g, donationLink);
+        .replace(/\{firstName\}/g, () => firstName)
+        .replace(/\{donationLink\}/g, () => donationLink);
 
       const result = await sendSMS({
         to: formattedPhone,
@@ -567,25 +574,46 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const campaigns = await prisma.outreachCampaign.findMany({
-      where: { campaignId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        createdByUser: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
+    // Clamped pagination, mirroring app/api/admin/transactions. `total` is the
+    // unpaginated count, so `total` keeps meaning what it always did rather
+    // than silently becoming "size of this page".
+    const parsedLimit = parseInt(searchParams.get("limit") || String(DEFAULT_LIST_LIMIT), 10);
+    const limit = Number.isNaN(parsedLimit)
+      ? DEFAULT_LIST_LIMIT
+      : Math.min(Math.max(parsedLimit, 1), MAX_LIST_LIMIT);
+    const parsedOffset = parseInt(searchParams.get("offset") || "0", 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    const [campaigns, total] = await Promise.all([
+      prisma.outreachCampaign.findMany({
+        where: { campaignId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: {
+          createdByUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.outreachCampaign.count({ where: { campaignId } }),
+    ]);
 
     return NextResponse.json(
       {
         success: true,
         campaigns,
-        total: campaigns.length,
+        total,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + campaigns.length < total,
+        },
       },
       { status: 200 }
     );

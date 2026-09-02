@@ -48,11 +48,11 @@ export default function ForgotPasswordPage() {
               <span className="text-white font-display font-bold text-xl">BB</span>
             </div>
           </div>
-          <CardTitle className="font-display text-2xl font-semibold">Forgot Password</CardTitle>
+          <CardTitle className="font-display text-2xl font-semibold">Need a new password?</CardTitle>
           <CardDescription>
             {sent
               ? ""
-              : "Enter your email and we'll send you a link to reset your password"}
+              : "Tell us the email you signed up with and we'll send a reset link."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -71,7 +71,10 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="bg-warning-light border border-warning text-warning px-4 py-3 rounded-lg text-sm">
+                <div
+                  role="alert"
+                  className="bg-warning-light border border-warning text-warning-dark px-4 py-3 rounded-lg text-sm"
+                >
                   {error}
                 </div>
               )}
@@ -80,6 +83,7 @@ export default function ForgotPasswordPage() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
@@ -87,7 +91,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Sending..." : "Send Reset Link"}
+                {loading ? "Sending..." : "Email me a reset link"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Remembered it?{" "}

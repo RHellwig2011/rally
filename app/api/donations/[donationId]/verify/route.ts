@@ -117,7 +117,7 @@ export async function POST(
             toEmail: donation.donorEmail,
             donorName: donation.donorName || 'Anonymous Donor',
             campaignName: `${donation.campaign.teamName} - ${donation.campaign.organizationName}`,
-            amount: Number(donation.grossAmount) / 100,
+            amountInCents: Number(donation.grossAmount),
             donationDate: donation.createdAt,
             taxDeductible: false, // TODO: Set based on campaign's tax-exempt status
           });
@@ -152,9 +152,12 @@ export async function POST(
 
     } else if (paymentIntent.status === 'requires_payment_method' ||
                paymentIntent.status === 'requires_confirmation') {
-      // Payment failed or was not completed
-      await prisma.donation.update({
-        where: { id: donationId },
+      // Payment failed or was not completed. Conditional claim, mirroring the
+      // Stripe webhook: this endpoint races the webhook by design, so an
+      // unconditional write could flip an already-COMPLETED donation to FAILED
+      // while leaving its credits applied.
+      await prisma.donation.updateMany({
+        where: { id: donationId, status: 'PENDING' },
         data: {
           status: 'FAILED',
           // Note: Payment failure details are stored in Stripe, not in our DB

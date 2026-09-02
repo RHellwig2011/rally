@@ -172,6 +172,38 @@ export async function POST(
       error?: string;
     }> = [];
 
+    // Resolve every Contact link in ONE query instead of a findFirst per
+    // recipient — a 500-contact blast was 500 extra round trips inside the send
+    // loop. deletedAt: null on the relation matters: a soft-deleted player's
+    // contacts must not be revived as the link target for this send.
+    const addresses = Array.from(
+      new Set(
+        validated.contacts
+          .map((c) => (isEmail ? c.email : c.phone))
+          .filter((a): a is string => !!a)
+      )
+    );
+
+    const linkableContacts = addresses.length
+      ? await prisma.contact.findMany({
+          where: {
+            teamMember: { campaignId, deletedAt: null },
+            ...(isEmail ? { email: { in: addresses } } : { phone: { in: addresses } }),
+          },
+          select: { id: true, email: true, phone: true },
+        })
+      : [];
+
+    // First row wins for a duplicated address, matching the findFirst this
+    // replaces.
+    const contactIdByAddress = new Map<string, string>();
+    for (const contact of linkableContacts) {
+      const key = isEmail ? contact.email : contact.phone;
+      if (key && !contactIdByAddress.has(key)) {
+        contactIdByAddress.set(key, contact.id);
+      }
+    }
+
     for (const recipient of validated.contacts) {
       const address = isEmail ? recipient.email : recipient.phone;
 
@@ -185,9 +217,12 @@ export async function POST(
         continue;
       }
 
+      // Function replacer: recipient names are user-supplied, and a name
+      // containing `$&`, `$\`` or `$'` would otherwise be expanded by
+      // String.prototype.replace into surrounding template text.
       const personalizedMessage = validated.message.replace(
-        "{name}",
-        recipient.name || "there"
+        /\{name\}/g,
+        () => recipient.name || "there"
       );
 
       // Attempt the actual send (services fail gracefully with placeholder keys)
@@ -198,7 +233,10 @@ export async function POST(
           subject: validated.subject!,
           html: buildEmailHtml(personalizedMessage, campaignName),
           text: personalizedMessage,
-          replyTo: user.email,
+          // Only route replies to an address the account has actually proven
+          // it controls. An unverified address here turns our verified sending
+          // domain into a relay that collects replies for an attacker.
+          replyTo: user.emailVerified ? user.email : undefined,
           programId,
         });
       } else {
@@ -209,20 +247,14 @@ export async function POST(
         });
       }
 
-      // Try to link an existing Contact row within this campaign
-      const existingContact = await prisma.contact.findFirst({
-        where: {
-          teamMember: { campaignId },
-          ...(isEmail ? { email: address } : { phone: address }),
-        },
-        select: { id: true },
-      });
+      // Link to an existing Contact row within this campaign (prefetched above)
+      const existingContactId = contactIdByAddress.get(address) || null;
 
       // Record the honest per-recipient outcome
       await prisma.outreachLog.create({
         data: {
           outreachCampaignId: outreachCampaign.id,
-          contactId: existingContact?.id || null,
+          contactId: existingContactId,
           type: isEmail ? "EMAIL" : "SMS",
           recipientEmail: isEmail ? address : recipient.email || null,
           recipientPhone: isEmail ? recipient.phone || null : address,
@@ -236,9 +268,9 @@ export async function POST(
 
       if (sendResult.success) {
         sentCount++;
-        if (existingContact) {
+        if (existingContactId) {
           await prisma.contact.update({
-            where: { id: existingContact.id },
+            where: { id: existingContactId },
             data: {
               ...(isEmail ? { emailsSent: { increment: 1 } } : { smsSent: { increment: 1 } }),
               lastContactedAt: new Date(),

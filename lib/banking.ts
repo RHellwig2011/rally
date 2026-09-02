@@ -1,5 +1,36 @@
 import { prisma } from "./prisma";
-import { TransactionType, DisbursementStatus } from "@prisma/client";
+import {
+  Prisma,
+  TransactionType,
+  DisbursementStatus,
+  type BankingAccount,
+  type Donation,
+  type Transaction,
+} from "@prisma/client";
+import { completeDonation, runMoneyTransaction } from "./donations";
+
+export interface ProcessDonationResult {
+  donation: Donation;
+  transaction: Transaction | null;
+  bankingAccount: BankingAccount;
+}
+
+/**
+ * True when `error` is the unique-index violation on Donation.paymentIntentId
+ * (prisma/migrations/00000000000002_donation_payment_intent_unique). That index
+ * is the real exclusion for concurrent webhook deliveries; the in-transaction
+ * lookup below is only a fast path.
+ */
+function isDuplicatePaymentIntent(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code !== "P2002") return false;
+  const target = (error.meta as { target?: unknown } | undefined)?.target;
+  if (Array.isArray(target)) return target.includes("paymentIntentId");
+  if (typeof target === "string") return target.includes("paymentIntentId");
+  // Some drivers omit meta.target. Donation's only other unique column is its
+  // own cuid primary key, so a P2002 here is this index either way.
+  return true;
+}
 
 /**
  * Calculate fee breakdown for a donation
@@ -41,7 +72,7 @@ export async function processDonation(params: {
   isAnonymous?: boolean;
   referralCode?: string;
   paymentIntentId?: string;
-}) {
+}): Promise<ProcessDonationResult> {
   const {
     campaignId,
     donorId,
@@ -77,8 +108,60 @@ export async function processDonation(params: {
     campaign.platformFeePercent
   );
 
-  // Use transaction to ensure atomicity
-  const result = await prisma.$transaction(async (tx) => {
+  /**
+   * Resolve a payment intent that already has a donation row instead of
+   * inserting a second one.
+   *
+   * A PENDING row is the normal case: POST /api/donations recorded the donation
+   * before the client confirmed payment, and this webhook fallback only ran
+   * because the lookup upstream missed it (or lost a race with it). Completing
+   * that row is what credits the campaign, and completeDonation's conditional
+   * PENDING/FAILED -> COMPLETED claim makes the credit exactly-once even when
+   * the verify endpoint is racing us. Anything already COMPLETED or REFUNDED is
+   * returned untouched.
+   */
+  const settleExistingDonation = async (
+    existing: Donation
+  ): Promise<ProcessDonationResult> => {
+    if (existing.status === "PENDING" || existing.status === "FAILED") {
+      await completeDonation(existing.id);
+    }
+
+    const [donation, bankingAccount] = await Promise.all([
+      prisma.donation.findUnique({ where: { id: existing.id } }),
+      prisma.bankingAccount.findUnique({
+        where: { id: campaign.bankingAccount!.id },
+      }),
+    ]);
+
+    return {
+      donation: donation ?? existing,
+      transaction: null,
+      bankingAccount: bankingAccount ?? campaign.bankingAccount!,
+    };
+  };
+
+  // Fast path for a payment intent that was already recorded. Stripe redelivers
+  // webhooks, so the same payment_intent.succeeded reaches this fallback more
+  // than once. This read alone is NOT the guard — at ReadCommitted two
+  // concurrent deliveries can both miss it — the unique index on
+  // Donation.paymentIntentId is, and the P2002 catch below closes the window.
+  if (paymentIntentId) {
+    const alreadyRecorded = await prisma.donation.findFirst({
+      where: { paymentIntentId },
+    });
+
+    if (alreadyRecorded) {
+      return settleExistingDonation(alreadyRecorded);
+    }
+  }
+
+  // runMoneyTransaction is the required wrapper for every money mutation: it
+  // pins the isolation level and retries write conflicts. Its callback must be
+  // replay-safe, which is why the balance changes below are all relative
+  // increments and the insert is protected by a unique index rather than a
+  // read-then-write check.
+  const runInsert = () => runMoneyTransaction(async (tx) => {
     // Create donation record
     const donation = await tx.donation.create({
       data: {
@@ -143,10 +226,12 @@ export async function processDonation(params: {
       },
     });
 
-    // Update referral stats if applicable
+    // Update referral stats if applicable. Scoped to this campaign: referral
+    // codes are not globally unique, so an unscoped match would credit another
+    // campaign's referral row with this donation.
     if (referralCode) {
       await tx.referral.updateMany({
-        where: { referralCode },
+        where: { referralCode, campaignId },
         data: {
           donationCount: { increment: 1 },
           totalRaised: { increment: grossAmount },
@@ -157,185 +242,29 @@ export async function processDonation(params: {
     return { donation, transaction, bankingAccount: updatedBankingAccount };
   });
 
-  return result;
-}
+  try {
+    return await runInsert();
+  } catch (error) {
+    // A concurrent delivery (or the app's own PENDING row acquiring this
+    // payment intent between the read above and this insert) won the unique
+    // index. Credit nothing extra — settle against the row that won. The catch
+    // is out here rather than inside the callback because a failed statement
+    // aborts the Postgres transaction: no further query in it would run.
+    if (paymentIntentId && isDuplicatePaymentIntent(error)) {
+      const winner = await prisma.donation.findFirst({
+        where: { paymentIntentId },
+      });
 
-/**
- * Create a disbursement request
- */
-export async function createDisbursementRequest(params: {
-  bankingAccountId: string;
-  campaignId: string;
-  requestedBy: string;
-  requestedAmount: bigint | number;
-  purpose: string;
-  receiptsUrls?: string[];
-}) {
-  const { bankingAccountId, campaignId, requestedBy, requestedAmount: rawAmount, purpose, receiptsUrls = [] } = params;
-  const requestedAmount = typeof rawAmount === 'bigint' ? rawAmount : BigInt(rawAmount);
+      if (winner) {
+        console.warn(
+          `Duplicate donation insert for payment intent ${paymentIntentId}; settled against existing donation ${winner.id}`
+        );
+        return settleExistingDonation(winner);
+      }
+    }
 
-  // Get banking account
-  const bankingAccount = await prisma.bankingAccount.findUnique({
-    where: { id: bankingAccountId },
-  });
-
-  if (!bankingAccount) {
-    throw new Error("Banking account not found");
+    throw error;
   }
-
-  // Check if sufficient funds
-  if (bankingAccount.availableBalance < requestedAmount) {
-    throw new Error("Insufficient funds");
-  }
-
-  // Check if requires guardian approval
-  const requiresApproval =
-    bankingAccount.requiresGuardianApproval && requestedAmount >= bankingAccount.approvalThreshold;
-
-  // Create disbursement request
-  const disbursementRequest = await prisma.disbursementRequest.create({
-    data: {
-      bankingAccountId,
-      campaignId,
-      requestedBy,
-      requestedAmount,
-      purpose,
-      receiptsUrls,
-      status: requiresApproval ? DisbursementStatus.PENDING : DisbursementStatus.APPROVED,
-    },
-  });
-
-  // Update pending disbursement amount
-  await prisma.bankingAccount.update({
-    where: { id: bankingAccountId },
-    data: {
-      pendingDisbursement: { increment: requestedAmount },
-    },
-  });
-
-  return disbursementRequest;
-}
-
-/**
- * Approve a disbursement request
- */
-export async function approveDisbursementRequest(params: {
-  disbursementRequestId: string;
-  approvedBy: string;
-}) {
-  const { disbursementRequestId, approvedBy } = params;
-
-  const disbursementRequest = await prisma.disbursementRequest.update({
-    where: { id: disbursementRequestId },
-    data: {
-      status: DisbursementStatus.APPROVED,
-      approvedBy,
-      approvedAt: new Date(),
-    },
-  });
-
-  return disbursementRequest;
-}
-
-/**
- * Reject a disbursement request
- */
-export async function rejectDisbursementRequest(params: {
-  disbursementRequestId: string;
-  approvedBy: string;
-  rejectionReason: string;
-}) {
-  const { disbursementRequestId, approvedBy, rejectionReason } = params;
-
-  const disbursementRequest = await prisma.disbursementRequest.findUnique({
-    where: { id: disbursementRequestId },
-  });
-
-  if (!disbursementRequest) {
-    throw new Error("Disbursement request not found");
-  }
-
-  // Use transaction to update both disbursement request and banking account
-  await prisma.$transaction([
-    prisma.disbursementRequest.update({
-      where: { id: disbursementRequestId },
-      data: {
-        status: DisbursementStatus.REJECTED,
-        approvedBy,
-        approvedAt: new Date(),
-        rejectionReason,
-      },
-    }),
-    prisma.bankingAccount.update({
-      where: { id: disbursementRequest.bankingAccountId },
-      data: {
-        pendingDisbursement: { decrement: disbursementRequest.requestedAmount },
-      },
-    }),
-  ]);
-}
-
-/**
- * Process a disbursement (simulate payout)
- */
-export async function processDisbursement(params: {
-  disbursementRequestId: string;
-  processedBy: string;
-}) {
-  const { disbursementRequestId, processedBy } = params;
-
-  const disbursementRequest = await prisma.disbursementRequest.findUnique({
-    where: { id: disbursementRequestId },
-    include: { bankingAccount: true },
-  });
-
-  if (!disbursementRequest) {
-    throw new Error("Disbursement request not found");
-  }
-
-  if (disbursementRequest.status !== DisbursementStatus.APPROVED) {
-    throw new Error("Disbursement request must be approved first");
-  }
-
-  // Use transaction to ensure atomicity
-  const result = await prisma.$transaction(async (tx) => {
-    // Update banking account balances
-    const updatedBankingAccount = await tx.bankingAccount.update({
-      where: { id: disbursementRequest.bankingAccountId },
-      data: {
-        availableBalance: { decrement: disbursementRequest.requestedAmount },
-        disbursedTotal: { increment: disbursementRequest.requestedAmount },
-        pendingDisbursement: { decrement: disbursementRequest.requestedAmount },
-      },
-    });
-
-    // Create ledger transaction
-    const transaction = await tx.transaction.create({
-      data: {
-        bankingAccountId: disbursementRequest.bankingAccountId,
-        type: TransactionType.DISBURSEMENT,
-        amount: -disbursementRequest.requestedAmount, // Negative for disbursement
-        balanceAfter: updatedBankingAccount.availableBalance,
-        disbursementId: disbursementRequest.id,
-        description: disbursementRequest.purpose,
-        createdBy: processedBy,
-      },
-    });
-
-    // Update disbursement request status
-    const updated = await tx.disbursementRequest.update({
-      where: { id: disbursementRequestId },
-      data: {
-        status: DisbursementStatus.COMPLETED,
-        disbursementDate: new Date(),
-        payoutTransactionId: transaction.id,
-      },
-    });
-
-    return { disbursementRequest: updated, transaction, bankingAccount: updatedBankingAccount };
-  });
-
-  return result;
 }
 
 /**

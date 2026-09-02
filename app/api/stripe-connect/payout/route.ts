@@ -15,6 +15,39 @@ const payoutSchema = z.object({
 const INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS";
 
 /**
+ * Stripe error types that mean the transfer definitively did NOT happen: the
+ * request was rejected before any money moved, so the books must be put back.
+ * Everything else — StripeConnectionError, StripeAPIError, a socket timeout, an
+ * error thrown by something other than the SDK — is AMBIGUOUS: Stripe may have
+ * accepted the transfer and only the response was lost. Reversing the debit on
+ * an ambiguous error is the dangerous case, because the funds reappear as
+ * available while Stripe has already paid them out, and a concurrent
+ * disbursement can then spend money that is gone.
+ */
+const DEFINITE_STRIPE_FAILURE_TYPES = new Set([
+  "StripeCardError",
+  "StripeInvalidRequestError",
+  "StripeAuthenticationError",
+  "StripePermissionError",
+  "StripeRateLimitError",
+]);
+
+function isDefiniteStripeFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { type, code } = error as { type?: unknown; code?: unknown };
+  if (typeof type !== "string" || !DEFINITE_STRIPE_FAILURE_TYPES.has(type)) {
+    return false;
+  }
+  // An invalid-request error without a code is not necessarily a clean
+  // rejection (the SDK also surfaces some transport problems this way), so
+  // require Stripe to have named the failure.
+  if (type === "StripeInvalidRequestError" && typeof code !== "string") {
+    return false;
+  }
+  return true;
+}
+
+/**
  * POST /api/stripe-connect/payout
  * Create a payout to a campaign's Stripe Connect account (ADMIN or BANK_ADMIN).
  *
@@ -138,13 +171,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 2 — create the payout via Stripe. On failure, release the claim and
-    // give the funds back, leaving the request APPROVED and retryable.
+    // Step 2 — create the payout via Stripe. On a definite rejection, release
+    // the claim and give the funds back, leaving the request APPROVED and
+    // retryable. On an ambiguous error the debit STAYS, because the transfer
+    // may well have happened.
     let transfer;
     try {
       transfer = await createPayout({
         accountId: stripeAccountId,
         amount: Number(disbursementRequest.requestedAmount),
+        // The disbursement request is the natural key: at most one transfer
+        // ever belongs to it. If this call times out and the settle step or an
+        // operator retries, Stripe replays the original transfer rather than
+        // sending the money a second time.
+        idempotencyKey: `disbursement-${disbursementRequest.id}`,
         metadata: {
           disbursementRequestId: disbursementRequest.id,
           campaignId: disbursementRequest.bankingAccount.campaign.id,
@@ -152,6 +192,36 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (stripeError) {
+      if (!isDefiniteStripeFailure(stripeError)) {
+        // Ambiguous: a timeout or connection error can arrive after Stripe has
+        // already accepted the transfer. Crediting availableBalance back here
+        // would show money the team may no longer have, and a second
+        // disbursement could reserve it. Leave the row PROCESSING and the debit
+        // in place; the idempotency key means a deliberate retry replays the
+        // original transfer rather than paying twice, but a human has to
+        // confirm at Stripe which happened first.
+        console.error(
+          `Payout for disbursement ${disbursementRequest.id} failed ambiguously; ` +
+            `funds stay debited and the request stays PROCESSING. Check Stripe for a transfer with ` +
+            `idempotency key disbursement-${disbursementRequest.id} and reconcile before retrying:`,
+          stripeError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Payout could not be confirmed with Stripe and is left pending. " +
+              "The funds stay debited; reconcile this disbursement before retrying.",
+            disbursementRequestId: disbursementRequest.id,
+            status: "PROCESSING",
+          },
+          { status: 502 }
+        );
+      }
+
+      // Definite rejection — Stripe never created a transfer, so put the books
+      // back and make the request retryable.
       await runMoneyTransaction(async (tx) => {
         const released = await tx.disbursementRequest.updateMany({
           where: { id: disbursementRequest.id, status: "PROCESSING" },

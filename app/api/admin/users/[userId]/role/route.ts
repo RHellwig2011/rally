@@ -110,21 +110,39 @@ export async function PUT(
       }
     }
 
-    // Update user role
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        role: validatedData.role,
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        updatedAt: true,
-      }
+    // Update user role and evict the old sessions in one step
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          role: validatedData.role,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          updatedAt: true,
+        }
+      });
+
+      // The role is baked into the signed sessionToken, so an already-issued
+      // token keeps asserting the OLD role for its full 30 days — and
+      // rotateRefreshToken would keep minting fresh ones from it. A demotion
+      // that leaves the user's previous privileges live is not a demotion.
+      // Mirrors the mass-revoke in resetPassword (lib/auth.ts).
+      await tx.refreshToken.updateMany({
+        where: { userId, revoked: false },
+        data: {
+          revoked: true,
+          revokedAt: new Date(),
+          reason: "role_change",
+        },
+      });
+
+      return updated;
     });
 
     // Log the role change

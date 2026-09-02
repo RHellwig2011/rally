@@ -84,14 +84,14 @@ export async function GET(
       donation_count: bigint;
     }>>`
       SELECT
-        DATE("createdAt") as date,
+        ("createdAt" AT TIME ZONE 'UTC')::date as date,
         SUM("grossAmount") as total_amount,
         COUNT(*) as donation_count
       FROM "Donation"
       WHERE "campaignId" = ${campaignId}
         AND status = 'COMPLETED'
         AND "createdAt" >= ${startDate}
-      GROUP BY DATE("createdAt")
+      GROUP BY ("createdAt" AT TIME ZONE 'UTC')::date
       ORDER BY date DESC
     `;
 

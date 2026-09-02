@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SportArtwork } from "@/components/SportArtwork";
+import { MarketingMobileNav } from "@/components/MarketingMobileNav";
 
 /**
  * Marketing home page.
@@ -51,6 +52,25 @@ const STEPS = [
   },
 ];
 
+/**
+ * Deliberately claims rather than counts. The platform is new; a metric row
+ * here would have to be fabricated, so it states what the product does instead.
+ */
+const VALUE_PROPS = [
+  {
+    head: "Built for teams of every size",
+    body: "A ten-swimmer club and a 60-player football program run the same drive.",
+  },
+  {
+    head: "Every dollar accounted for",
+    body: "Fees are shown before the gift and each move is on the ledger after it.",
+  },
+  {
+    head: "No setup fee, no contract",
+    body: "You pay a percentage of what you raise. Raise nothing, pay nothing.",
+  },
+];
+
 const CAPABILITIES = [
   {
     label: "Outreach",
@@ -79,7 +99,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#F5F7FA] text-[#101A2C] antialiased">
       {/* ---------------------------------------------------------------- Nav */}
       <header className="sticky top-0 z-50 border-b border-[#E4E8EF] bg-[#F5F7FA]/85 backdrop-blur">
-        <div className="mx-auto flex h-[66px] max-w-[1180px] items-center gap-8 px-5 sm:px-8 lg:px-16">
+        <div className="relative mx-auto flex h-[66px] max-w-[1180px] items-center gap-8 px-5 sm:px-8 lg:px-16">
           <Link
             href="/"
             className="font-display text-[18px] font-bold tracking-[-0.01em] text-primary"
@@ -103,16 +123,17 @@ export default function Home() {
           <div className="flex-1" />
           <Link
             href="/login"
-            className="whitespace-nowrap text-[15px] font-semibold text-[#5B6575] transition-colors hover:text-primary"
+            className="hidden whitespace-nowrap text-[15px] font-semibold text-[#5B6575] transition-colors hover:text-primary md:inline"
           >
             Sign in
           </Link>
           <Link
             href="/signup"
-            className="whitespace-nowrap rounded-lg bg-primary px-[18px] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
+            className="hidden whitespace-nowrap rounded-lg bg-primary px-[18px] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 md:inline-block"
           >
             Start a campaign
           </Link>
+          <MarketingMobileNav />
         </div>
       </header>
 
@@ -230,23 +251,23 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero stat row — hairline dividers, tabular figures */}
-        <dl className="mt-14 grid grid-cols-3 divide-x divide-[#E4E8EF]">
-          {[
-            { v: "$2.5M", l: "raised for teams", accent: false },
-            { v: "500+", l: "active programs", accent: false },
-            { v: "98%", l: "reach their goal", accent: true },
-          ].map((s, i) => (
-            <div key={s.l} className={i === 0 ? "pr-5 sm:pr-10" : "px-5 sm:px-10"}>
-              <dt className="sr-only">{s.l}</dt>
-              <dd
-                className={`font-display text-[clamp(22px,5vw,28px)] font-bold tabular-nums ${
-                  s.accent ? "text-secondary" : "text-primary"
-                }`}
-              >
-                {s.v}
+        {/*
+          Value props, not metrics. The numbers that used to sit here were
+          invented; nothing in the product backs them, so they're gone rather
+          than restated with a smaller figure.
+        */}
+        <dl className="mt-14 grid gap-6 divide-y divide-[#E4E8EF] sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-y-0">
+          {VALUE_PROPS.map((v, i) => (
+            <div
+              key={v.head}
+              className={`pt-6 sm:pt-0 ${i === 0 ? "sm:pr-5 lg:pr-10" : "sm:px-5 lg:px-10"}`}
+            >
+              <dt className="font-display text-[clamp(18px,3.4vw,21px)] font-semibold text-primary">
+                {v.head}
+              </dt>
+              <dd className="mt-1.5 text-[14px] leading-snug text-[#5B6575]">
+                {v.body}
               </dd>
-              <p className="mt-1 text-[13px] leading-snug text-[#5B6575]">{s.l}</p>
             </div>
           ))}
         </dl>
@@ -256,7 +277,12 @@ export default function Home() {
       <div className="overflow-hidden border-y border-[#E4E8EF] py-[15px]">
         <div className="flex w-max animate-marquee gap-[34px] font-display text-[15px] font-semibold tracking-[0.02em] text-[#5B6575] motion-reduce:animate-none">
           {[...SPORTS, ...SPORTS].map((s, i) => (
-            <span key={i} className="flex items-center gap-[34px] whitespace-nowrap">
+            <span
+              key={i}
+              // The second pass exists only so the loop reads as continuous.
+              aria-hidden={i >= SPORTS.length}
+              className="flex items-center gap-[34px] whitespace-nowrap"
+            >
               {s}
               <span className="text-secondary" aria-hidden>
                 ●
@@ -335,16 +361,13 @@ export default function Home() {
       <section className="bg-primary text-white">
         <div className="mx-auto max-w-[1000px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
           <p className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-secondary-300">
-            From the sideline
+            Why it works
           </p>
-          <blockquote className="mt-7">
-            <p className="font-quote text-[clamp(28px,4.6vw,52px)] leading-[1.16] text-white">
-              “We raised $15K in three weeks. The part that actually won people
-              over was letting every parent see exactly where the money went.”
-            </p>
-          </blockquote>
+          <p className="mt-7 font-quote text-[clamp(28px,4.6vw,52px)] leading-[1.16] text-white">
+            People give when they can see where the money goes.
+          </p>
           <p className="mt-7 font-mono text-xs tracking-[0.1em] text-white/60">
-            — SARAH T. · VOLLEYBALL COACH
+            EVERY DONATION · EVERY FEE · EVERY PAYOUT · ON ONE LEDGER
           </p>
         </div>
       </section>
@@ -397,7 +420,7 @@ export default function Home() {
               </dl>
               <p className="mt-5 text-[13px] leading-relaxed text-[#5B6575]">
                 Larger gifts keep a larger share — processing is a flat 30¢ plus
-                a percentage, so a $500 donation nets 88%.
+                a percentage, so a $500 donation nets 87%.
               </p>
             </div>
           </div>
@@ -482,7 +505,7 @@ export default function Home() {
             ))}
           </div>
           <div className="mt-11 flex flex-wrap justify-between gap-3 border-t border-white/10 pt-5 text-[13px] text-[#66738A]">
-            <span>© 2026 Bleacher Backers. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Bleacher Backers. All rights reserved.</span>
             <span>We never sell or share your data.</span>
           </div>
         </div>

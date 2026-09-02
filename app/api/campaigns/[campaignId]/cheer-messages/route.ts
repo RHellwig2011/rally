@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { checkRateLimit, getClientIdentifier } from "@/lib/utils/rate-limiter";
+
+/**
+ * POST here is PUBLIC by design (middleware lets /cheer-messages through so
+ * anonymous well-wishers can post), which makes it an unauthenticated write.
+ * Keyed on IP + campaignId: one spammer must not be able to bury a single
+ * team's moderation queue, but a shared school/library NAT posting to several
+ * different campaigns should not be collectively locked out.
+ */
+const CHEER_POST_RATE_LIMIT = {
+  limit: 10, // 10 messages
+  windowMs: 15 * 60 * 1000, // per 15 minutes
+};
+
+/** Free-text name shown on the wall; bounded like every other public input. */
+const MAX_AUTHOR_NAME_LENGTH = 100;
 
 /**
  * GET /api/campaigns/[campaignId]/cheer-messages
@@ -84,11 +100,42 @@ export async function POST(
 ) {
   try {
     const { campaignId } = params;
+
+    // Throttle before touching the body or the database. Mirrors the rest of
+    // the limiter family (and middleware) by bypassing in development.
+    if (process.env.NODE_ENV !== "development") {
+      const identifier = `cheer:${getClientIdentifier(req)}:${campaignId}`;
+      const { limited, info } = checkRateLimit(identifier, CHEER_POST_RATE_LIMIT);
+      if (limited) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Too many messages. Please try again later.",
+            retryAfter: info.reset,
+          },
+          {
+            status: 429,
+            headers: {
+              "X-RateLimit-Limit": info.limit.toString(),
+              "X-RateLimit-Remaining": "0",
+              "X-RateLimit-Reset": info.reset.toString(),
+              "Retry-After": Math.max(
+                0,
+                info.reset - Math.floor(Date.now() / 1000)
+              ).toString(),
+            },
+          }
+        );
+      }
+    }
+
     const body = await req.json();
     const { authorName, message, isAnonymous } = body;
 
-    // Validate input
-    if (!message || message.trim().length === 0) {
+    // Anonymous posts arrive from an unauthenticated caller, so nothing about
+    // the body's shape can be assumed — a non-string message would otherwise
+    // throw on .trim() and surface as a 500.
+    if (typeof message !== "string" || message.trim().length === 0) {
       return NextResponse.json(
         { success: false, error: "Message is required" },
         { status: 400 }
@@ -102,14 +149,27 @@ export async function POST(
       );
     }
 
-    const displayName = isAnonymous ? "Anonymous" : (authorName || "Anonymous");
+    const anonymous = isAnonymous === true;
+    const submittedName = typeof authorName === "string" ? authorName.trim() : "";
 
-    if (!isAnonymous && (!authorName || authorName.trim().length === 0)) {
+    if (!anonymous && submittedName.length === 0) {
       return NextResponse.json(
         { success: false, error: "Name is required" },
         { status: 400 }
       );
     }
+
+    if (submittedName.length > MAX_AUTHOR_NAME_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Name must be ${MAX_AUTHOR_NAME_LENGTH} characters or less`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const displayName = anonymous ? "Anonymous" : submittedName || "Anonymous";
 
     // Verify campaign exists
     const campaign = await prisma.campaign.findUnique({
@@ -129,6 +189,10 @@ export async function POST(
         campaignId,
         authorName: displayName,
         message: message.trim(),
+        // Persisted, not just folded into displayName: the moderation list and
+        // the public wall both read isAnonymous, and dropping it here made
+        // every submission look like a named post to those consumers.
+        isAnonymous: anonymous,
         isApproved: false, // Require approval by campaign owner
       },
     });
