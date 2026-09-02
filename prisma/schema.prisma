@@ -68,6 +68,11 @@ model User {
 
   // Authentication
   passwordHash  String
+  // Social sign-in. Nullable + unique: Postgres treats NULLs as distinct, so
+  // password-only users are unaffected. A user created via OAuth gets a random
+  // unusable passwordHash and can add a real password via the reset flow.
+  googleId      String?   @unique
+  appleId       String?   @unique
   verificationToken String?
   verificationTokenExpiry DateTime?
   passwordResetToken String?

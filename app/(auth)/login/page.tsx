@@ -8,6 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/lib/store/authStore";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
+
+/** Friendly copy for the ?error= codes the OAuth callback redirects with. */
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  oauth_not_configured: "That sign-in option isn't available right now. Please use your email and password.",
+  oauth_cancelled: "Sign-in was cancelled.",
+  oauth_state_mismatch: "That sign-in link expired. Please try again.",
+  oauth_unverified_email:
+    "Your sign-in provider couldn't verify that email address, so we can't connect it to your existing account. Please sign in with your password instead.",
+  oauth_failed: "Something went wrong during sign-in. Please try again.",
+};
 
 /**
  * Is `redirect` a path on this site, and only this site?
@@ -52,7 +63,10 @@ function LoginForm() {
   const setUser = useAuthStore((state) => state.setUser);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const code = searchParams?.get("error");
+    return (code && OAUTH_ERROR_MESSAGES[code]) || "";
+  });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,6 +180,8 @@ function LoginForm() {
             >
               {loading ? "Signing in..." : "Sign in"}
             </Button>
+
+            <OAuthButtons redirect={searchParams?.get("redirect")} />
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
