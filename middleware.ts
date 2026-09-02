@@ -50,6 +50,11 @@ export async function middleware(request: NextRequest) {
     "/terms",
     "/privacy",
     "/forgot-password",
+    // The create-campaign wizard is a public page that gates in-page (it
+    // checks /api/auth/me and renders a sign-in card for anonymous visitors).
+    // The mutation it drives, POST /api/campaigns, still requires auth +
+    // verified email inside the handler.
+    "/create-campaign",
     "/auth/verify-email",
     "/auth/reset-password",
     "/test-donation",
