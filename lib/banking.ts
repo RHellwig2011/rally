@@ -8,6 +8,10 @@ import {
   type Transaction,
 } from "@prisma/client";
 import { completeDonation, runMoneyTransaction } from "./donations";
+import {
+  decideTeamMemberAttribution,
+  teamMemberAttributionWhere,
+} from "./donation-attribution";
 
 export interface ProcessDonationResult {
   donation: Donation;
@@ -37,7 +41,11 @@ function isDuplicatePaymentIntent(error: unknown): boolean {
  * @param grossAmount - Amount in cents (as BigInt or number)
  * @param platformFeePercent - Platform fee percentage (default 10%)
  */
-export function calculateDonationFees(grossAmount: bigint | number, platformFeePercent: number = 10) {
+export function calculateDonationFees(
+  grossAmount: bigint | number,
+  platformFeePercent: number = 10,
+  coverFees: boolean = false
+) {
   const amount = typeof grossAmount === 'bigint' ? grossAmount : BigInt(grossAmount);
 
   // Calculate platform fee (half-up rounding to match the canonical formula
@@ -48,14 +56,85 @@ export function calculateDonationFees(grossAmount: bigint | number, platformFeeP
   // Processing fee: 2.9% + $0.30, rounded (Math.round(gross * 0.029) + 30)
   const processingFee = (amount * BigInt(29) + BigInt(500)) / BigInt(1000) + BigInt(30);
 
-  // Net amount after fees
-  const netAmount = amount - platformFee - processingFee;
+  // When the donor covers processing, the campaign keeps gross - platformFee.
+  const netAmount = coverFees
+    ? amount - platformFee
+    : amount - platformFee - processingFee;
 
   return {
     grossAmount: amount,
     platformFee,
     processingFee,
     netAmount,
+  };
+}
+
+function processingFeeOnGross(gross: number): number {
+  return Math.round(gross * 0.029) + 30;
+}
+
+/**
+ * Invert `charged = gross + round(gross * 0.029) + 30` to recover the gift
+ * when PaymentIntent metadata did not record grossAmount.
+ */
+function invertCoveredGross(charged: number): number {
+  if (!Number.isFinite(charged) || charged <= 30) return charged;
+  const approx = Math.round((charged - 30) / 1.029);
+  for (let delta = 0; delta <= 5; delta++) {
+    for (const g of [approx - delta, approx + delta]) {
+      if (g > 0 && g + processingFeeOnGross(g) === charged) {
+        return g;
+      }
+    }
+  }
+  return approx > 0 ? approx : charged;
+}
+
+export type StripeIntentLike = {
+  amount: number;
+  metadata?: Record<string, string | undefined> | null;
+};
+
+/**
+ * Reconstruct donation fields from a Stripe PaymentIntent for the webhook
+ * fallback (no PENDING row). Never treats a coverFees charge as gross.
+ */
+export function reconstructDonationFromIntent(pi: StripeIntentLike): {
+  grossAmount: bigint;
+  coverFees: boolean;
+  teamMemberId?: string;
+  campaignId?: string;
+  donorEmail?: string;
+  donorName?: string;
+  referralCode?: string;
+} {
+  const metadata = pi.metadata ?? {};
+  const coverFees = metadata.coverFees === "true";
+  const rawGross = metadata.grossAmount?.trim();
+  let grossAmount: bigint;
+
+  if (rawGross && /^\d+$/.test(rawGross)) {
+    grossAmount = BigInt(rawGross);
+  } else if (coverFees) {
+    grossAmount = BigInt(invertCoveredGross(pi.amount));
+  } else {
+    grossAmount = BigInt(pi.amount);
+  }
+
+  const teamMemberId = metadata.teamMemberId?.trim() || undefined;
+  const campaignId = metadata.campaignId?.trim() || undefined;
+  const donorEmail = metadata.donorEmail?.trim() || undefined;
+  const donorName = metadata.donorName?.trim() || undefined;
+  const referralCode = metadata.referralCode?.trim() || undefined;
+
+  return {
+    grossAmount,
+    coverFees,
+    ...(teamMemberId && { teamMemberId }),
+    ...(campaignId && { campaignId }),
+    ...(donorEmail && { donorEmail }),
+    ...(donorName && { donorName }),
+    ...(referralCode && { referralCode }),
   };
 }
 
@@ -72,6 +151,8 @@ export async function processDonation(params: {
   isAnonymous?: boolean;
   referralCode?: string;
   paymentIntentId?: string;
+  teamMemberId?: string;
+  coverFees?: boolean;
 }): Promise<ProcessDonationResult> {
   const {
     campaignId,
@@ -83,6 +164,7 @@ export async function processDonation(params: {
     isAnonymous = false,
     referralCode,
     paymentIntentId,
+    coverFees = false,
   } = params;
 
   // Convert to BigInt if needed
@@ -105,8 +187,28 @@ export async function processDonation(params: {
   // Calculate fees
   const { platformFee, processingFee, netAmount } = calculateDonationFees(
     grossAmount,
-    campaign.platformFeePercent
+    campaign.platformFeePercent,
+    coverFees
   );
+
+  let teamMemberId: string | undefined;
+  if (params.teamMemberId) {
+    const member = await prisma.teamMember.findFirst({
+      where: teamMemberAttributionWhere(campaignId, params.teamMemberId),
+      select: { id: true },
+    });
+    const decision = decideTeamMemberAttribution(
+      params.teamMemberId,
+      member?.id
+    );
+    if (decision.status === "reject") {
+      console.error(
+        `processDonation: teamMemberId ${params.teamMemberId} did not resolve on campaign ${campaignId}; recording unattributed`
+      );
+    } else if (decision.status === "use") {
+      teamMemberId = decision.teamMemberId;
+    }
+  }
 
   /**
    * Resolve a payment intent that already has a donation row instead of
@@ -179,6 +281,7 @@ export async function processDonation(params: {
         paymentIntentId,
         status: "COMPLETED",
         paymentProvider: paymentIntentId ? "STRIPE" : "SIMULATED",
+        ...(teamMemberId && { teamMemberId }),
       },
     });
 
@@ -225,6 +328,17 @@ export async function processDonation(params: {
         currentAmount: { increment: grossAmount },
       },
     });
+
+    if (teamMemberId) {
+      await tx.teamMember.updateMany({
+        where: {
+          id: teamMemberId,
+          campaignId,
+          deletedAt: null,
+        },
+        data: { amountRaised: { increment: grossAmount } },
+      });
+    }
 
     // Update referral stats if applicable. Scoped to this campaign: referral
     // codes are not globally unique, so an unscoped match would credit another

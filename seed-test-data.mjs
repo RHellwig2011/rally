@@ -51,7 +51,10 @@ async function main() {
   // Create a test campaign
   const campaign = await prisma.campaign.upsert({
     where: { slug: 'test-basketball-2024' },
-    update: {},
+    update: {
+      organizationVerifiedAt: new Date(),
+      organizationVerifiedById: admin.id,
+    },
     create: {
       id: 'test-campaign-001',
       organizationName: 'Lincoln High School',
@@ -67,6 +70,8 @@ async function main() {
       primaryColor: '#1e40af',
       secondaryColor: '#dbeafe',
       status: 'ACTIVE',
+      organizationVerifiedAt: new Date(),
+      organizationVerifiedById: admin.id,
     }
   });
 

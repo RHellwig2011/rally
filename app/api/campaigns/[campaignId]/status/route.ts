@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { sendCampaignStatusChangeNotification } from "@/lib/email";
 import { checkCsrf } from "@/lib/csrf";
+import { leaderMayActivateCampaign } from "@/lib/org-verification";
 
 // Campaign status enum matching Prisma schema
 const CampaignStatus = {
@@ -79,6 +80,7 @@ export async function PUT(
         endDate: true,
         completedAt: true,
         archivedAt: true,
+        organizationVerifiedAt: true,
         primaryLeader: {
           select: { id: true, email: true, firstName: true }
         },
@@ -167,6 +169,22 @@ export async function PUT(
           { status: 400 }
         );
       }
+
+      if (
+        !leaderMayActivateCampaign({
+          role: user.role,
+          organizationVerifiedAt: campaign.organizationVerifiedAt,
+        })
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Organization must be verified by platform staff before this campaign can go live",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // COMPLETED campaigns should have end date in past or donations
@@ -199,6 +217,11 @@ export async function PUT(
           ...(newStatus === 'ARCHIVED' && !campaign.archivedAt && {
             archivedAt: now
           }),
+          ...(newStatus === 'ACTIVE' &&
+            !campaign.organizationVerifiedAt && {
+              organizationVerifiedAt: now,
+              organizationVerifiedById: user.id,
+            }),
           updatedAt: now,
         },
         select: {

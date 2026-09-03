@@ -208,6 +208,11 @@ model Campaign {
   status            CampaignStatus   @default(DRAFT)
   category          CampaignCategory @default(OTHER)
 
+  // Staff must verify the named organization before a leader can go live.
+  // ADMIN/BANK_ADMIN activation also stamps this.
+  organizationVerifiedAt    DateTime?
+  organizationVerifiedById  String?
+
   // Leadership
   primaryLeaderId   String
   primaryLeader     User             @relation("CampaignLeader", fields: [primaryLeaderId], references: [id])
@@ -350,6 +355,7 @@ enum TransactionType {
   FEE_COLLECTION
   REFUND
   ADJUSTMENT
+  CHARGEBACK
 }
 
 model Transaction {
@@ -388,6 +394,7 @@ enum DonationStatus {
   COMPLETED
   FAILED
   REFUNDED
+  DISPUTED
 }
 
 enum PaymentMethod {
@@ -439,6 +446,16 @@ model Donation {
   utmSource         String?
 
   status            DonationStatus  @default(PENDING)
+
+  // Chargeback / dispute. disputeId is Stripe's dp_*; unique so a redelivered
+  // charge.dispute.created cannot attach the same dispute to two donations.
+  disputeId         String?         @unique
+  disputedAt        DateTime?
+  disputeFee        BigInt          @default(0)
+
+  // Cumulative gross cents already reversed by refunds. Partial refunds stay
+  // COMPLETED until this reaches grossAmount, then status becomes REFUNDED.
+  refundedAmount    BigInt          @default(0)
 
   // Tax receipt
   taxReceiptUrl     String?
@@ -666,7 +683,7 @@ model TeamMember {
   deletedAt       DateTime?
 
   // Visibility
-  isProfilePublic Boolean   @default(true)
+  isProfilePublic Boolean   @default(false)
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

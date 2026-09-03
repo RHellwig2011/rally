@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { formatFundraisingLink } from "@/lib/utils/team-member";
+import { isPubliclyListableCampaign } from "@/lib/public-campaign";
 
 /**
  * Per-player fundraising leaderboard with a hard public/staff split.
@@ -91,11 +92,19 @@ export async function GET(
         organizationName: true,
         primaryLeaderId: true,
         minContactsPerPlayer: true,
+        status: true,
         guardians: { select: { id: true } },
       },
     });
 
     if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    if (scope === "public" && !isPubliclyListableCampaign(campaign.status)) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }

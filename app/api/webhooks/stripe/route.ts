@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { constructWebhookEvent } from "@/lib/stripe";
-import { processDonation } from "@/lib/banking";
-import { completeDonation, refundDonation } from "@/lib/donations";
+import { constructWebhookEvent, stripe } from "@/lib/stripe";
+import { processDonation, reconstructDonationFromIntent } from "@/lib/banking";
+import { completeDonation, applyChargeback, applyRefund, reinstateChargeback, stripeDisputeFeeCents, chargeRefundToGross } from "@/lib/donations";
 import prisma from "@/lib/prisma";
 import Stripe from "stripe";
 
@@ -80,6 +80,18 @@ export async function POST(req: NextRequest) {
         await handleChargeRefunded(event.data.object as Stripe.Charge);
         break;
 
+      case "charge.dispute.created":
+        await handleDisputeCreated(event.data.object as Stripe.Dispute);
+        break;
+
+      case "charge.dispute.closed":
+        await handleDisputeClosed(event.data.object as Stripe.Dispute);
+        break;
+
+      case "charge.dispute.funds_reinstated":
+        await handleDisputeFundsReinstated(event.data.object as Stripe.Dispute);
+        break;
+
       case "account.updated":
         await handleAccountUpdated(event.data.object as Stripe.Account);
         break;
@@ -104,7 +116,10 @@ export async function POST(req: NextRequest) {
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   console.log("Payment succeeded:", paymentIntent.id);
 
-  const { campaignId, donorEmail, donorName, referralCode } = paymentIntent.metadata;
+  const reconstructed = reconstructDonationFromIntent({
+    amount: paymentIntent.amount,
+    metadata: paymentIntent.metadata,
+  });
 
   // Normal flow: the app pre-creates a PENDING donation before the client
   // confirms payment, so complete that record (idempotent — a no-op if the
@@ -123,7 +138,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     console.log("Donation completed via webhook:", existingDonation.id);
 
     try {
-      const { sendDonationReceipt } = await import('@/lib/email');
+      const { sendDonationReceipt } = await import("@/lib/email");
       const campaign = await prisma.campaign.findUnique({
         where: { id: existingDonation.campaignId },
         select: { organizationName: true, teamName: true },
@@ -132,7 +147,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       if (campaign) {
         await sendDonationReceipt({
           toEmail: existingDonation.donorEmail,
-          donorName: existingDonation.donorName || 'Donor',
+          donorName: existingDonation.donorName || "Donor",
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
           amountInCents: Number(existingDonation.grossAmount),
           donationDate: existingDonation.createdAt,
@@ -140,36 +155,38 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
         });
       }
     } catch (emailError) {
-      console.error('Failed to send donation receipt:', emailError);
+      console.error("Failed to send donation receipt:", emailError);
     }
     return;
   }
 
-  // Fallback: a payment intent we never recorded (e.g. created outside the
-  // app). Requires metadata to reconstruct the donation.
+  const campaignId = reconstructed.campaignId;
+  const donorEmail = reconstructed.donorEmail;
+  const donorName = reconstructed.donorName;
+
   if (!campaignId || !donorEmail) {
     console.error("Missing required metadata in payment intent:", paymentIntent.id);
     return;
   }
 
   try {
-    // Process the donation
     const result = await processDonation({
       campaignId,
       donorEmail,
       donorName,
       donorMessage: paymentIntent.description || undefined,
-      grossAmount: BigInt(paymentIntent.amount),
+      grossAmount: reconstructed.grossAmount,
       paymentIntentId: paymentIntent.id,
       isAnonymous: false,
-      referralCode,
+      referralCode: reconstructed.referralCode,
+      teamMemberId: reconstructed.teamMemberId,
+      coverFees: reconstructed.coverFees,
     });
 
     console.log("Donation processed successfully:", result.donation.id);
 
-    // Send receipt email
     try {
-      const { sendDonationReceipt } = await import('@/lib/email');
+      const { sendDonationReceipt } = await import("@/lib/email");
       const campaign = await prisma.campaign.findUnique({
         where: { id: campaignId },
         select: { organizationName: true, teamName: true },
@@ -178,15 +195,15 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       if (campaign) {
         await sendDonationReceipt({
           toEmail: donorEmail,
-          donorName: donorName || 'Donor',
+          donorName: donorName || "Donor",
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
-          amountInCents: paymentIntent.amount,
+          amountInCents: Number(reconstructed.grossAmount),
           donationDate: new Date(),
           taxDeductible: false,
         });
       }
     } catch (emailError) {
-      console.error('Failed to send donation receipt:', emailError);
+      console.error("Failed to send donation receipt:", emailError);
     }
   } catch (error) {
     console.error("Failed to process donation:", error);
@@ -225,7 +242,8 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 }
 
 /**
- * Handle charge refund
+ * Handle charge refund. Stripe sends charge.refunded with a running
+ * amount_refunded; applyRefund reverses only the delta.
  */
 async function handleChargeRefunded(charge: Stripe.Charge) {
   console.log("Charge refunded:", charge.id);
@@ -235,25 +253,13 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     return;
   }
 
-  // refundDonation reverses the donation in full — the gross, the net, and the
-  // platform fee. A partial refund would therefore claw back more than Stripe
-  // actually returned, so it is left for manual handling rather than applied
-  // incorrectly.
-  if (charge.amount_refunded < charge.amount) {
-    console.warn(
-      `Partial refund on charge ${charge.id} (${charge.amount_refunded} of ${charge.amount}) is not supported; no credits reversed`
-    );
-    return;
-  }
-
   const paymentIntentId = typeof charge.payment_intent === 'string'
     ? charge.payment_intent
     : charge.payment_intent.id;
 
-  // Find the donation
   const donation = await prisma.donation.findFirst({
     where: { paymentIntentId },
-    select: { id: true },
+    select: { id: true, grossAmount: true },
   });
 
   if (!donation) {
@@ -261,16 +267,27 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
     return;
   }
 
-  // Atomically flip COMPLETED -> REFUNDED and reverse all credits
-  // (campaign total, team member total, banking balances + REFUND transaction)
-  const refunded = await refundDonation(donation.id);
+  const refundedGross = chargeRefundToGross(
+    BigInt(charge.amount_refunded),
+    BigInt(charge.amount),
+    donation.grossAmount
+  );
+
+  const refunded = await applyRefund(donation.id, refundedGross);
 
   if (!refunded) {
-    console.log("Donation was not in COMPLETED state; refund skipped:", donation.id);
+    console.log("Donation was not refundable; refund skipped:", donation.id);
     return;
   }
 
-  console.log("Refund processed successfully for donation:", donation.id);
+  console.log(
+    "Refund processed for donation:",
+    donation.id,
+    "refundedAmount=",
+    refunded.refundedAmount.toString(),
+    "status=",
+    refunded.status
+  );
 }
 
 /**
@@ -293,5 +310,162 @@ async function handleAccountUpdated(account: Stripe.Account) {
     });
 
     console.log("Banking account verification updated:", bankingAccount.id, isVerified);
+  }
+}
+
+function isInquiryDispute(status: string | null | undefined): boolean {
+  return typeof status === "string" && status.startsWith("warning_");
+}
+
+function paymentIntentIdFrom(dispute: Stripe.Dispute): string | null {
+  if (typeof dispute.payment_intent === "string") return dispute.payment_intent;
+  if (dispute.payment_intent && typeof dispute.payment_intent === "object") {
+    return dispute.payment_intent.id;
+  }
+  return null;
+}
+
+async function resolveDonationForDispute(dispute: Stripe.Dispute) {
+  let paymentIntentId = paymentIntentIdFrom(dispute);
+
+  if (!paymentIntentId) {
+    const chargeId =
+      typeof dispute.charge === "string" ? dispute.charge : dispute.charge?.id;
+    if (!chargeId) return null;
+    const charge = await stripe.charges.retrieve(chargeId);
+    const pi = charge.payment_intent;
+    paymentIntentId = typeof pi === "string" ? pi : pi?.id ?? null;
+  }
+
+  if (!paymentIntentId) return null;
+
+  return prisma.donation.findFirst({
+    where: { paymentIntentId },
+    select: { id: true, campaignId: true, grossAmount: true, donorEmail: true },
+  });
+}
+
+async function alertBankAdmins(params: {
+  donationId: string;
+  campaignId: string;
+  disputeId: string;
+  reason: string | null;
+  feeCents: bigint;
+  grossAmount: bigint;
+}) {
+  try {
+    const [admins, campaign] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: { in: ["BANK_ADMIN", "ADMIN"] } },
+        select: { email: true },
+      }),
+      prisma.campaign.findUnique({
+        where: { id: params.campaignId },
+        select: { organizationName: true, teamName: true },
+      }),
+    ]);
+
+    const emails = admins.map((a) => a.email).filter(Boolean);
+    if (emails.length === 0) {
+      console.error("Chargeback applied but no BANK_ADMIN/ADMIN users to alert", params);
+      return;
+    }
+
+    const { sendEmailWithResult } = await import("@/lib/email");
+    const campaignLabel = campaign
+      ? `${campaign.organizationName} ${campaign.teamName}`
+      : params.campaignId;
+    const fee = (Number(params.feeCents) / 100).toFixed(2);
+    const gross = (Number(params.grossAmount) / 100).toFixed(2);
+
+    await sendEmailWithResult({
+      to: emails,
+      subject: `Chargeback on ${campaignLabel}`,
+      transactional: true,
+      text: `Stripe dispute ${params.disputeId} (${params.reason ?? "unknown reason"}) on donation ${params.donationId}. Gross $${gross}, dispute fee $${fee}. Campaign balance has been reversed and may be negative.`,
+      html: `<p>Stripe dispute <code>${params.disputeId}</code> (${params.reason ?? "unknown reason"}) on donation <code>${params.donationId}</code>.</p><p>Gross $${gross}. Dispute fee $${fee}. Campaign: ${campaignLabel}.</p><p>Campaign balance has been reversed and may be negative.</p>`,
+    });
+  } catch (error) {
+    console.error("Failed to alert admins of chargeback:", error);
+  }
+}
+
+async function handleDisputeCreated(dispute: Stripe.Dispute) {
+  console.log("Dispute created:", dispute.id, dispute.status);
+
+  if (isInquiryDispute(dispute.status)) {
+    console.log("Inquiry dispute; funds not withdrawn, skipping reversal:", dispute.id);
+    return;
+  }
+
+  const donation = await resolveDonationForDispute(dispute);
+  if (!donation) {
+    console.error("Donation not found for dispute:", dispute.id);
+    return;
+  }
+
+  const feeCents = stripeDisputeFeeCents(dispute);
+  const applied = await applyChargeback(donation.id, {
+    disputeId: dispute.id,
+    feeCents,
+  });
+
+  if (!applied) {
+    console.log("Chargeback not applied (donation not COMPLETED):", donation.id);
+    return;
+  }
+
+  await alertBankAdmins({
+    donationId: donation.id,
+    campaignId: donation.campaignId,
+    disputeId: dispute.id,
+    reason: dispute.reason,
+    feeCents,
+    grossAmount: donation.grossAmount,
+  });
+}
+
+async function handleDisputeClosed(dispute: Stripe.Dispute) {
+  console.log("Dispute closed:", dispute.id, dispute.status);
+
+  if (isInquiryDispute(dispute.status) || dispute.status === "warning_closed") {
+    return;
+  }
+
+  const donation = await resolveDonationForDispute(dispute);
+  if (!donation) {
+    console.error("Donation not found for closed dispute:", dispute.id);
+    return;
+  }
+
+  if (dispute.status === "won") {
+    const restored = await reinstateChargeback(donation.id);
+    if (!restored) {
+      console.log("Chargeback reinstatement skipped:", donation.id);
+    }
+    return;
+  }
+
+  if (dispute.status === "lost") {
+    const feeCents = stripeDisputeFeeCents(dispute);
+    await applyChargeback(donation.id, {
+      disputeId: dispute.id,
+      feeCents,
+    });
+  }
+}
+
+async function handleDisputeFundsReinstated(dispute: Stripe.Dispute) {
+  console.log("Dispute funds reinstated:", dispute.id);
+
+  const donation = await resolveDonationForDispute(dispute);
+  if (!donation) {
+    console.error("Donation not found for funds_reinstated:", dispute.id);
+    return;
+  }
+
+  const restored = await reinstateChargeback(donation.id);
+  if (!restored) {
+    console.log("Chargeback reinstatement skipped:", donation.id);
   }
 }

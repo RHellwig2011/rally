@@ -222,19 +222,110 @@ export async function completeDonation(
   });
 }
 
+function allocatedShare(
+  total: bigint,
+  refundedGross: bigint,
+  gross: bigint
+): bigint {
+  const zero = BigInt(0);
+  if (gross <= zero) return zero;
+  if (refundedGross <= zero) return zero;
+  if (refundedGross >= gross) return total;
+  return (total * refundedGross) / gross;
+}
+
+function remainingCredits(donation: {
+  grossAmount: bigint;
+  netAmount: bigint;
+  platformFee: bigint;
+  refundedAmount: bigint;
+}) {
+  const prev = donation.refundedAmount;
+  const gross = donation.grossAmount;
+  return {
+    gross: allocatedShare(gross, gross, gross) - allocatedShare(gross, prev, gross),
+    net:
+      donation.netAmount - allocatedShare(donation.netAmount, prev, gross),
+    platformFee:
+      donation.platformFee - allocatedShare(donation.platformFee, prev, gross),
+  };
+}
+
 /**
- * Atomically mark a COMPLETED donation REFUNDED and reverse its credits.
- * Returns the refunded donation, or null if it was not in COMPLETED state.
+ * Map Stripe charge.amount_refunded (against charge.amount, which is larger
+ * than donation.grossAmount when the donor covered processing fees) onto
+ * donation.grossAmount cents.
  */
-export async function refundDonation(donationId: string) {
+export function chargeRefundToGross(
+  amountRefunded: bigint,
+  chargeAmount: bigint,
+  grossAmount: bigint
+): bigint {
+  const zero = BigInt(0);
+  if (chargeAmount <= zero) return zero;
+  if (amountRefunded >= chargeAmount) return grossAmount;
+  if (amountRefunded <= zero) return zero;
+  return (grossAmount * amountRefunded) / chargeAmount;
+}
+
+/**
+ * Apply a cumulative refund of `refundedGrossCents` against donation.grossAmount.
+ * Stripe redelivers charge.refunded with a running total; we reverse only the
+ * delta since donation.refundedAmount. Full refund (target >= gross) claims
+ * COMPLETED → REFUNDED. Partial refunds stay COMPLETED.
+ *
+ * Omitting refundedGrossCents refunds the remainder in full (refundDonation).
+ */
+export async function applyRefund(
+  donationId: string,
+  refundedGrossCents?: bigint
+) {
   return runMoneyTransaction(async (tx) => {
+    const current = await tx.donation.findUnique({
+      where: { id: donationId },
+    });
+    if (!current) return null;
+
+    const zero = BigInt(0);
+    const gross = current.grossAmount;
+    let target =
+      refundedGrossCents === undefined ? gross : refundedGrossCents;
+    if (target < zero) target = zero;
+    if (target > gross) target = gross;
+
+    if (current.status === "REFUNDED") {
+      return current.refundedAmount >= target ? current : null;
+    }
+    if (current.status !== "COMPLETED") {
+      return null;
+    }
+
+    const prev = current.refundedAmount;
+    if (target <= prev) {
+      return current;
+    }
+
+    const fully = target >= gross;
     const transitioned = await tx.donation.updateMany({
-      where: { id: donationId, status: "COMPLETED" },
-      data: { status: "REFUNDED" },
+      where: {
+        id: donationId,
+        status: "COMPLETED",
+        refundedAmount: prev,
+      },
+      data: {
+        refundedAmount: target,
+        status: fully ? "REFUNDED" : "COMPLETED",
+      },
     });
 
     if (transitioned.count === 0) {
-      return null;
+      const again = await tx.donation.findUnique({
+        where: { id: donationId },
+      });
+      if (again && again.refundedAmount >= target) {
+        return again;
+      }
+      throw new Error(`Refund claim lost for donation ${donationId}`);
     }
 
     const donation = await tx.donation.findUnique({
@@ -242,13 +333,21 @@ export async function refundDonation(donationId: string) {
     });
     if (!donation) return null;
 
+    const grossDelta =
+      allocatedShare(gross, target, gross) -
+      allocatedShare(gross, prev, gross);
+    const netDelta =
+      allocatedShare(current.netAmount, target, gross) -
+      allocatedShare(current.netAmount, prev, gross);
+    const feeDelta =
+      allocatedShare(current.platformFee, target, gross) -
+      allocatedShare(current.platformFee, prev, gross);
+
     await tx.campaign.update({
       where: { id: donation.campaignId },
-      data: { currentAmount: { decrement: donation.grossAmount } },
+      data: { currentAmount: { decrement: grossDelta } },
     });
 
-    // Identical scoping to completeDonation so a refund always decrements the
-    // exact row the original donation incremented.
     const teamMemberId = donation.teamMemberId || donation.referralCode;
     if (teamMemberId) {
       await tx.teamMember.updateMany({
@@ -257,7 +356,7 @@ export async function refundDonation(donationId: string) {
           campaignId: donation.campaignId,
           deletedAt: null,
         },
-        data: { amountRaised: { decrement: donation.grossAmount } },
+        data: { amountRaised: { decrement: grossDelta } },
       });
     }
 
@@ -269,9 +368,9 @@ export async function refundDonation(donationId: string) {
       const updated = await tx.bankingAccount.update({
         where: { id: bankingAccount.id },
         data: {
-          totalRaised: { decrement: donation.grossAmount },
-          availableBalance: { decrement: donation.netAmount },
-          platformFeesCollected: { decrement: donation.platformFee },
+          totalRaised: { decrement: grossDelta },
+          availableBalance: { decrement: netDelta },
+          platformFeesCollected: { decrement: feeDelta },
         },
       });
 
@@ -279,26 +378,264 @@ export async function refundDonation(donationId: string) {
         data: {
           bankingAccountId: bankingAccount.id,
           type: "REFUND",
-          amount: -donation.netAmount,
+          amount: -netDelta,
           balanceAfter: updated.availableBalance,
           donationId: donation.id,
-          description: `Refund for donation ${donation.id}`,
-          // System-generated: no createdBy user (FK to User.id)
+          description: fully
+            ? `Refund for donation ${donation.id}`
+            : `Partial refund (${target} of ${gross} cents) for donation ${donation.id}`,
         },
       });
 
-      // Reverse the platform fee in the ledger so FEE_COLLECTION totals
-      // reconcile with bankingAccount.platformFeesCollected.
       await tx.transaction.create({
         data: {
           bankingAccountId: bankingAccount.id,
           type: "FEE_COLLECTION",
-          amount: -donation.platformFee,
+          amount: -feeDelta,
           balanceAfter: updated.availableBalance,
           donationId: donation.id,
           description: `Platform fee reversal for refunded donation ${donation.id}`,
         },
       });
+    }
+
+    return donation;
+  });
+}
+
+/** Full refund — wrapper around applyRefund for existing callers. */
+export async function refundDonation(donationId: string) {
+  return applyRefund(donationId);
+}
+
+type StripeDisputeFeeSource = {
+  balance_transactions?: Array<string | { fee?: number | null } | null> | null;
+};
+
+/**
+ * Stripe's dispute fee in cents from expanded `balance_transactions`.
+ * Unexpanded id strings and missing fees return 0 — we do not guess $15.
+ */
+export function stripeDisputeFeeCents(dispute: StripeDisputeFeeSource): bigint {
+  const txs = dispute.balance_transactions;
+  if (!Array.isArray(txs)) return BigInt(0);
+
+  let fee = BigInt(0);
+  for (const entry of txs) {
+    if (!entry || typeof entry === "string") continue;
+    if (typeof entry.fee === "number" && Number.isFinite(entry.fee) && entry.fee > 0) {
+      fee += BigInt(Math.trunc(entry.fee));
+    }
+  }
+  return fee;
+}
+
+/**
+ * Atomically mark a COMPLETED donation DISPUTED and reverse its credits,
+ * plus Stripe's dispute fee. Idempotent for the same disputeId.
+ *
+ * availableBalance is allowed to go negative — the campaign may already have
+ * disbursed the funds. BANK_ADMIN alerting lives in the webhook, not here.
+ */
+export async function applyChargeback(
+  donationId: string,
+  options: { disputeId: string; feeCents: bigint }
+) {
+  const zero = BigInt(0);
+  const feeCents = options.feeCents > zero ? options.feeCents : zero;
+
+  return runMoneyTransaction(async (tx) => {
+    const transitioned = await tx.donation.updateMany({
+      where: { id: donationId, status: "COMPLETED" },
+      data: {
+        status: "DISPUTED",
+        disputeId: options.disputeId,
+        disputedAt: new Date(),
+        disputeFee: feeCents,
+      },
+    });
+
+    if (transitioned.count === 0) {
+      const existing = await tx.donation.findUnique({
+        where: { id: donationId },
+      });
+      if (
+        existing?.status === "DISPUTED" &&
+        existing.disputeId === options.disputeId
+      ) {
+        return existing;
+      }
+      return null;
+    }
+
+    const donation = await tx.donation.findUnique({
+      where: { id: donationId },
+    });
+    if (!donation) return null;
+
+    const remaining = remainingCredits(donation);
+
+    await tx.campaign.update({
+      where: { id: donation.campaignId },
+      data: { currentAmount: { decrement: remaining.gross } },
+    });
+
+    const teamMemberId = donation.teamMemberId || donation.referralCode;
+    if (teamMemberId) {
+      await tx.teamMember.updateMany({
+        where: {
+          id: teamMemberId,
+          campaignId: donation.campaignId,
+          deletedAt: null,
+        },
+        data: { amountRaised: { decrement: remaining.gross } },
+      });
+    }
+
+    const bankingAccount = await tx.bankingAccount.findUnique({
+      where: { campaignId: donation.campaignId },
+    });
+
+    if (bankingAccount) {
+      const updated = await tx.bankingAccount.update({
+        where: { id: bankingAccount.id },
+        data: {
+          totalRaised: { decrement: remaining.gross },
+          availableBalance: { decrement: remaining.net + feeCents },
+          platformFeesCollected: { decrement: remaining.platformFee },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          bankingAccountId: bankingAccount.id,
+          type: "CHARGEBACK",
+          amount: -remaining.net,
+          balanceAfter: updated.availableBalance,
+          donationId: donation.id,
+          description: `Chargeback ${options.disputeId} for donation ${donation.id}`,
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          bankingAccountId: bankingAccount.id,
+          type: "FEE_COLLECTION",
+          amount: -remaining.platformFee,
+          balanceAfter: updated.availableBalance,
+          donationId: donation.id,
+          description: `Platform fee reversal for disputed donation ${donation.id}`,
+        },
+      });
+
+      if (feeCents > BigInt(0)) {
+        await tx.transaction.create({
+          data: {
+            bankingAccountId: bankingAccount.id,
+            type: "ADJUSTMENT",
+            amount: -feeCents,
+            balanceAfter: updated.availableBalance,
+            donationId: donation.id,
+            description: `Stripe dispute fee for ${options.disputeId}`,
+          },
+        });
+      }
+    }
+
+    return donation;
+  });
+}
+
+/**
+ * Atomically restore a DISPUTED donation to COMPLETED (merchant won / funds
+ * reinstated) and reverse the chargeback ledger. Idempotent: a second delivery
+ * finds COMPLETED and is a no-op.
+ */
+export async function reinstateChargeback(donationId: string) {
+  return runMoneyTransaction(async (tx) => {
+    const transitioned = await tx.donation.updateMany({
+      where: { id: donationId, status: "DISPUTED" },
+      data: { status: "COMPLETED" },
+    });
+
+    if (transitioned.count === 0) {
+      return null;
+    }
+
+    const donation = await tx.donation.findUnique({
+      where: { id: donationId },
+    });
+    if (!donation) return null;
+
+    const feeCents =
+      donation.disputeFee > BigInt(0) ? donation.disputeFee : BigInt(0);
+    const remaining = remainingCredits(donation);
+
+    await tx.campaign.update({
+      where: { id: donation.campaignId },
+      data: { currentAmount: { increment: remaining.gross } },
+    });
+
+    const teamMemberId = donation.teamMemberId || donation.referralCode;
+    if (teamMemberId) {
+      await tx.teamMember.updateMany({
+        where: {
+          id: teamMemberId,
+          campaignId: donation.campaignId,
+          deletedAt: null,
+        },
+        data: { amountRaised: { increment: remaining.gross } },
+      });
+    }
+
+    const bankingAccount = await tx.bankingAccount.findUnique({
+      where: { campaignId: donation.campaignId },
+    });
+
+    if (bankingAccount) {
+      const updated = await tx.bankingAccount.update({
+        where: { id: bankingAccount.id },
+        data: {
+          totalRaised: { increment: remaining.gross },
+          availableBalance: { increment: remaining.net + feeCents },
+          platformFeesCollected: { increment: remaining.platformFee },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          bankingAccountId: bankingAccount.id,
+          type: "CHARGEBACK",
+          amount: remaining.net,
+          balanceAfter: updated.availableBalance,
+          donationId: donation.id,
+          description: `Chargeback reversal for donation ${donation.id}`,
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          bankingAccountId: bankingAccount.id,
+          type: "FEE_COLLECTION",
+          amount: remaining.platformFee,
+          balanceAfter: updated.availableBalance,
+          donationId: donation.id,
+          description: "Platform fee",
+        },
+      });
+
+      if (feeCents > BigInt(0)) {
+        await tx.transaction.create({
+          data: {
+            bankingAccountId: bankingAccount.id,
+            type: "ADJUSTMENT",
+            amount: feeCents,
+            balanceAfter: updated.availableBalance,
+            donationId: donation.id,
+            description: `Stripe dispute fee reversal for ${donation.disputeId ?? donation.id}`,
+          },
+        });
+      }
     }
 
     return donation;

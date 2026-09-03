@@ -59,7 +59,7 @@ export default function PlayerProfileEditor() {
     position: "",
     grade: "",
     favoriteQuote: "",
-    isProfilePublic: true,
+    isProfilePublic: false,
   });
 
   useEffect(() => {

@@ -7,6 +7,11 @@ import {
   checkDonationEmailRateLimit,
 } from "@/lib/utils/rate-limiter";
 import { checkCsrf } from "@/lib/csrf";
+import {
+  decideTeamMemberAttribution,
+  teamMemberAttributionWhere,
+} from "@/lib/donation-attribution";
+import { isPubliclyListableCampaign } from "@/lib/public-campaign";
 
 // Hard ceiling applied at parse time, before PlatformSettings is consulted.
 // Also the fallback max when no settings row exists.
@@ -141,18 +146,32 @@ export async function POST(req: NextRequest) {
       ? grossAmountInCents - platformFee
       : grossAmountInCents - platformFee - processingFee;
 
-    // If a team member is being supported, make sure they belong to this campaign
+    // If a team member is being supported, they must resolve on this campaign.
+    // Athlete URLs carry fundLinkCode, not the cuid — look up either. A miss
+    // is 400: silently dropping attribution would credit the campaign while
+    // the donor still sees the player's page.
     let teamMemberId: string | undefined;
-    if (validatedData.teamMemberId) {
+    if (validatedData.teamMemberId?.trim()) {
       const teamMember = await prisma.teamMember.findFirst({
-        where: {
-          id: validatedData.teamMemberId,
-          campaignId: validatedData.campaignId,
-          deletedAt: null,
-        },
+        where: teamMemberAttributionWhere(
+          validatedData.campaignId,
+          validatedData.teamMemberId.trim()
+        ),
         select: { id: true },
       });
-      teamMemberId = teamMember?.id;
+      const decision = decideTeamMemberAttribution(
+        validatedData.teamMemberId,
+        teamMember?.id
+      );
+      if (decision.status === "reject") {
+        return NextResponse.json(
+          { success: false, error: "Team member not found" },
+          { status: 400 }
+        );
+      }
+      if (decision.status === "use") {
+        teamMemberId = decision.teamMemberId;
+      }
     }
 
     // referralCode is caller-supplied on this unauthenticated endpoint, so it is
@@ -203,9 +222,11 @@ export async function POST(req: NextRequest) {
       metadata: {
         donationId: donation.id,
         campaignName: `${campaign.organizationName} ${campaign.teamName}`,
+        grossAmount: String(grossAmountInCents),
         ...(coverFees && { coverFees: "true" }),
         ...(validatedData.donorName && { donorName: validatedData.donorName }),
         ...(referralCode && { referralCode }),
+        ...(teamMemberId && { teamMemberId }),
       },
     });
 
@@ -278,6 +299,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Campaign ID is required" },
         { status: 400 }
+      );
+    }
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { status: true },
+    });
+    if (!campaign || !isPubliclyListableCampaign(campaign.status)) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
       );
     }
 

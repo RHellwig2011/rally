@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { isPubliclyListableCampaign } from "@/lib/public-campaign";
 
 /**
  * GET /api/team-members/[teamMemberId]/public
@@ -48,6 +49,13 @@ export async function GET(
     });
 
     if (!teamMember) {
+      return NextResponse.json(
+        { error: "Player not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!isPubliclyListableCampaign(teamMember.campaign.status)) {
       return NextResponse.json(
         { error: "Player not found" },
         { status: 404 }
