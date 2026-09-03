@@ -500,14 +500,38 @@ export async function sendDonationReceipt(params: {
   amountInCents: number;
   donationDate: Date;
   taxDeductible: boolean;
+  /**
+   * H4: IRS-shaped receipt fields. Only meaningful when taxDeductible is
+   * true; a deductible receipt without legalName+ein is still sent but omits
+   * the deductibility claim (we must not assert deductibility we cannot
+   * substantiate with the org's identity).
+   */
+  orgLegalName?: string | null;
+  ein?: string | null;
 }) {
-  const { toEmail, donorName, campaignName, amountInCents, donationDate, taxDeductible } = params;
+  const { toEmail, donorName, campaignName, amountInCents, donationDate } = params;
+
+  // The deductibility claim requires the org's legal identity on the receipt.
+  const taxDeductible =
+    params.taxDeductible && !!params.orgLegalName && !!params.ein;
 
   const subject = `Thank you for your donation to ${campaignName}`;
 
   // Formatted once: the same figure appears three times across the HTML and
   // text bodies, and they must not be able to drift apart.
   const formattedAmount = `$${(amountInCents / 100).toFixed(2)}`;
+
+  // IRS substantiation block (Pub. 1771): legal name, EIN, amount, date, and
+  // the goods-or-services statement.
+  const irsHtml = taxDeductible
+    ? `
+        <p><strong>Organization:</strong> ${params.orgLegalName}</p>
+        <p><strong>EIN:</strong> ${params.ein}</p>
+        <p><em>No goods or services were provided in exchange for this contribution. ${params.orgLegalName} is a tax-exempt organization under Section 501(c)(3) of the Internal Revenue Code. Please retain this receipt for your tax records.</em></p>`
+    : "";
+  const irsText = taxDeductible
+    ? `- Organization: ${params.orgLegalName}\n- EIN: ${params.ein}\n\nNo goods or services were provided in exchange for this contribution. ${params.orgLegalName} is a tax-exempt organization under Section 501(c)(3) of the Internal Revenue Code. Please retain this receipt for your tax records.`
+    : "";
 
   const html = `
 <!DOCTYPE html>
@@ -541,7 +565,7 @@ export async function sendDonationReceipt(params: {
         <p><strong>Campaign:</strong> ${campaignName}</p>
         <p><strong>Amount:</strong> ${formattedAmount}</p>
         <p><strong>Date:</strong> ${donationDate.toLocaleDateString()}</p>
-        <p><strong>Tax Deductible:</strong> ${taxDeductible ? 'Yes' : 'No'}</p>
+        <p><strong>Tax Deductible:</strong> ${taxDeductible ? 'Yes' : 'No'}</p>${irsHtml}
       </div>
 
       ${taxDeductible ? '<p><em>This donation is tax-deductible. Please keep this receipt for your records.</em></p>' : ''}
@@ -570,7 +594,7 @@ Receipt Details:
 - Amount: ${formattedAmount}
 - Date: ${donationDate.toLocaleDateString()}
 - Tax Deductible: ${taxDeductible ? 'Yes' : 'No'}
-
+${irsText}
 ${taxDeductible ? 'This donation is tax-deductible. Please keep this receipt for your records.' : ''}
 
 Your support makes a real difference!

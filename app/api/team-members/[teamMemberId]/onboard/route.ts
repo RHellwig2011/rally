@@ -205,6 +205,14 @@ export async function POST(
       );
     }
 
+    // H12: a claimed spot with a linked account gets its share-link Referral
+    // row minted here (idempotent; nothing else creates them). Failure only
+    // degrades the share link to untracked — never fail the onboarding.
+    if (userId) {
+      const { ensureReferral } = await import('@/lib/referrals');
+      await ensureReferral(teamMember.campaignId, userId);
+    }
+
     // Re-fetch the claimed row for the welcome messages below.
     const updatedTeamMember = await prisma.teamMember.findUniqueOrThrow({
       where: { id: teamMemberId },

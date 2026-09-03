@@ -113,13 +113,17 @@ export async function POST(
         // Send confirmation email (only from the caller that won the race)
         try {
           const { sendDonationReceipt } = await import('@/lib/email');
+          const { getReceiptTaxIdentity } = await import('@/lib/receipts');
+          const taxIdentity = await getReceiptTaxIdentity(donation.campaignId);
           await sendDonationReceipt({
             toEmail: donation.donorEmail,
             donorName: donation.donorName || 'Anonymous Donor',
             campaignName: `${donation.campaign.teamName} - ${donation.campaign.organizationName}`,
             amountInCents: Number(donation.grossAmount),
             donationDate: donation.createdAt,
-            taxDeductible: false, // TODO: Set based on campaign's tax-exempt status
+            // H4: deductibility + org identity resolved from the campaign's
+            // Program (501(c)(3) status, legal name, EIN).
+            ...taxIdentity,
           });
         } catch (emailError) {
           console.error('Failed to send confirmation email:', emailError);

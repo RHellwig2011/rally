@@ -158,6 +158,14 @@ model Program {
   sport             String?
   slug              String     @unique
 
+  // H4: legal/tax identity for IRS-shaped receipts. Receipts only claim
+  // tax-deductibility when isTaxExempt is true, and then they must carry the
+  // legal name + EIN and the no-goods-or-services statement. Set by the org's
+  // leadership; verified by staff as part of org verification.
+  legalName         String?
+  ein               String?    // Employer Identification Number, "XX-XXXXXXX"
+  isTaxExempt       Boolean    @default(false) // 501(c)(3) determination on file
+
   createdById       String
   createdBy         User       @relation("ProgramCreator", fields: [createdById], references: [id])
 
@@ -402,6 +410,10 @@ enum PaymentMethod {
   CARD
   ACH
   WALLET
+  // H8: staff-recorded offline gifts. These never touch Stripe and never
+  // credit availableBalance — the coach already holds the money.
+  CASH
+  CHECK
 }
 
 enum PaymentProvider {

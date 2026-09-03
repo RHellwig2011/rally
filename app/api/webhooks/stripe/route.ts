@@ -139,19 +139,23 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
     try {
       const { sendDonationReceipt } = await import("@/lib/email");
+      const { getReceiptTaxIdentity } = await import("@/lib/receipts");
       const campaign = await prisma.campaign.findUnique({
         where: { id: existingDonation.campaignId },
         select: { organizationName: true, teamName: true },
       });
 
       if (campaign) {
+        const taxIdentity = await getReceiptTaxIdentity(
+          existingDonation.campaignId
+        );
         await sendDonationReceipt({
           toEmail: existingDonation.donorEmail,
           donorName: existingDonation.donorName || "Donor",
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
           amountInCents: Number(existingDonation.grossAmount),
           donationDate: existingDonation.createdAt,
-          taxDeductible: false,
+          ...taxIdentity,
         });
       }
     } catch (emailError) {
@@ -187,19 +191,21 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
     try {
       const { sendDonationReceipt } = await import("@/lib/email");
+      const { getReceiptTaxIdentity } = await import("@/lib/receipts");
       const campaign = await prisma.campaign.findUnique({
         where: { id: campaignId },
         select: { organizationName: true, teamName: true },
       });
 
       if (campaign) {
+        const taxIdentity = await getReceiptTaxIdentity(campaignId);
         await sendDonationReceipt({
           toEmail: donorEmail,
           donorName: donorName || "Donor",
           campaignName: `${campaign.organizationName} ${campaign.teamName}`,
           amountInCents: Number(reconstructed.grossAmount),
           donationDate: new Date(),
-          taxDeductible: false,
+          ...taxIdentity,
         });
       }
     } catch (emailError) {

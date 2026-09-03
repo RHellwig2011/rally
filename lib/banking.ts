@@ -382,6 +382,119 @@ export async function processDonation(params: {
 }
 
 /**
+ * H8: record an offline (cash / paper check) donation a staff member already
+ * has in hand. Same Donation table and Transaction ledger as card gifts so
+ * totals, leaderboards, and exports agree — but the platform never holds this
+ * money, so:
+ *   - no platform or processing fee is assessed (all fee columns are 0), and
+ *   - availableBalance is NOT credited; the DEPOSIT ledger row records the
+ *     gross with the unchanged balance as balanceAfter, so the ledger still
+ *     reconciles against what the platform can actually disburse.
+ * Campaign currentAmount / totalRaised / player amountRaised DO include it.
+ */
+export async function recordOfflineDonation(params: {
+  campaignId: string;
+  recordedByUserId: string;
+  grossAmount: bigint | number;
+  method: "CASH" | "CHECK";
+  donorName?: string;
+  donorEmail?: string;
+  donorMessage?: string;
+  isAnonymous?: boolean;
+  teamMemberId?: string;
+  /** e.g. a check number; goes into the ledger description only. */
+  reference?: string;
+}): Promise<ProcessDonationResult> {
+  const grossAmount =
+    typeof params.grossAmount === "bigint"
+      ? params.grossAmount
+      : BigInt(params.grossAmount);
+  if (grossAmount <= BigInt(0)) {
+    throw new Error("Offline donation amount must be positive");
+  }
+
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: params.campaignId },
+    include: { bankingAccount: true },
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  if (!campaign.bankingAccount) {
+    throw new Error("Banking account not set up for this campaign");
+  }
+
+  // Strict attribution, same policy as processDonation: an unresolvable id is
+  // an error for a staff-entered record (they picked from a roster UI).
+  let teamMemberId: string | undefined;
+  if (params.teamMemberId) {
+    const member = await prisma.teamMember.findFirst({
+      where: teamMemberAttributionWhere(params.campaignId, params.teamMemberId),
+      select: { id: true },
+    });
+    const decision = decideTeamMemberAttribution(params.teamMemberId, member?.id);
+    if (decision.status === "reject") {
+      throw new Error("Team member not found on this campaign");
+    }
+    if (decision.status === "use") teamMemberId = decision.teamMemberId;
+  }
+
+  return runMoneyTransaction(async (tx) => {
+    const donation = await tx.donation.create({
+      data: {
+        campaignId: params.campaignId,
+        donorEmail: params.donorEmail || "offline@recorded.local",
+        donorName: params.donorName,
+        donorMessage: params.donorMessage,
+        grossAmount,
+        platformFee: BigInt(0),
+        processingFee: BigInt(0),
+        netAmount: grossAmount,
+        isAnonymous: params.isAnonymous ?? false,
+        status: "COMPLETED",
+        paymentProvider: "SIMULATED",
+        paymentMethod: params.method,
+        ...(teamMemberId && { teamMemberId }),
+      },
+    });
+
+    // totalRaised counts the gift; availableBalance deliberately does not.
+    const updatedBankingAccount = await tx.bankingAccount.update({
+      where: { id: campaign.bankingAccount!.id },
+      data: { totalRaised: { increment: grossAmount } },
+    });
+
+    const transaction = await tx.transaction.create({
+      data: {
+        bankingAccountId: campaign.bankingAccount!.id,
+        type: TransactionType.DEPOSIT,
+        amount: grossAmount,
+        balanceAfter: updatedBankingAccount.availableBalance,
+        donationId: donation.id,
+        description: `Offline ${params.method.toLowerCase()} donation${
+          params.reference ? ` (${params.reference})` : ""
+        } recorded by staff${
+          params.donorName ? ` from ${params.donorName}` : ""
+        } — held outside platform balance`,
+        createdBy: params.recordedByUserId,
+      },
+    });
+
+    await tx.campaign.update({
+      where: { id: params.campaignId },
+      data: { currentAmount: { increment: grossAmount } },
+    });
+
+    if (teamMemberId) {
+      await tx.teamMember.updateMany({
+        where: { id: teamMemberId, campaignId: params.campaignId, deletedAt: null },
+        data: { amountRaised: { increment: grossAmount } },
+      });
+    }
+
+    return { donation, transaction, bankingAccount: updatedBankingAccount };
+  });
+}
+
+/**
  * Get banking account summary
  */
 export async function getBankingAccountSummary(bankingAccountId: string) {
