@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
+import crypto from 'crypto';
+import { getUserFromToken } from '@/lib/auth';
+import {
+  claimTeamMemberOnboarding,
+  isInvitationTokenExpired,
+} from '@/lib/onboarding';
 
 /**
  * POST /api/team-members/[teamMemberId]/onboard
  * Complete team member onboarding - add contact info and parent details
  * PUBLIC endpoint (uses invitation token for auth)
+ *
+ * C4/H14: completing onboarding is also the one-time CLAIM of the roster
+ * spot. The claim is a conditional updateMany (see lib/onboarding.ts) that
+ * links the member to a User, clears the invitation token, and refuses to
+ * run twice — a concurrent double POST has exactly one winner.
  */
 
 const onboardingSchema = z.object({
@@ -27,6 +39,62 @@ const onboardingSchema = z.object({
   secondParentEmail: z.string().email('Invalid second parent email').optional().or(z.literal('')),
   secondParentPhone: z.string().optional().or(z.literal('')),
 });
+
+/**
+ * Resolve the User this roster spot should be linked to (C4).
+ *
+ * An authenticated requester claims the spot as themselves. Otherwise we key
+ * off the onboarded email: an existing account is linked as-is, and a new
+ * one is provisioned with an unusable random passwordHash (same pattern as
+ * OAuth sign-up) that the player can replace via the password-reset flow.
+ *
+ * Returns null when there is no email to key an account to (SMS-only member)
+ * — the claim still proceeds, the spot just stays unlinked.
+ */
+async function resolveClaimUserId(
+  request: NextRequest,
+  memberName: string,
+  onboardedEmail: string | null
+): Promise<string | null> {
+  const sessionToken = request.cookies.get('sessionToken')?.value;
+  if (sessionToken) {
+    const sessionUser = await getUserFromToken(sessionToken);
+    if (sessionUser) return sessionUser.id;
+  }
+
+  if (!onboardedEmail) return null;
+  const email = onboardedEmail.toLowerCase();
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return existing.id;
+
+  const [firstName, ...rest] = memberName.trim().split(/\s+/);
+  try {
+    const created = await prisma.user.create({
+      data: {
+        email,
+        firstName: firstName || memberName,
+        lastName: rest.join(' ') || firstName || memberName,
+        role: 'PLAYER',
+        // Unusable for password login; replaced via the reset flow.
+        passwordHash: crypto.randomBytes(48).toString('hex'),
+        emailVerified: false,
+      },
+    });
+    return created.id;
+  } catch (error) {
+    // A concurrent signup/claim beat us to this email — link that account
+    // instead of failing the onboarding.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const raced = await prisma.user.findUnique({ where: { email } });
+      if (raced) return raced.id;
+    }
+    throw error;
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -63,6 +131,14 @@ export async function POST(
       );
     }
 
+    // H14: the token must be live. Fail closed on a missing expiry.
+    if (isInvitationTokenExpired(teamMember)) {
+      return NextResponse.json(
+        { error: 'This invitation link has expired. Ask your coach to resend the invitation.' },
+        { status: 410 }
+      );
+    }
+
     // Check if already completed
     if (teamMember.onboardingCompletedAt) {
       return NextResponse.json(
@@ -83,19 +159,27 @@ export async function POST(
       );
     }
 
-    // Update team member with onboarding info.
-    //
-    // Contact fields fall back to what the coach already had on file rather than
-    // to null: the form pre-fills them but does not require them, so a player
-    // who leaves the email box alone must not have their invite-time address
-    // erased — that address is how the campaign reaches them.
+    // C4: figure out which User this spot links to BEFORE claiming, so the
+    // link lands atomically with the rest of the onboarding write.
+    const userId = await resolveClaimUserId(
+      request,
+      teamMember.name,
+      validatedData.email || teamMember.email
+    );
+
+    // Contact fields fall back to what the coach already had on file rather
+    // than to null: the form pre-fills them but does not require them, so a
+    // player who leaves the email box alone must not have their invite-time
+    // address erased — that address is how the campaign reaches them.
     //
     // Phone is written to `phoneNumber`, not the legacy `phone` column. Every
-    // staff-facing read and write uses `phoneNumber`; a number stored in `phone`
-    // was never visible to the coach anywhere.
-    const updatedTeamMember = await prisma.teamMember.update({
-      where: { id: teamMemberId },
-      data: {
+    // staff-facing read and write uses `phoneNumber`; a number stored in
+    // `phone` was never visible to the coach anywhere.
+    const claim = await claimTeamMemberOnboarding({
+      teamMemberId,
+      invitationToken: validatedData.invitationToken,
+      userId,
+      profileData: {
         email: validatedData.email || teamMember.email,
         phoneNumber: validatedData.phone || teamMember.phoneNumber,
         parentFirstName: validatedData.parentFirstName,
@@ -108,16 +192,22 @@ export async function POST(
         secondParentLastName: validatedData.secondParentLastName || null,
         secondParentEmail: validatedData.secondParentEmail || null,
         secondParentPhone: validatedData.secondParentPhone || null,
-        onboardingCompletedAt: new Date(),
-        // Onboarding IS acceptance of the invitation. Without these two, the
-        // `?status=accepted` roster filter could never return an onboarded
-        // player, the roster badge showed them as pending forever, and the
-        // resend-invite guard (`invitationStatus === "ACCEPTED"`) was
-        // unreachable — so the system would re-email a player who had already
-        // finished, and reset them to PENDING.
-        invitationStatus: "ACCEPTED",
-        joinedAt: new Date(),
       },
+    });
+
+    if (claim !== 'claimed') {
+      // Lost a concurrent double-submit, the token expired between our check
+      // and the write, or the spot was already linked. Either way this
+      // request must not apply its own copy of the onboarding.
+      return NextResponse.json(
+        { error: 'Onboarding already completed' },
+        { status: 400 }
+      );
+    }
+
+    // Re-fetch the claimed row for the welcome messages below.
+    const updatedTeamMember = await prisma.teamMember.findUniqueOrThrow({
+      where: { id: teamMemberId },
       include: {
         campaign: {
           select: {
@@ -214,6 +304,7 @@ export async function POST(
         id: updatedTeamMember.id,
         name: updatedTeamMember.name,
         campaignSlug: updatedTeamMember.campaign.slug,
+        claimedByUserId: updatedTeamMember.userId,
       },
     });
 
@@ -277,6 +368,15 @@ export async function GET(
       return NextResponse.json(
         { error: 'Invalid invitation token or team member not found' },
         { status: 404 }
+      );
+    }
+
+    // H14: surface expiry distinctly from an invalid token so the page can
+    // tell the player to ask for a resend rather than to recheck the link.
+    if (isInvitationTokenExpired(teamMember)) {
+      return NextResponse.json(
+        { error: 'This invitation link has expired. Ask your coach to resend the invitation.' },
+        { status: 410 }
       );
     }
 

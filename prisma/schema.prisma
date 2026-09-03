@@ -674,6 +674,10 @@ model TeamMember {
 
   // Invitation & Onboarding
   invitationToken       String?           @unique
+  // H14: set on create/resend (14-day TTL, see lib/onboarding.ts); cleared
+  // with the token on successful claim. Null on pre-expiry rows is
+  // backfilled by migration 00000000000007 and otherwise treated as expired.
+  invitationTokenExpiresAt DateTime?
   invitationStatus      InvitationStatus  @default(PENDING)
   invitationSentAt      DateTime?
   onboardingCompletedAt DateTime?

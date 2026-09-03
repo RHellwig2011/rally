@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
@@ -17,6 +16,7 @@ import {
   sendTeamMemberInvitation,
   formatFundraisingLink,
 } from "@/lib/utils/team-member";
+import { generateInvitationToken, invitationTokenExpiry } from "@/lib/onboarding";
 import {
   checkRateLimit,
   getRateLimitIdentifier,
@@ -277,7 +277,7 @@ export async function POST(
 
       for (const rowData of validation.validRows) {
         const email = rowData.email.toLowerCase();
-        const invitationToken = crypto.randomBytes(32).toString("hex");
+        const invitationToken = generateInvitationToken();
 
         const shared = {
           name: rowData.name,
@@ -288,6 +288,7 @@ export async function POST(
           position: rowData.position || null,
           grade: rowData.grade || null,
           invitationToken,
+          invitationTokenExpiresAt: invitationTokenExpiry(),
           invitationStatus: "PENDING" as const,
           invitationSentAt: new Date(),
         };
