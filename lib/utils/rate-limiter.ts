@@ -7,11 +7,13 @@
  *  - a cold start or redeploy wipes all counters, handing an attacker a fresh
  *    budget on demand.
  * That is acceptable for a single long-lived instance and is still far better
- * than no throttle, but a multi-instance production deployment MUST back this
- * with shared storage (Redis, Vercel KV, Upstash) so buckets are global. The
- * exported surface (checkRateLimit / checkAuthRateLimit / checkLoginRateLimit /
- * checkDonationRateLimit) is the seam to swap: replace the store behind it and
- * no route handler changes.
+ * than no throttle. For multi-instance production the GLOBAL middleware limit
+ * is already backed by the shared Redis store in ./rate-limit-store (Upstash
+ * REST, configured via UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN), which
+ * falls back to this in-memory limiter when Redis is unconfigured or down.
+ * The exported surface (checkRateLimit / checkAuthRateLimit /
+ * checkLoginRateLimit / checkDonationRateLimit) remains the sync seam other
+ * route handlers use; those per-route buckets are still per-instance.
  */
 
 import { NextResponse } from "next/server";
