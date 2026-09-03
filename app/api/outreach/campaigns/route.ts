@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
-import { sendSMS, formatPhoneNumber } from "@/lib/services/sms";
 import { partitionSuppressed } from "@/lib/suppression";
 import { checkCsrf } from "@/lib/csrf";
+import {
+  deliverOutreachCampaign,
+  type OutreachContact,
+} from "@/lib/outreach";
 
 // Validation schema for creating an outreach campaign
 const createCampaignSchema = z.object({
@@ -18,14 +20,9 @@ const createCampaignSchema = z.object({
   // Only honoured for leader-level callers; see the authorization block below.
   teamMemberIds: z.array(z.string()).max(500).optional(),
   scheduledFor: z.string().datetime().optional(), // ISO datetime string
+  // Omit to send immediately. SCHEDULED requires a future scheduledFor.
+  status: z.enum(["SCHEDULED"]).optional(),
 });
-
-interface OutreachContact {
-  id: string;
-  email: string | null;
-  phone: string | null;
-  firstName: string | null;
-}
 
 /**
  * Default page size for the GET list below. Generous on purpose: existing
@@ -109,29 +106,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (validatedData.scheduledFor) {
+    const wantsSchedule =
+      validatedData.status === "SCHEDULED" || Boolean(validatedData.scheduledFor);
+
+    if (validatedData.status === "SCHEDULED" && !validatedData.scheduledFor) {
+      return NextResponse.json(
+        { success: false, error: "scheduledFor is required when status is SCHEDULED" },
+        { status: 400 }
+      );
+    }
+
+    if (wantsSchedule) {
       // A schedule in the past is a client bug, not a request to send now.
-      if (new Date(validatedData.scheduledFor).getTime() <= Date.now()) {
+      if (
+        !validatedData.scheduledFor ||
+        new Date(validatedData.scheduledFor).getTime() <= Date.now()
+      ) {
         return NextResponse.json(
           { success: false, error: "scheduledFor must be a future date and time" },
           { status: 400 }
         );
       }
-
-      // TODO: implement the scheduled-outreach worker (a /api/cron/* job that
-      // picks up OutreachCampaign rows with status SCHEDULED and a due
-      // scheduledFor, then calls sendOutreachMessages). Until it exists a
-      // SCHEDULED row is never dispatched, so accepting one here would tell a
-      // coach their appeal is queued and then silently never send it. Fail
-      // loudly instead; the send-now path (no scheduledFor) is unaffected.
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Scheduled outreach is not available yet. Send now by omitting scheduledFor.",
-        },
-        { status: 501 }
-      );
     }
 
     // Determine which team members' contacts this caller may address.
@@ -188,19 +183,21 @@ export async function POST(req: NextRequest) {
         createdBy: user.id,
         name: validatedData.name,
         type: validatedData.type,
-        status: validatedData.scheduledFor ? "SCHEDULED" : "SENDING",
+        status: wantsSchedule ? "SCHEDULED" : "SENDING",
         emailSubject: validatedData.emailSubject,
         emailBody: validatedData.emailBody,
         smsBody: validatedData.smsBody,
-        scheduledFor: validatedData.scheduledFor ? new Date(validatedData.scheduledFor) : null,
+        scheduledFor: wantsSchedule && validatedData.scheduledFor
+          ? new Date(validatedData.scheduledFor)
+          : null,
         totalRecipients: allContacts.length,
       },
     });
 
     // If not scheduled, send immediately
-    if (!validatedData.scheduledFor) {
+    if (!wantsSchedule) {
       // Send emails and SMS in the background (don't wait)
-      sendOutreachMessages(
+      deliverOutreachCampaign(
         outreachCampaign.id,
         { emailContacts, smsContacts, suppressedEmailContacts, suppressedSmsContacts },
         validatedData,
@@ -221,7 +218,7 @@ export async function POST(req: NextRequest) {
         attempted,
         queued: attempted - skipped,
         skipped,
-        message: validatedData.scheduledFor
+        message: wantsSchedule
           ? "Outreach campaign scheduled"
           : `Outreach campaign is being sent to ${attempted - skipped} of ${attempted} recipient${
               attempted !== 1 ? "s" : ""
@@ -257,266 +254,6 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * OutreachLog.status is the Prisma `MessageStatus` enum, which has no SKIPPED
- * member (PENDING/SENT/DELIVERED/FAILED/OPENED/CLICKED). A suppressed
- * recipient is therefore recorded as FAILED with an explicit opt-out reason
- * and a NULL sentAt — never as SENT. prisma/schema.prisma is owned elsewhere;
- * adding a SKIPPED member there would let this read as what it really is.
- */
-const SUPPRESSED_LOG_STATUS = "FAILED" as const;
-const SUPPRESSED_EMAIL_REASON = "Recipient has opted out of email (suppressed)";
-const SUPPRESSED_SMS_REASON = "Recipient has opted out of SMS (suppressed)";
-
-/**
- * Send outreach messages to contacts
- */
-async function sendOutreachMessages(
-  outreachCampaignId: string,
-  audience: {
-    emailContacts: OutreachContact[];
-    smsContacts: OutreachContact[];
-    suppressedEmailContacts: OutreachContact[];
-    suppressedSmsContacts: OutreachContact[];
-  },
-  campaignData: {
-    type: "EMAIL" | "SMS" | "BOTH";
-    emailSubject?: string;
-    emailBody?: string;
-    smsBody?: string;
-  },
-  campaignSlug: string,
-  programId: string | null
-) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const donationLink = `${appUrl}/raise/${campaignSlug}/donate`;
-
-  let emailsSent = 0;
-  let smsSent = 0;
-  let skipped = 0;
-
-  // Record the people we deliberately withheld from, up front. This is the
-  // row a CAN-SPAM/TCPA audit looks for: it proves we honoured the opt-out.
-  for (const contact of audience.suppressedEmailContacts) {
-    skipped++;
-    await prisma.outreachLog.create({
-      data: {
-        outreachCampaignId,
-        contactId: contact.id,
-        type: "EMAIL",
-        recipientEmail: contact.email,
-        status: SUPPRESSED_LOG_STATUS,
-        sentAt: null,
-        failureReason: SUPPRESSED_EMAIL_REASON,
-      },
-    });
-  }
-
-  for (const contact of audience.suppressedSmsContacts) {
-    skipped++;
-    await prisma.outreachLog.create({
-      data: {
-        outreachCampaignId,
-        contactId: contact.id,
-        type: "SMS",
-        recipientPhone: contact.phone,
-        status: SUPPRESSED_LOG_STATUS,
-        sentAt: null,
-        failureReason: SUPPRESSED_SMS_REASON,
-      },
-    });
-  }
-
-  // Send email
-  for (const contact of audience.emailContacts) {
-    if (!contact.email) continue;
-
-    try {
-      // Replace placeholders in email
-      const firstName = contact.firstName || "Friend";
-      // Function replacers: contact names are user-supplied, so a `$&`/`$\``/
-      // `$'` sequence must be inserted literally rather than expanded.
-      const personalizedBody = campaignData.emailBody!
-        .replace(/\{firstName\}/g, () => firstName)
-        .replace(/\{donationLink\}/g, () => donationLink);
-
-      const result = await sendEmail({
-        to: contact.email,
-        subject: campaignData.emailSubject!,
-        html: personalizedBody,
-        text: personalizedBody.replace(/<[^>]*>/g, ""), // Strip HTML tags for text version
-        programId,
-      });
-
-      // A suppressed recipient is NOT a delivery. Logging it as SENT with a
-      // timestamp would misrepresent an opt-out we correctly honoured.
-      if (result.status === "SUPPRESSED") {
-        skipped++;
-
-        await prisma.outreachLog.create({
-          data: {
-            outreachCampaignId,
-            contactId: contact.id,
-            type: "EMAIL",
-            recipientEmail: contact.email,
-            status: SUPPRESSED_LOG_STATUS,
-            sentAt: null,
-            failureReason: SUPPRESSED_EMAIL_REASON,
-          },
-        });
-      } else {
-        emailsSent++;
-
-        // Log the outreach
-        await prisma.outreachLog.create({
-          data: {
-            outreachCampaignId,
-            contactId: contact.id,
-            type: "EMAIL",
-            recipientEmail: contact.email,
-            status: "SENT",
-            sentAt: new Date(),
-            emailProvider: "resend",
-            providerMessageId: result.id ?? null,
-          },
-        });
-
-        // Update contact
-        await prisma.contact.update({
-          where: { id: contact.id },
-          data: {
-            emailsSent: { increment: 1 },
-            lastContactedAt: new Date(),
-          },
-        });
-      }
-    } catch (error) {
-      console.error(`Failed to send email to ${contact.email}:`, error);
-
-      await prisma.outreachLog.create({
-        data: {
-          outreachCampaignId,
-          contactId: contact.id,
-          type: "EMAIL",
-          recipientEmail: contact.email,
-          status: "FAILED",
-          failureReason: error instanceof Error ? error.message : "Unknown error",
-        },
-      });
-    }
-
-    // Small delay to avoid rate limiting
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  // Send SMS
-  for (const contact of audience.smsContacts) {
-    if (!contact.phone) continue;
-
-    try {
-      const formattedPhone = formatPhoneNumber(contact.phone);
-      if (!formattedPhone) {
-        throw new Error("Invalid phone number format");
-      }
-
-      const firstName = contact.firstName || "Friend";
-      // Function replacers — see the email branch above.
-      const personalizedBody = campaignData.smsBody!
-        .replace(/\{firstName\}/g, () => firstName)
-        .replace(/\{donationLink\}/g, () => donationLink);
-
-      const result = await sendSMS({
-        to: formattedPhone,
-        message: personalizedBody,
-        programId,
-      });
-
-      if (result.suppressed) {
-        skipped++;
-
-        await prisma.outreachLog.create({
-          data: {
-            outreachCampaignId,
-            contactId: contact.id,
-            type: "SMS",
-            recipientPhone: contact.phone,
-            status: SUPPRESSED_LOG_STATUS,
-            sentAt: null,
-            failureReason: result.error || SUPPRESSED_SMS_REASON,
-          },
-        });
-      } else if (!result.success) {
-        await prisma.outreachLog.create({
-          data: {
-            outreachCampaignId,
-            contactId: contact.id,
-            type: "SMS",
-            recipientPhone: contact.phone,
-            status: "FAILED",
-            failureReason: result.error || "Send failed",
-          },
-        });
-      } else {
-        smsSent++;
-
-        await prisma.outreachLog.create({
-          data: {
-            outreachCampaignId,
-            contactId: contact.id,
-            type: "SMS",
-            recipientPhone: contact.phone,
-            status: "SENT",
-            sentAt: new Date(),
-            smsProvider: "twilio",
-            providerMessageId: result.messageId ?? null,
-          },
-        });
-
-        await prisma.contact.update({
-          where: { id: contact.id },
-          data: {
-            smsSent: { increment: 1 },
-            lastContactedAt: new Date(),
-          },
-        });
-      }
-    } catch (error) {
-      console.error(`Failed to send SMS to ${contact.phone}:`, error);
-
-      await prisma.outreachLog.create({
-        data: {
-          outreachCampaignId,
-          contactId: contact.id,
-          type: "SMS",
-          recipientPhone: contact.phone,
-          status: "FAILED",
-          failureReason: error instanceof Error ? error.message : "Unknown error",
-        },
-      });
-    }
-
-    // Small delay to avoid rate limiting
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  if (skipped > 0) {
-    console.warn(
-      `🔕 Outreach campaign ${outreachCampaignId}: skipped ${skipped} opted-out recipient(s).`
-    );
-  }
-
-  // Update campaign stats with what actually went out.
-  await prisma.outreachCampaign.update({
-    where: { id: outreachCampaignId },
-    data: {
-      status: emailsSent + smsSent > 0 ? "SENT" : "FAILED",
-      emailsSent,
-      smsSent,
-      sentAt: emailsSent + smsSent > 0 ? new Date() : null,
-    },
-  });
 }
 
 /**
