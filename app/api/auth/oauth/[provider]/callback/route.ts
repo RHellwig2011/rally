@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createRefreshToken, generateJwt } from "@/lib/auth";
+import { createRefreshToken, generateJwt, ACCESS_TOKEN_MAX_AGE_SEC, REFRESH_COOKIE_MAX_AGE_SEC } from "@/lib/auth";
 import {
   exchangeCodeForIdentity,
   getProviderConfig,
@@ -75,6 +75,7 @@ async function findOrCreateUser(
       firstName,
       lastName,
       emailVerified: identity.emailVerified,
+      termsAcceptedAt: new Date(),
       [providerField]: identity.providerSubject,
     } as any,
   });
@@ -146,13 +147,13 @@ async function handleCallback(
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
   });
   response.cookies.set("refresh_token", refresh, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: REFRESH_COOKIE_MAX_AGE_SEC,
     sameSite: "lax",
   });
   // State cookie is single-use.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Archivo, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Atmosphere } from "@/components/atmosphere";
+import { SessionKeepAlive } from "@/components/session-keep-alive";
 
 // Type system, per the "C · Stadium" design brief (§2):
 //   Archivo (600/700/800) — display/headings/numbers-as-display.
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body className={inter.className}>
         {/* Fixed floodlights / grain / red top rule behind every route. */}
         <Atmosphere />
+        <SessionKeepAlive />
         {children}
       </body>
     </html>

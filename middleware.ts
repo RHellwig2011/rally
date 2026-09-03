@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
     "/create-campaign",
     "/auth/verify-email",
     "/auth/reset-password",
-    "/test-donation",
+    ...(process.env.NODE_ENV !== "production" ? ["/test-donation"] : []),
     "/api/csrf-token",
     // Uptime monitors and deploy smoke tests call this with no credentials.
     "/api/health",

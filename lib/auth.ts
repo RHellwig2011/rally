@@ -6,7 +6,9 @@ import crypto from "crypto";
 
 import { JWT_SECRET } from "./jwt-secret";
 
-const JWT_EXPIRES_IN = "30d"; // access token lifetime — matches the 30-day sessionToken cookie
+const JWT_EXPIRES_IN = "15m";
+export const ACCESS_TOKEN_MAX_AGE_SEC = 15 * 60;
+export const REFRESH_COOKIE_MAX_AGE_SEC = 30 * 24 * 60 * 60;
 
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 30);
 
@@ -40,9 +42,11 @@ export async function registerUser(data: {
   lastName: string;
   role?: string;
   phone?: string;
+  termsAccepted?: boolean;
 }) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw new Error("Email already in use");
+  if (!data.termsAccepted) throw new Error("Terms must be accepted");
 
   const passwordHash = await bcrypt.hash(data.password, 10);
 
@@ -61,6 +65,7 @@ export async function registerUser(data: {
       verificationToken,
       verificationTokenExpiry,
       emailVerified: false,
+      termsAcceptedAt: new Date(),
     },
   });
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rotateRefreshToken, generateJwt } from "@/lib/auth";
+import { rotateRefreshToken, generateJwt, ACCESS_TOKEN_MAX_AGE_SEC, REFRESH_COOKIE_MAX_AGE_SEC } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days, matches login
+const COOKIE_MAX_AGE = REFRESH_COOKIE_MAX_AGE_SEC;
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: COOKIE_MAX_AGE,
+      maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
     });
     res.cookies.set("refresh_token", newRefresh, {
       httpOnly: true,

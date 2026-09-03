@@ -109,6 +109,16 @@ export async function POST(
       );
     }
 
+    if (!campaign.bankingAccount.payoutAccountVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Complete Stripe payout onboarding before requesting a disbursement",
+        },
+        { status: 400 }
+      );
+    }
+
     const amountInCents = BigInt(Math.round(validatedData.amount * 100));
 
     // Check for pending disbursements

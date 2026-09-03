@@ -10,6 +10,9 @@ const registerSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Terms of Service" }),
+  }),
 });
 
 export async function POST(req: NextRequest) {
@@ -24,7 +27,10 @@ export async function POST(req: NextRequest) {
       return rateLimitCheck.response!;
     }
 
-    const { user, verificationToken } = await registerUser(validated);
+    const { user, verificationToken } = await registerUser({
+      ...validated,
+      termsAccepted: true,
+    });
 
     // Send verification email (don't await - let it happen in background)
     sendEmailVerification({

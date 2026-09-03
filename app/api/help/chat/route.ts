@@ -70,8 +70,7 @@ AI FEATURES:
 BANKING & PAYOUTS:
 - Funds held in secure campaign banking accounts
 - Transparent tracking of all transactions
-- Guardian approval required for large withdrawals (configurable threshold)
-- One-click payouts to linked bank account
+- Payouts require a completed Stripe Connect account and BANK_ADMIN approval. Approver cannot be the same person who requested the disbursement.
 - Real-time balance updates
 
 SUPPORT:

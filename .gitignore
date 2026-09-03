@@ -39,3 +39,4 @@ NEW_CREDENTIALS_TRACKER.md
 API_KEYS_AND_STATUS.csv
 *CREDENTIALS*
 *credentials*.csv
+.worktrees/

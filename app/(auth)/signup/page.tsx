@@ -44,6 +44,7 @@ function SignupForm() {
     email: "",
     password: "",
     confirmPassword: "",
+    acceptedTerms: false,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,11 @@ function SignupForm() {
       return;
     }
 
+    if (!formData.acceptedTerms) {
+      setError("You must accept the Terms of Service and Privacy Policy");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -78,7 +84,8 @@ function SignupForm() {
           lastName: formData.lastName,
           email: formData.email,
           password: formData.password,
-          role: "CAMPAIGN_LEADER", // Default role for new signups
+          role: "CAMPAIGN_LEADER",
+          acceptedTerms: true,
         }),
       });
 
@@ -237,6 +244,31 @@ function SignupForm() {
                 disabled={loading}
                 className="h-12"
               />
+            </div>
+
+            <div className="flex items-start gap-2 text-sm">
+              <input
+                id="acceptedTerms"
+                name="acceptedTerms"
+                type="checkbox"
+                className="mt-1"
+                checked={formData.acceptedTerms}
+                onChange={(e) =>
+                  setFormData({ ...formData, acceptedTerms: e.target.checked })
+                }
+                required
+                disabled={loading}
+              />
+              <Label htmlFor="acceptedTerms" className="font-normal leading-snug">
+                I agree to the{" "}
+                <Link href="/terms" className="text-primary-300 hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="text-primary-300 hover:underline">
+                  Privacy Policy
+                </Link>
+              </Label>
             </div>
 
             <Button

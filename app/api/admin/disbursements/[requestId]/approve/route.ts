@@ -131,6 +131,16 @@ export async function PUT(
       );
     }
 
+    if (disbursementRequest.requestedBy === user.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "The person who requested a disbursement cannot approve it",
+        },
+        { status: 403 }
+      );
+    }
+
     // The conditional updateMany is the concurrency guard (same pattern as
     // lib/donations.ts completeDonation): only one caller ever transitions
     // PENDING -> APPROVED. No balance bookkeeping happens here, so this needs no

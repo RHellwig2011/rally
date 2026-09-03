@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginUser } from "@/lib/auth";
+import { loginUser, ACCESS_TOKEN_MAX_AGE_SEC, REFRESH_COOKIE_MAX_AGE_SEC } from "@/lib/auth";
 import {
   checkLoginRateLimit,
   recordFailedLogin,
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 30 * 24 * 60 * 60, // 30 days, matches the JWT lifetime in lib/auth.ts
+      maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
     });
 
     if (result.refresh) {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: REFRESH_COOKIE_MAX_AGE_SEC,
         sameSite: "lax",
       });
     }

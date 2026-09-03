@@ -10,6 +10,9 @@ const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   role: z.enum(['CAMPAIGN_LEADER', 'GUARDIAN', 'DONOR']).optional(),
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Terms of Service" }),
+  }),
 });
 
 export async function POST(request: NextRequest) {
@@ -31,6 +34,7 @@ export async function POST(request: NextRequest) {
       firstName: validatedData.firstName,
       lastName: validatedData.lastName,
       role: validatedData.role || 'CAMPAIGN_LEADER',
+      termsAccepted: true,
     });
 
     // Send verification email in the background — the token belongs only in
@@ -61,6 +65,13 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof Error && error.message.includes("Terms must be accepted")) {
+      return NextResponse.json(
+        { success: false, error: "You must accept the Terms of Service" },
         { status: 400 }
       );
     }

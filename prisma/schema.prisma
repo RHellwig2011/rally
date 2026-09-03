@@ -82,6 +82,7 @@ model User {
   emailVerified Boolean   @default(false)
   phoneVerified Boolean   @default(false)
   kycStatus     KYCStatus?
+  termsAcceptedAt DateTime?
 
   // Metadata
   programsCreated   Program[]      @relation("ProgramCreator")
