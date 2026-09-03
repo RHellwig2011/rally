@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtEdge } from "./lib/auth/edge";
-import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from "./lib/utils/rate-limiter";
+import { getClientIdentifier, RATE_LIMITS } from "./lib/utils/rate-limiter";
+import { checkSharedRateLimit } from "./lib/utils/rate-limit-store";
 import { applySecurityHeaders } from "./lib/utils/security-headers";
 
 export async function middleware(request: NextRequest) {
@@ -17,7 +18,10 @@ export async function middleware(request: NextRequest) {
     }
 
     const identifier = getClientIdentifier(request, userId);
-    const { limited, info } = checkRateLimit(identifier, RATE_LIMITS.GLOBAL);
+    // Shared (Redis-backed) counter so the global budget is per-deployment,
+    // not per-instance; falls back to the in-memory limiter when Redis is
+    // unconfigured or unreachable.
+    const { limited, info } = await checkSharedRateLimit(identifier, RATE_LIMITS.GLOBAL);
 
     if (limited) {
       return NextResponse.json(
