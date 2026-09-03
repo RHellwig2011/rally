@@ -106,11 +106,11 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-[rgba(4,6,10,.72)] flex items-center justify-center z-[110] p-4">
+      <div className="rounded-2xl border border-white/10 bg-[linear-gradient(165deg,var(--bb-night-4),#121826)] text-foreground shadow-sheet max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold font-display text-foreground">
               {isEditing ? 'Edit Team Member' : 'Add Team Member'}
             </h2>
             <button
@@ -133,8 +133,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.name ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.name ? 'border-warning' : ''
                 }`}
                 placeholder="John Doe"
                 required
@@ -154,8 +154,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 value={formData.email}
                 onChange={handleInputChange}
                 disabled={isEditing}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.email ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.email ? 'border-warning' : ''
                 } ${isEditing ? 'bg-muted cursor-not-allowed' : ''}`}
                 placeholder="john.doe@example.com"
                 required
@@ -177,8 +177,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="personalGoal"
                 value={formData.personalGoal}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.personalGoal ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.personalGoal ? 'border-warning' : ''
                 }`}
                 placeholder="500"
                 min="1"
@@ -200,8 +200,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="position"
                 value={formData.position}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.position ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.position ? 'border-warning' : ''
                 }`}
                 placeholder="Forward, Goalkeeper, etc."
                 maxLength={50}
@@ -220,8 +220,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="grade"
                 value={formData.grade}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.grade ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.grade ? 'border-warning' : ''
                 }`}
                 placeholder="12, Senior, College Freshman, etc."
                 maxLength={20}
@@ -240,8 +240,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="phoneNumber"
                 value={formData.phoneNumber}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.phoneNumber ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.phoneNumber ? 'border-warning' : ''
                 }`}
                 placeholder="+1234567890"
               />
@@ -259,8 +259,8 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="profilePhotoUrl"
                 value={formData.profilePhotoUrl}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.profilePhotoUrl ? 'border-warning' : 'border-border'
+                className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
+                  errors.profilePhotoUrl ? 'border-warning' : ''
                 }`}
                 placeholder="https://example.com/photo.jpg"
               />
@@ -279,7 +279,7 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-foreground disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : isEditing ? 'Update' : 'Add Member'}
               </button>

@@ -19,8 +19,9 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      // BRIEF §3 "Modal": overlay is rgba(4,6,10,.72).
-      "fixed inset-0 z-50 bg-[rgba(4,6,10,.72)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // BRIEF §3 "Modal": overlay is rgba(4,6,10,.72). z-[110] so modals sit
+      // above the atmosphere TopRule (z-[100]).
+      "fixed inset-0 z-[110] bg-[rgba(4,6,10,.72)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -38,7 +39,9 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         // Night gradient card, 16px radius, spring entrance (BRIEF §3 "Modal").
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] p-7 text-foreground shadow-[0_30px_80px_rgba(0,0,0,.7)] duration-200 ease-spring data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        // max-h + overflow keep tall modals (campaign settings) reachable on
+        // short viewports; z-[110] sits above the atmosphere TopRule.
+        "fixed left-[50%] top-[50%] z-[110] grid max-h-[calc(100dvh-2rem)] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-2xl border border-white/10 bg-[linear-gradient(165deg,var(--bb-night-4),#121826)] p-7 text-foreground shadow-sheet duration-200 ease-spring data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       {...props}

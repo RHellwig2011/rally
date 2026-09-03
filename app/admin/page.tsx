@@ -307,8 +307,8 @@ export default function AdminOverviewPage() {
                       className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0"
                     >
                       <div className="flex-shrink-0 mt-1">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                          <TrendingUp className="w-4 h-4 text-primary" />
+                        <div className="w-8 h-8 rounded-full bg-[rgba(200,16,46,.14)] flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-primary-300" />
                         </div>
                       </div>
                       <div className="flex-1">
@@ -320,7 +320,7 @@ export default function AdminOverviewPage() {
                             campaign.status === 'ACTIVE' ? 'bg-success-light text-success-dark' :
                             campaign.status === 'DRAFT' ? 'bg-muted text-foreground' :
                             campaign.status === 'COMPLETED' ? 'bg-white/[0.08] text-foreground' :
-                            'bg-[rgba(232,163,61,.14)] text-[#E8A33D]'
+                            'bg-[rgba(232,163,61,.14)] text-[var(--bb-warning)]'
                           }`}>
                             {campaign.status}
                           </span>
@@ -438,7 +438,7 @@ export default function AdminOverviewPage() {
                         <p className="font-semibold text-foreground">
                           {formatCurrency(Number(disbursement.requestedAmount))}
                         </p>
-                        <span className="text-xs bg-[rgba(232,163,61,.14)] text-[#E8A33D] px-2 py-1 rounded-full">
+                        <span className="text-xs bg-[rgba(232,163,61,.14)] text-[var(--bb-warning)] px-2 py-1 rounded-full">
                           Pending
                         </span>
                       </div>

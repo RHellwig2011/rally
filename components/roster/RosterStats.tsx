@@ -21,8 +21,8 @@ export function RosterStats({
   const progressPercentage = totalGoal > 0 ? Math.min((totalRaised / totalGoal) * 100, 100) : 0;
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-lg font-semibold mb-4">Team Overview</h2>
+    <div className="rounded-card border border-white/10 bg-card shadow-card p-6">
+      <h2 className="text-lg font-semibold font-display text-foreground mb-4">Team Overview</h2>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -36,11 +36,11 @@ export function RosterStats({
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600">{pendingInvitations}</p>
+          <p className="text-2xl font-bold text-[var(--bb-warning)]">{pendingInvitations}</p>
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Total Raised</p>
-          <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalRaised)}</p>
+          <p className="text-2xl font-bold text-secondary">{formatCurrency(totalRaised)}</p>
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Team Goal</p>
@@ -57,7 +57,7 @@ export function RosterStats({
           </div>
           <div className="w-full bg-accent rounded-full h-3">
             <div
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500"
+              className="bg-secondary shadow-glow-accent h-3 rounded-full transition-all duration-500"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>

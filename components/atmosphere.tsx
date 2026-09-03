@@ -11,7 +11,8 @@
  * so Floodlights and Grain use negative z-index instead. `body` carries the
  * background and `html` does not, so the body background propagates to the
  * canvas and these layers still render on top of it. TopRule is z-[100],
- * above app chrome but below Radix overlays.
+ * above app chrome (headers are z-50) but below Radix overlays — dialogs are
+ * z-[110] and toasts z-[120], so modals never render under the red rule.
  */
 
 /** Fixed 3px team-red rule with glow across the top of every screen. */

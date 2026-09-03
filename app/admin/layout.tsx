@@ -65,7 +65,7 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen">
       {/* Top Navigation Bar */}
-      <nav className="border-b bg-white sticky top-0 z-50">
+      <nav className="border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/admin" className="flex items-center space-x-2">
@@ -73,7 +73,7 @@ export default function AdminLayout({
                 <span className="text-white font-bold text-lg">R</span>
               </div>
               <span className="text-2xl font-bold text-foreground">Rally</span>
-              <span className="text-sm bg-primary-100 text-primary px-2 py-1 rounded-full font-semibold ml-2">
+              <span className="text-sm bg-[rgba(200,16,46,.15)] text-primary-300 px-2 py-1 rounded-full font-semibold ml-2">
                 Admin
               </span>
             </Link>
@@ -85,8 +85,8 @@ export default function AdminLayout({
               </Button>
               {showUser && (
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                    <span className="text-primary font-semibold text-sm">{initials}</span>
+                  <div className="w-8 h-8 bg-[rgba(200,16,46,.15)] rounded-full flex items-center justify-center">
+                    <span className="text-primary-300 font-semibold text-sm">{initials}</span>
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-sm font-semibold text-foreground">{fullName}</p>
@@ -109,7 +109,7 @@ export default function AdminLayout({
 
       <div className="flex">
         {/* Sidebar Navigation */}
-        <aside className="hidden md:flex md:flex-col w-64 border-r bg-white min-h-[calc(100vh-4rem)]">
+        <aside className="hidden md:flex md:flex-col w-64 border-r border-border bg-card min-h-[calc(100vh-4rem)]">
           <nav className="flex-1 px-4 py-6 space-y-1">
             {navigation.map((item) => {
               const isActive = pathname === item.href;
@@ -120,7 +120,7 @@ export default function AdminLayout({
                   className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                     isActive
                       ? "bg-primary text-white"
-                      : "text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <item.icon className="w-5 h-5" />

@@ -29,7 +29,7 @@ export function GiftTicker({ items }: { items: GiftTickerItem[] }) {
   // Repeat short lists so one half of the track is always wider than the
   // viewport — otherwise the -50% loop exposes a gap.
   const sequence: GiftTickerItem[] = [];
-  while (sequence.length < MIN_SEQUENCE || sequence.length % items.length !== 0) {
+  while (sequence.length < MIN_SEQUENCE) {
     sequence.push(...items);
   }
 
@@ -50,7 +50,7 @@ export function GiftTicker({ items }: { items: GiftTickerItem[] }) {
   return (
     <div
       aria-hidden="true"
-      className="group relative z-10 overflow-hidden border-b border-white/10 bg-[#0A0E1A]"
+      className="group relative z-10 overflow-hidden border-b border-white/10 bg-[#0A0D14]"
     >
       <div className="flex w-max animate-marquee group-hover:[animation-play-state:paused] motion-reduce:animate-none">
         {renderSequence("a")}

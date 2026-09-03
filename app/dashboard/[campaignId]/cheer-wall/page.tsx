@@ -150,7 +150,7 @@ export default function CheerWallModerationPage() {
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 filter === tab.id
                   ? "bg-primary text-white"
-                  : "bg-white text-muted-foreground border border-border hover:border-primary-200"
+                  : "bg-card text-muted-foreground border border-border hover:border-primary"
               }`}
             >
               {tab.label} ({tab.count})
@@ -174,7 +174,7 @@ export default function CheerWallModerationPage() {
         ) : visible.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[rgba(200,16,46,.12)] rounded-full flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="w-8 h-8 text-primary" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-1">

@@ -14,7 +14,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "relative overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] text-card-foreground shadow-card",
+      "relative overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(165deg,var(--bb-night-4),#121826)] text-card-foreground shadow-card",
       "before:absolute before:inset-x-0 before:top-0 before:z-[1] before:h-[3px] before:bg-primary before:shadow-[0_0_12px_#C8102E] before:content-['']",
       className
     )}

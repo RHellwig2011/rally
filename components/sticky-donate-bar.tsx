@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 export function StickyDonateBar({
   watchId,
+  hideWhenVisibleId,
   feeLine,
   ctaLabel,
   ctaHref,
@@ -28,6 +29,13 @@ export function StickyDonateBar({
 }: {
   /** Id of the give block to watch; the bar appears once it scrolls past. */
   watchId: string;
+  /**
+   * Id of an element that suppresses the bar while it is on screen — e.g. the
+   * live donation form on the athlete page, which sits BELOW the watched give
+   * block, so without this the bar would hover over the card form the donor
+   * is filling in.
+   */
+  hideWhenVisibleId?: string;
   /** Small centered disclosure above the button, e.g. the $100 example net. */
   feeLine: string;
   ctaLabel: string;
@@ -40,12 +48,26 @@ export function StickyDonateBar({
   useEffect(() => {
     const target = document.getElementById(watchId);
     if (!target) return;
+    const suppressor = hideWhenVisibleId
+      ? document.getElementById(hideWhenVisibleId)
+      : null;
 
     // A plain scroll listener, not IntersectionObserver: IO only fires when
     // the intersection RATIO changes, so a give block that starts below the
     // fold and scrolls off the top (0% → 0%) never triggers a callback.
     // bottom < 0 is the whole rule — only when it scrolled off the TOP.
-    const update = () => setOn(target.getBoundingClientRect().bottom < 0);
+    const update = () => {
+      const past = target.getBoundingClientRect().bottom < 0;
+      // The suppressor counts as "in use" once its top is into the upper 60%
+      // of the viewport — the donor is looking at the form, so the redundant
+      // CTA bar gets out of the way. (A bottom-edge threshold would suppress
+      // the bar the instant the form peeks into view, which on short pages
+      // kills the bar entirely.)
+      const suppressed = suppressor
+        ? suppressor.getBoundingClientRect().top < window.innerHeight * 0.6
+        : false;
+      setOn(past && !suppressed);
+    };
     update();
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
@@ -53,18 +75,22 @@ export function StickyDonateBar({
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [watchId]);
+  }, [watchId, hideWhenVisibleId]);
 
   return (
     <div
       aria-hidden={!on}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgba(10,14,26,.94)] backdrop-blur-[10px]",
-        "transition-transform duration-500 ease-spring motion-reduce:transition-none lg:hidden",
+        "fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgba(10,13,20,.94)] backdrop-blur-[10px]",
+        // Stadium ease for the slide: the spring overshoots past y=0 mid-
+        // transition, briefly exposing page content under a bar that is
+        // supposed to sit flush on the bottom edge.
+        "transition-transform duration-500 ease-stadium motion-reduce:transition-none lg:hidden",
         on ? "translate-y-0" : "translate-y-full"
       )}
     >
-      <div className="mx-auto max-w-[480px] px-5 pb-3 pt-2.5">
+      {/* max() keeps the CTA clear of the iOS home indicator. */}
+      <div className="mx-auto max-w-[480px] px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
         <p className="mb-2 text-center text-[11px] tabular text-muted-foreground">
           {feeLine}
         </p>

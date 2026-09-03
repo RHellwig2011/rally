@@ -36,8 +36,10 @@ import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 // BRIEF §3 amount-chip / option-tile states. Unselected tiles sit on the night
 // wash; the selected one takes the team-red border, inner glow and drop halo.
+// The focus ring matches the Button base (primary-300 — full-alpha red is too
+// dim on the night shell for a focus indicator).
 const OPTION_TILE =
-  "rounded-xl border transition-all duration-200 ease-spring active:scale-[.97]";
+  "rounded-xl border transition-all duration-200 ease-spring active:scale-[.97] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 const OPTION_TILE_OFF =
   "border-white/10 bg-white/[0.04] text-foreground hover:-translate-y-0.5 hover:border-white/25";
 const OPTION_TILE_ON =
@@ -843,7 +845,7 @@ export default function CreateCampaignPage() {
 
               {/* Live preview of the public page — BRIEF §4 screen 06
                   ".preview-card": blinking LIVE dot, red rule, goal bar at 0. */}
-              <div className="overflow-hidden rounded-card border border-border bg-[linear-gradient(160deg,#1A2130,#12161F)] shadow-[0_30px_70px_rgba(0,0,0,.5)]">
+              <div className="overflow-hidden rounded-card border border-border bg-[linear-gradient(160deg,#1A2130,#12161F)] shadow-sheet">
                 <div className="flex items-center gap-2 border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   <span
                     aria-hidden="true"
@@ -1210,7 +1212,7 @@ function ReviewRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex flex-shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+        className="flex flex-shrink-0 items-center gap-1 text-sm font-medium text-primary-300 hover:underline"
       >
         <Pencil className="h-3.5 w-3.5" />
         Edit

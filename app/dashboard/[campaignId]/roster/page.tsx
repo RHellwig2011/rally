@@ -429,7 +429,7 @@ export default function RosterPage({
                             <span className="font-semibold tabular text-foreground">
                               #{index + 1}
                             </span>
-                            {index === 0 && <Trophy className="w-4 h-4 text-[#E8A33D]" />}
+                            {index === 0 && <Trophy className="w-4 h-4 text-[var(--bb-warning)]" />}
                           </div>
                         </td>
                         <td className={TD}>
@@ -461,7 +461,7 @@ export default function RosterPage({
                               Active
                             </span>
                           ) : member.invitationStatus === "PENDING" ? (
-                            <span className="inline-flex items-center rounded-full border border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.12)] px-2.5 py-0.5 text-xs font-semibold text-[#E8A33D]">
+                            <span className="inline-flex items-center rounded-full border border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.12)] px-2.5 py-0.5 text-xs font-semibold text-[var(--bb-warning)]">
                               <Mail className="w-3 h-3 mr-1" />
                               Invited
                             </span>

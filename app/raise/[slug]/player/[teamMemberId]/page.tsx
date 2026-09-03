@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, calculatePercentage } from "@/lib/utils";
-import { MONEY_HERO_SHADOW, formatWholeDollars } from "@/components/app-chrome";
+import { MONEY_HERO_SHADOW, SiteHeader, formatWholeDollars } from "@/components/app-chrome";
 import { StickyDonateBar } from "@/components/sticky-donate-bar";
 import DonationForm from "@/components/DonationForm";
 
@@ -200,32 +200,20 @@ export default function PlayerFundraisingPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Site header — BRIEF §3, same chrome as the team campaign page. */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
-              />
-              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
-                Bleacher Backers
-              </span>
-            </Link>
-            <Button
-              onClick={() =>
-                document
-                  .getElementById("donate")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              <Heart className="mr-2 h-4 w-4" />
-              Donate Now
-            </Button>
-          </div>
-        </div>
-      </nav>
+      {/* Site header — shared stadium-night chrome (BRIEF §3), same as the
+          team campaign page. */}
+      <SiteHeader>
+        <Button
+          onClick={() =>
+            document
+              .getElementById("donate")
+              ?.scrollIntoView({ behavior: "smooth" })
+          }
+        >
+          <Heart className="mr-2 h-4 w-4" />
+          Donate Now
+        </Button>
+      </SiteHeader>
 
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         {/* Back link to the team campaign — BRIEF §4 screen 02. */}
@@ -240,7 +228,7 @@ export default function PlayerFundraisingPage() {
         {/* Masthead */}
         <header className="pb-6 pt-5">
           <p
-            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-300 sm:text-[12px]"
             style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}
           >
             {data.campaign.organizationName} · {data.campaign.teamName}
@@ -343,7 +331,7 @@ export default function PlayerFundraisingPage() {
           {personalGoal !== null && (
             <>
               <p className="mt-3 text-sm text-muted-foreground">
-                of a <span className="tabular text-foreground">{formatCurrency(personalGoal)}</span>{" "}
+                of a <span className="tabular text-foreground">{formatWholeDollars(personalGoal / 100)}</span>{" "}
                 personal goal
               </p>
               <div
@@ -365,7 +353,7 @@ export default function PlayerFundraisingPage() {
                 </span>
                 {toGo !== null && (
                   <span>
-                    <span className="tabular text-foreground">{formatCurrency(toGo)}</span> to go
+                    <span className="tabular text-foreground">{formatWholeDollars(toGo / 100)}</span> to go
                   </span>
                 )}
               </div>
@@ -377,7 +365,7 @@ export default function PlayerFundraisingPage() {
             {[
               { v: String(data.stats.donationCount), k: "Supporters" },
               {
-                v: toGo !== null ? formatCurrency(toGo) : "—",
+                v: toGo !== null ? formatWholeDollars(toGo / 100) : "—",
                 k: "To go",
               },
               { v: String(data.stats.clickCount), k: "Page views" },
@@ -548,7 +536,7 @@ export default function PlayerFundraisingPage() {
                         &ldquo;{donation.donorMessage}&rdquo;
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-muted-foreground/70">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {new Date(donation.createdAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -603,9 +591,11 @@ export default function PlayerFundraisingPage() {
 
       {/* Sticky bottom donate bar — BRIEF §4 screen 02. Appears once the
           #give block scrolls off the top; the CTA scrolls back down to the
-          donation form. */}
+          donation form. Retracts while #donate (the live card form) is on
+          screen so it never covers the form being filled in. */}
       <StickyDonateBar
         watchId="give"
+        hideWhenVisibleId="donate"
         feeLine={`One platform fee — ${data.campaign.platformFeePercent}% — plus card processing, shown before you give`}
         ctaLabel={`Donate to ${data.teamMember.name.split(" ")[0]}'s fundraiser`}
         onCtaClick={() =>

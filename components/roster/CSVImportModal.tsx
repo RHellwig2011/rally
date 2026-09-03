@@ -149,11 +149,11 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-[rgba(4,6,10,.72)] flex items-center justify-center z-[110] p-4">
+      <div className="rounded-2xl border border-white/10 bg-[linear-gradient(165deg,var(--bb-night-4),#121826)] text-foreground shadow-sheet max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Import Team Members from CSV</h2>
+            <h2 className="text-2xl font-bold font-display text-foreground">Import Team Members from CSV</h2>
             <button
               onClick={onClose}
               className="text-muted-foreground hover:text-foreground"
@@ -165,7 +165,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
           {!importResult ? (
             <>
               {/* Instructions */}
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <div className="mb-4 p-4 border border-white/10 bg-white/[0.04] rounded-lg">
                 <h3 className="font-semibold mb-2">CSV Requirements:</h3>
                 <ul className="text-sm text-foreground space-y-1">
                   <li>• Required columns: name, email</li>
@@ -180,7 +180,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-                  ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-border hover:border-border'}`}
+                  ${isDragActive ? 'border-secondary bg-white/[0.04]' : 'border-white/10 hover:border-white/20'}`}
               >
                 <input {...getInputProps()} />
                 <svg
@@ -201,7 +201,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                   <div>
                     <p className="text-sm font-medium">{file.name}</p>
                     <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
-                    <p className="text-xs text-blue-600 mt-2">Click or drag to replace</p>
+                    <p className="text-xs text-secondary mt-2">Click or drag to replace</p>
                   </div>
                 ) : (
                   <div>
@@ -220,7 +220,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                 <a
                   href={`/api/campaigns/${campaignId}/import-roster`}
                   download="team_roster_template.csv"
-                  className="px-4 py-2 text-blue-600 hover:underline"
+                  className="px-4 py-2 text-secondary hover:underline"
                 >
                   Download Template
                 </a>
@@ -234,7 +234,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                   <button
                     onClick={handleImport}
                     disabled={!file || importing}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-foreground disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {importing ? 'Importing...' : 'Import'}
                   </button>
@@ -259,7 +259,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                     </div>
                     <div>
                       <p className="text-muted-foreground">Skipped</p>
-                      <p className="font-semibold text-yellow-600">{importResult.summary.skipCount}</p>
+                      <p className="font-semibold text-[var(--bb-warning)]">{importResult.summary.skipCount}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Errors</p>
@@ -272,7 +272,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                 {(importResult.results.errors.length > 0 || importResult.results.skipped.length > 0) && (
                   <button
                     onClick={() => setShowDetails(!showDetails)}
-                    className="text-blue-600 hover:underline text-sm"
+                    className="text-secondary hover:underline text-sm"
                   >
                     {showDetails ? 'Hide Details' : 'Show Details'}
                   </button>
@@ -297,10 +297,10 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
 
                     {importResult.results.skipped.length > 0 && (
                       <div>
-                        <h4 className="font-semibold text-yellow-600 mb-2">Skipped (Duplicates)</h4>
+                        <h4 className="font-semibold text-[var(--bb-warning)] mb-2">Skipped (Duplicates)</h4>
                         <div className="space-y-1">
                           {importResult.results.skipped.map((skip, index) => (
-                            <div key={index} className="text-sm p-2 bg-yellow-50 rounded">
+                            <div key={index} className="text-sm p-2 bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.45)] rounded">
                               Row {skip.row}: {skip.email} - {skip.reason}
                             </div>
                           ))}
@@ -315,7 +315,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
               <div className="flex justify-between mt-6">
                 <button
                   onClick={handleDownloadReport}
-                  className="px-4 py-2 text-blue-600 hover:underline"
+                  className="px-4 py-2 text-secondary hover:underline"
                 >
                   Download Report
                 </button>
@@ -331,7 +331,7 @@ export function CSVImportModal({ campaignId, onClose, onComplete }: CSVImportMod
                   </button>
                   <button
                     onClick={handleComplete}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
                   >
                     {importResult.success && importResult.summary.successCount > 0 ? 'Done' : 'Close'}
                   </button>

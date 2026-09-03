@@ -114,7 +114,7 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen bg-background">
       <Navigation />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -136,7 +136,7 @@ export default function HelpPage() {
           {/* Quick Links Sidebar */}
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-20">
-              <h3 className="font-display text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <h3 className="font-display text-lg font-semibold text-primary-300 mb-4 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
                 Quick questions
               </h3>
@@ -145,7 +145,7 @@ export default function HelpPage() {
                   <button
                     key={index}
                     onClick={() => handleQuickQuestion(question)}
-                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-primary-50 hover:text-primary rounded-lg transition-colors"
+                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-white/10 hover:text-primary rounded-lg transition-colors"
                   >
                     {question}
                   </button>
@@ -219,7 +219,7 @@ export default function HelpPage() {
                       className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                         message.role === "user"
                           ? "bg-primary text-white"
-                          : "bg-white border border-border text-foreground"
+                          : "bg-card border border-border text-foreground"
                       }`}
                     >
                       <div className="whitespace-pre-wrap break-words">
@@ -247,7 +247,7 @@ export default function HelpPage() {
                     <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
                       <Bot className="w-5 h-5" />
                     </div>
-                    <div className="bg-white border border-border rounded-2xl px-4 py-3">
+                    <div className="bg-card border border-border rounded-2xl px-4 py-3">
                       <div className="flex gap-1">
                         <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
                         <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
@@ -261,7 +261,7 @@ export default function HelpPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-4 border-t bg-white rounded-b-lg">
+              <div className="p-4 border-t bg-card rounded-b-lg">
                 <div className="flex gap-2">
                   <Input
                     ref={inputRef}
@@ -295,7 +295,7 @@ export default function HelpPage() {
         {/* Additional Help Resources */}
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-display text-lg font-semibold text-primary mb-2">Getting Started</h3>
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">Getting Started</h3>
             <p className="text-muted-foreground text-sm mb-4">
               Learn how to create your first campaign and start raising money
             </p>
@@ -305,7 +305,7 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-display text-lg font-semibold text-primary mb-2">Browse Campaigns</h3>
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">Browse Campaigns</h3>
             <p className="text-muted-foreground text-sm mb-4">
               See how other teams are using Bleacher Backers to reach their goals
             </p>
@@ -315,7 +315,7 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-display text-lg font-semibold text-primary mb-2">About Bleacher Backers</h3>
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">About Bleacher Backers</h3>
             <p className="text-muted-foreground text-sm mb-4">
               Learn more about our mission and what makes Bleacher Backers different
             </p>
@@ -327,7 +327,7 @@ export default function HelpPage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-12">
+      <footer className="border-t border-border bg-card mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved.</p>

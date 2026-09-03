@@ -64,20 +64,24 @@ export function TeamChip({
 /** Red initials avatar, as used by the coach/user slot in the header. */
 export function InitialsAvatar({
   initials,
+  name,
   className,
 }: {
   initials: string;
+  /** Full name for the accessible label; falls back to the initials. */
+  name?: string;
   className?: string;
 }) {
   return (
     <span
-      aria-hidden="true"
+      role="img"
+      aria-label={`Signed in as ${name || initials}`}
       className={cn(
         "flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-primary font-display text-[11px] font-bold text-primary-foreground shadow-[0_0_14px_rgba(200,16,46,.55)]",
         className
       )}
     >
-      {initials}
+      <span aria-hidden="true">{initials}</span>
     </span>
   );
 }
@@ -105,7 +109,7 @@ export function SiteHeader({
         className
       )}
     >
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Wordmark />
         {left}
         {children ? (
@@ -118,7 +122,9 @@ export function SiteHeader({
   );
 }
 
-/** 600/11px uppercase eyebrow in team red with a soft glow (BRIEF §2). */
+/** Eyebrow in team red with a soft glow (BRIEF §2). "team" tone is TEXT, so
+    it uses primary-300 (#F37287, ~7:1 on the night shell) — #C8102E fails AA
+    at 3.3:1 and is reserved for fills/rules. */
 export function Kicker({
   children,
   className,
@@ -133,7 +139,7 @@ export function Kicker({
       className={cn(
         "block text-[11px] font-semibold uppercase tracking-[0.16em]",
         tone === "team"
-          ? "text-primary [text-shadow:0_0_14px_rgba(200,16,46,.6)]"
+          ? "text-primary-300 [text-shadow:0_0_14px_rgba(200,16,46,.6)]"
           : "text-muted-foreground",
         className
       )}
@@ -185,27 +191,6 @@ export const tableStyles = {
   td: "border-b border-border px-4 py-3 align-middle tabular",
   tr: "transition-colors hover:bg-white/[0.04] [&:last-child>td]:border-b-0",
 } as const;
-
-/** Card heading: 800/15px uppercase Archivo with the green square bullet. */
-export function CardEyebrowTitle({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <h2
-      className={cn(
-        "flex items-center gap-2 font-display text-[15px] font-extrabold uppercase tracking-[0.04em] text-foreground",
-        "before:h-2 before:w-2 before:flex-none before:rounded-[2px] before:bg-secondary before:shadow-[0_0_10px_rgba(34,196,139,.8)] before:content-['']",
-        className
-      )}
-    >
-      {children}
-    </h2>
-  );
-}
 
 /**
  * Hero money numerals — BRIEF §2: big money is set as a display numeral

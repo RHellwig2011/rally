@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Heart, Share2, Users, Calendar, Trophy } from "lucide-react";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatRelativeTime, calculatePercentage, calculateDaysRemaining } from "@/lib/utils";
-import { MONEY_HERO_SHADOW, formatWholeDollars } from "@/components/app-chrome";
+import { MONEY_HERO_SHADOW, SiteHeader, formatWholeDollars } from "@/components/app-chrome";
 import { GiftTicker, type GiftTickerItem } from "@/components/gift-ticker";
 import { StickyDonateBar } from "@/components/sticky-donate-bar";
 
@@ -291,26 +291,13 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
         <ReferralTracker />
       </Suspense>
 
-      {/* Site header — BRIEF §3: translucent night bar, hairline rule, wordmark
-          with a red dot. Sits below the fixed red top rule from <Atmosphere />. */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
-              />
-              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
-                Bleacher Backers
-              </span>
-            </Link>
-            <Button asChild>
-              <Link href={`/raise/${params.slug}/donate`}>Donate to the team</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      {/* Site header — shared stadium-night chrome (BRIEF §3). Sits below the
+          fixed red top rule from <Atmosphere />. */}
+      <SiteHeader>
+        <Button asChild>
+          <Link href={`/raise/${params.slug}/donate`}>Donate to the team</Link>
+        </Button>
+      </SiteHeader>
 
       {/* Gift ticker — BRIEF §4 screen 01: live gifts and vitals in a
           marquee loop between the header and the masthead. */}
@@ -318,7 +305,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
       {/* Masthead — school kicker over the big uppercase team name. */}
       <header className="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-300 sm:text-[12px]"
            style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}>
           {campaign.organizationName}
         </p>
@@ -332,8 +319,8 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
           {nameHead}
           {nameTail && (
             <span
-              className="block text-transparent"
-              style={{ WebkitTextStroke: "1.5px #8B93A3", textShadow: "none" }}
+              className="outline-text block"
+              style={{ "--outline-stroke": "1.5px #8B93A3", textShadow: "none" } as CSSProperties}
             >
               {nameTail}
             </span>
@@ -399,8 +386,8 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
             ) : (
               <span
                 aria-hidden
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-[96px] font-extrabold leading-none text-transparent"
-                style={{ WebkitTextStroke: "2px rgba(255,255,255,.14)" }}
+                className="outline-text absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-[96px] font-extrabold leading-none"
+                style={{ "--outline-stroke": "2px rgba(255,255,255,.14)" } as CSSProperties}
               >
                 {campaign.teamName.charAt(0)}
               </span>
@@ -431,25 +418,34 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
           {formatWholeDollars(currentAmount / 100)}
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          of a <span className="tabular text-foreground">{formatCurrency(goalAmount)}</span> goal
+          of a <span className="tabular text-foreground">{formatWholeDollars(goalAmount / 100)}</span> goal
         </p>
 
-        <Progress variant="team" value={currentAmount} max={goalAmount} className="mt-5" />
+        <Progress
+          variant="team"
+          value={currentAmount}
+          max={goalAmount}
+          label="Campaign funding progress"
+          className="mt-5"
+        />
         <div className="mt-2 flex justify-between text-xs text-muted-foreground">
           <span>
             <span className="tabular text-foreground">{percentage}%</span> funded
           </span>
           <span>
-            <span className="tabular text-foreground">{formatCurrency(amountToGo)}</span> to go
+            <span className="tabular text-foreground">{formatWholeDollars(amountToGo / 100)}</span> to go
           </span>
         </div>
 
         {/* Three-stat grid — BRIEF §3 "Stat blocks". */}
         <div className="mt-6 grid grid-cols-3 gap-3.5">
           {[
-            { v: donorCount, k: "Donors" },
-            { v: daysLeft, k: "Days left" },
-            { v: campaign.updates.length, k: "Updates" },
+            { v: donorCount, k: donorCount === 1 ? "Donor" : "Donors" },
+            { v: daysLeft, k: daysLeft === 1 ? "Day left" : "Days left" },
+            {
+              v: campaign.updates.length,
+              k: campaign.updates.length === 1 ? "Update" : "Updates",
+            },
           ].map((stat) => (
             <div
               key={stat.k}

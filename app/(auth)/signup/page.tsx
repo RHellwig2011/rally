@@ -129,7 +129,9 @@ function SignupForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
+      {/* No opaque background here — the global Atmosphere (floodlights,
+          grain) must show through; body carries the night background. */}
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
@@ -249,29 +251,26 @@ function SignupForm() {
 
             <div className="text-center text-xs text-muted-foreground mt-4">
               By signing up, you agree to our{" "}
-              <Link href="/terms" className="text-primary hover:underline">
+              <Link href="/terms" className="text-primary-300 hover:underline">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="text-primary hover:underline">
+              <Link href="/privacy" className="text-primary-300 hover:underline">
                 Privacy Policy
               </Link>
             </div>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-2 text-muted-foreground">or</span>
-              </div>
+            <div className="my-4 flex items-center gap-3 text-sm">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-muted-foreground">or</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
 
             <div className="text-center text-sm">
               Already have an account?{" "}
               <Link
                 href={`/login${searchParams?.get("redirect") ? `?redirect=${encodeURIComponent(searchParams.get("redirect")!)}` : ""}`}
-                className="text-primary font-semibold hover:underline"
+                className="text-primary-300 font-semibold hover:underline"
               >
                 Sign in
               </Link>

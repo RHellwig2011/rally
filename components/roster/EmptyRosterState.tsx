@@ -45,7 +45,7 @@ export function EmptyRosterState({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-12 text-center">
+    <div className="rounded-card border border-white/10 bg-card shadow-card p-12 text-center">
       <svg
         className="mx-auto h-16 w-16 text-muted-foreground mb-4"
         fill="none"
@@ -70,7 +70,7 @@ export function EmptyRosterState({
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={onAddMember}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             <svg
               className="inline-block w-5 h-5 mr-2"
@@ -89,7 +89,7 @@ export function EmptyRosterState({
           </button>
           <button
             onClick={onImportCSV}
-            className="px-6 py-3 bg-success text-white rounded-lg hover:bg-success transition-colors"
+            className="px-6 py-3 bg-success text-success-foreground rounded-lg hover:bg-success/90 transition-colors"
           >
             <svg
               className="inline-block w-5 h-5 mr-2"

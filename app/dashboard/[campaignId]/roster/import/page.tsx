@@ -571,7 +571,7 @@ export default function RosterImportPage({
                                     : null
                                 )
                               }
-                              className="w-full max-w-xs rounded-md border border-border bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                              className="w-full max-w-xs rounded-md border border-border bg-card text-foreground px-2 py-1.5 text-sm [color-scheme:dark] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                             >
                               <option value="">Don’t import</option>
                               {FIELD_OPTIONS.map(([field, label]) => (

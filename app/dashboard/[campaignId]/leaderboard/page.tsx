@@ -121,7 +121,7 @@ export default function StaffLeaderboardPage({
   }, [params.campaignId, router]);
 
   const nav = (
-    <nav className="border-b bg-white sticky top-0 z-50">
+    <nav className="border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-2">
@@ -425,7 +425,7 @@ export default function StaffLeaderboardPage({
                           <td className="py-4 px-4">
                             <div className="flex flex-wrap gap-1.5">
                               {entry.publiclyVisible ? (
-                                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-700">
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[rgba(200,16,46,.12)] text-primary-300">
                                   <Eye className="w-3 h-3" />
                                   Public
                                 </span>

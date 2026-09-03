@@ -1,8 +1,10 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SportArtwork } from "@/components/SportArtwork";
 import { MarketingMobileNav } from "@/components/MarketingMobileNav";
+import { Wordmark } from "@/components/app-chrome";
 
 /**
  * Marketing home page.
@@ -24,9 +26,11 @@ import { MarketingMobileNav } from "@/components/MarketingMobileNav";
  */
 const HERO_PHOTO: string | null = null;
 
-/** BRIEF §2: red kicker/eyebrow — 600/11px Inter, wide tracking, red glow. */
+/** BRIEF §2: red kicker/eyebrow — 600/11px Inter, wide tracking, red glow.
+    Text is primary-300: #C8102E fails AA (3.3:1) at this size on the night
+    shell; red stays for fills and rules. */
 const KICKER =
-  "font-semibold uppercase tracking-[0.18em] text-primary text-[11px] sm:text-[12px]";
+  "font-semibold uppercase tracking-[0.18em] text-primary-300 text-[11px] sm:text-[12px]";
 const KICKER_GLOW = { textShadow: "0 0 14px rgba(200,16,46,.6)" };
 
 /** BRIEF §2: stacked red drop-shadow behind a display heading. */
@@ -35,10 +39,11 @@ const RED_STACK_SHADOW = {
     "0 2px 0 rgba(200,16,46,.5), 0 6px 0 rgba(200,16,46,.2), 0 18px 44px rgba(200,16,46,.25)",
 };
 
-/** BRIEF §3 "sec-num": 700 46px Archivo drawn as an outline, not a fill. */
+/** BRIEF §3 "sec-num": 700 46px Archivo drawn as an outline, not a fill.
+    .outline-text keeps it visible under forced-colors (see globals.css). */
 const SEC_NUM =
-  "font-display text-[38px] font-bold leading-none tracking-[-0.02em] text-transparent sm:text-[46px]";
-const SEC_NUM_STROKE = { WebkitTextStroke: "1.5px #8B93A3" };
+  "outline-text font-display text-[38px] font-bold leading-none tracking-[-0.02em] sm:text-[46px]";
+const SEC_NUM_STROKE = { "--outline-stroke": "1.5px #8B93A3" } as CSSProperties;
 
 /** Uppercase H2 that sits beside an outlined numeral. */
 const SEC_H2 =
@@ -150,16 +155,7 @@ export default function Home() {
           bottom rule. Sits under the fixed red top rule from <Atmosphere />. */}
       <header className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
         <div className="relative mx-auto flex h-[66px] max-w-[1180px] items-center gap-8 px-5 sm:px-8 lg:px-16">
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground"
-          >
-            <span
-              aria-hidden
-              className="h-[9px] w-[9px] rounded-full bg-primary shadow-glow-team"
-            />
-            Bleacher&nbsp;Backers
-          </Link>
+          <Wordmark />
           <nav className="ml-2 hidden gap-7 md:flex">
             <a href="#how" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               How it works
@@ -213,11 +209,11 @@ export default function Home() {
               >
                 Fund the
                 <span
-                  className="block text-transparent"
+                  className="outline-text block"
                   style={{
-                    WebkitTextStroke: "2px #EEF1F6",
+                    "--outline-stroke": "2px #EEF1F6",
                     textShadow: "none",
-                  }}
+                  } as CSSProperties}
                 >
                   season.
                 </span>
@@ -271,7 +267,7 @@ export default function Home() {
                     aria-hidden
                     className="absolute inset-0 bg-gradient-to-t from-[#12161F] via-transparent to-transparent"
                   />
-                  <span className="absolute left-4 top-5 rounded-full border border-white/10 bg-[rgba(10,13,20,.7)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+                  <span className="absolute left-4 top-5 rounded-full border border-white/10 bg-[rgba(10,13,20,.7)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-300 backdrop-blur-sm">
                     Basketball
                   </span>
                 </div>
@@ -355,13 +351,16 @@ export default function Home() {
           between items. The track renders SPORTS twice so translateX(-50%)
           loops seamlessly — see the `marquee` keyframe in tailwind.config. */}
       <div className="overflow-hidden border-y border-white/10 bg-white/[0.02] py-[13px]">
-        <div className="flex w-max animate-marquee gap-[34px] font-display text-[14px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground motion-reduce:animate-none">
+        {/* No `gap` on the track: a -50% loop must translate exactly one
+            sequence. Spacing lives on the items (pr) so the two halves are
+            identical width — with a track gap the loop snaps 17px per cycle. */}
+        <div className="flex w-max animate-marquee font-display text-[14px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground motion-reduce:animate-none">
           {[...SPORTS, ...SPORTS].map((s, i) => (
             <span
               key={i}
               // The second pass exists only so the loop reads as continuous.
               aria-hidden={i >= SPORTS.length}
-              className="flex items-center gap-[34px] whitespace-nowrap"
+              className="flex items-center gap-[34px] whitespace-nowrap pr-[34px]"
             >
               {s}
               <span
@@ -401,8 +400,8 @@ export default function Home() {
                 {/* BRIEF §4 screen 03 "step-num": outlined numeral, red stroke. */}
                 <span
                   aria-hidden
-                  className="font-display text-[34px] font-extrabold leading-none text-transparent"
-                  style={{ WebkitTextStroke: "1.5px #C8102E" }}
+                  className="outline-text font-display text-[34px] font-extrabold leading-none"
+                  style={{ "--outline-stroke": "1.5px #C8102E" } as CSSProperties}
                 >
                   {s.n}
                 </span>
@@ -445,7 +444,7 @@ export default function Home() {
                 className="rounded-card border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] p-7 shadow-card transition-transform duration-200 ease-spring hover:-translate-y-1"
               >
                 <span
-                  className="font-semibold uppercase tracking-[0.18em] text-primary text-[11px]"
+                  className="font-semibold uppercase tracking-[0.18em] text-primary-300 text-[11px]"
                   style={KICKER_GLOW}
                 >
                   {c.label}

@@ -40,7 +40,9 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
+      {/* No opaque background here — the global Atmosphere (floodlights,
+          grain) must show through; body carries the night background. */}
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -95,7 +97,7 @@ export default function ForgotPasswordPage() {
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Remembered it?{" "}
-                <Link href="/login" className="text-primary hover:underline font-medium">
+                <Link href="/login" className="text-primary-300 hover:underline font-medium">
                   Back to login
                 </Link>
               </p>

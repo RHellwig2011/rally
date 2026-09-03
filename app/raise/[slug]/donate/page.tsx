@@ -140,7 +140,7 @@ function DonatePageContent({ params }: { params: { slug: string } }) {
         {/* Campaign Header */}
         <div className="mb-8 text-center">
           <p
-            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-300 sm:text-[12px]"
             style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}
           >
             {campaign.organizationName}

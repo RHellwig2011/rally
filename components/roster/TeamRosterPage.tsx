@@ -237,7 +237,7 @@ export function TeamRosterPage({
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -258,13 +258,13 @@ export function TeamRosterPage({
         <div className="flex flex-wrap gap-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all"
           >
             Add Team Member
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="px-4 py-2 bg-success text-white rounded-lg hover:bg-success transition-colors"
+            className="px-4 py-2 bg-success text-success-foreground rounded-lg hover:brightness-110 transition-all"
           >
             Import from CSV
           </button>

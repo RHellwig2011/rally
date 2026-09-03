@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -315,7 +315,7 @@ function DonationFormInner({
               <div className="flex justify-between pt-3 text-base font-semibold text-foreground">
                 <span>{campaignName} receives</span>
                 <span
-                  className="font-bold tabular text-[#3ECF9C]"
+                  className="font-bold tabular text-[var(--bb-accent-bright)]"
                   style={{ textShadow: "0 0 18px rgba(62,207,156,.45)" }}
                 >
                   ${netToCampaign.toFixed(2)}
@@ -368,8 +368,8 @@ function DonationFormInner({
             <div className="mb-4 flex items-baseline gap-3">
               <span
                 aria-hidden
-                className="font-display text-[30px] font-extrabold leading-none text-transparent"
-                style={{ WebkitTextStroke: "1.5px #C8102E" }}
+                className="outline-text font-display text-[30px] font-extrabold leading-none"
+                style={{ "--outline-stroke": "1.5px #C8102E" } as CSSProperties}
               >
                 01
               </span>
@@ -394,7 +394,7 @@ function DonationFormInner({
                       ${value}
                     </span>
                     <span className="mt-1.5 block text-xs text-muted-foreground">
-                      <span className="font-semibold tabular text-[#3ECF9C]">
+                      <span className="font-semibold tabular text-[var(--bb-accent-bright)]">
                         ${reachFor(value).toFixed(2)}
                       </span>{" "}
                       reaches the team
@@ -470,7 +470,7 @@ function DonationFormInner({
                 <div className="flex justify-between pt-3 text-base font-semibold text-foreground">
                   <span>The team receives</span>
                   <span
-                    className="font-bold tabular text-[#3ECF9C]"
+                    className="font-bold tabular text-[var(--bb-accent-bright)]"
                     style={{ textShadow: "0 0 18px rgba(62,207,156,.45)" }}
                   >
                     ${netToCampaign.toFixed(2)}
@@ -499,8 +499,8 @@ function DonationFormInner({
             <div className="mb-4 flex items-baseline gap-3">
               <span
                 aria-hidden
-                className="font-display text-[30px] font-extrabold leading-none text-transparent"
-                style={{ WebkitTextStroke: "1.5px #C8102E" }}
+                className="outline-text font-display text-[30px] font-extrabold leading-none"
+                style={{ "--outline-stroke": "1.5px #C8102E" } as CSSProperties}
               >
                 02
               </span>
@@ -572,8 +572,8 @@ function DonationFormInner({
             <div className="mb-4 flex items-baseline gap-3">
               <span
                 aria-hidden
-                className="font-display text-[30px] font-extrabold leading-none text-transparent"
-                style={{ WebkitTextStroke: "1.5px #C8102E" }}
+                className="outline-text font-display text-[30px] font-extrabold leading-none"
+                style={{ "--outline-stroke": "1.5px #C8102E" } as CSSProperties}
               >
                 03
               </span>

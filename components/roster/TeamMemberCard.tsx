@@ -43,17 +43,17 @@ export function TeamMemberCard({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACCEPTED':
-        return 'bg-green-100 text-green-800';
+        return 'bg-[rgba(34,196,139,.12)] text-[#3ECF9C]';
       case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-[rgba(232,163,61,.12)] text-[var(--bb-warning)]';
       case 'DECLINED':
-        return 'bg-red-100 text-red-800';
+        return 'bg-[rgba(242,97,75,.12)] text-destructive';
       case 'EMAIL_FAILED':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-[rgba(242,97,75,.12)] text-destructive';
       case 'REMOVED':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-white/[0.06] text-muted-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-white/[0.06] text-muted-foreground';
     }
   };
 
@@ -75,7 +75,7 @@ export function TeamMemberCard({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+    <div className="rounded-card border border-white/10 bg-card shadow-card p-6 hover:-translate-y-0.5 transition-all">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
           {member.profilePhotoUrl ? (
@@ -87,8 +87,8 @@ export function TeamMemberCard({
               className="rounded-full object-cover"
             />
           ) : (
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-semibold text-lg">
+            <div className="w-12 h-12 bg-white/[0.06] rounded-full flex items-center justify-center">
+              <span className="text-secondary font-semibold text-lg">
                 {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
               </span>
             </div>
@@ -115,7 +115,7 @@ export function TeamMemberCard({
           </div>
           <div className="w-full bg-accent rounded-full h-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-secondary shadow-glow-accent h-2 rounded-full transition-all duration-300"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
@@ -136,7 +136,7 @@ export function TeamMemberCard({
           <Link
             href={fundraisingLink}
             target="_blank"
-            className="ml-2 text-blue-600 hover:underline text-xs"
+            className="ml-2 text-secondary hover:underline text-xs"
           >
             {fundraisingLink}
           </Link>
@@ -148,7 +148,7 @@ export function TeamMemberCard({
         <Link
           href={fundraisingLink}
           target="_blank"
-          className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-center"
+          className="flex-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors text-center"
         >
           View Page
         </Link>
@@ -165,7 +165,7 @@ export function TeamMemberCard({
             {member.invitationStatus === 'PENDING' && (
               <button
                 onClick={() => onResendInvite(member.id)}
-                className="flex-1 px-3 py-1.5 text-sm bg-success text-white rounded hover:bg-success transition-colors"
+                className="flex-1 px-3 py-1.5 text-sm bg-success text-success-foreground rounded hover:bg-success/90 transition-colors"
               >
                 Resend Invite
               </button>
@@ -174,7 +174,7 @@ export function TeamMemberCard({
             {member.invitationStatus !== 'REMOVED' && (
               <button
                 onClick={() => onDelete(member.id)}
-                className="flex-1 px-3 py-1.5 text-sm bg-warning text-white rounded hover:bg-warning transition-colors"
+                className="flex-1 px-3 py-1.5 text-sm bg-warning text-warning-foreground rounded hover:bg-warning/90 transition-colors"
               >
                 Remove
               </button>

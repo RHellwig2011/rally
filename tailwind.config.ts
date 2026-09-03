@@ -88,7 +88,9 @@ const config: Config = {
           DEFAULT: "#F2614B",
           light: "#1D1418",
           dark: "#F27B72",
-          foreground: "#FFFFFF",
+          // Dark ink on the bright error red: white-on-#F2614B is 3.19:1 and
+          // fails AA for button labels; #2A0A06 is ~10:1.
+          foreground: "#2A0A06",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Heart, Info, Medal, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SiteHeader } from "@/components/app-chrome";
 import { formatCurrency, calculatePercentage } from "@/lib/utils";
 
 /**
@@ -148,34 +149,21 @@ export default function PublicLeaderboardPage({
 
   return (
     <div className="min-h-screen">
-      {/* Site header — BRIEF §3, the same chrome as the campaign page. */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
-              />
-              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
-                Bleacher Backers
-              </span>
-            </Link>
-            <Button asChild>
-              <Link href={`/raise/${params.slug}/donate`}>
-                <Heart className="mr-2 h-4 w-4" />
-                Donate
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      {/* Site header — shared stadium-night chrome (BRIEF §3). */}
+      <SiteHeader>
+        <Button asChild>
+          <Link href={`/raise/${params.slug}/donate`}>
+            <Heart className="mr-2 h-4 w-4" />
+            Donate
+          </Link>
+        </Button>
+      </SiteHeader>
 
       {/* Masthead */}
       <header className="mx-auto max-w-3xl px-4 pb-8 pt-10 text-center sm:px-6 lg:px-8">
         <Trophy className="mx-auto mb-4 h-9 w-9 text-primary" />
         <p
-          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-300 sm:text-[12px]"
           style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}
         >
           {campaign.organizationName} {campaign.teamName}

@@ -20,7 +20,7 @@ export function RosterFilters({
   onSortChange,
 }: RosterFiltersProps) {
   return (
-    <div className="bg-white p-4 rounded-lg shadow space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
+    <div className="rounded-card border border-white/10 bg-card shadow-card p-4 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between">
       {/* Search */}
       <div className="flex-1 max-w-md">
         <div className="relative">
@@ -29,7 +29,7 @@ export function RosterFilters({
             placeholder="Search by name, email, position, or grade..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-3 py-2 rounded-lg border border-white/10 bg-white/[0.05] text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)]"
           />
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground"
@@ -58,7 +58,7 @@ export function RosterFilters({
             id="status"
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 rounded-lg border border-white/10 bg-white/[0.05] text-sm text-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)]"
           >
             <option value="all">All Status</option>
             <option value="ACCEPTED">Active</option>
@@ -78,7 +78,7 @@ export function RosterFilters({
             id="sortBy"
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as any)}
-            className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 rounded-lg border border-white/10 bg-white/[0.05] text-sm text-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)]"
           >
             <option value="amountRaised">Amount Raised</option>
             <option value="name">Name</option>

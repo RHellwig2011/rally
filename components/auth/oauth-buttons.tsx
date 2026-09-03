@@ -35,19 +35,18 @@ export function OAuthButtons({ redirect }: { redirect?: string | null }) {
 
   return (
     <div className="space-y-3">
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-muted-foreground">or continue with</span>
-        </div>
+      {/* Flex divider — no background chip, so it works over any surface
+          (the old pattern needed a bg chip to cover the line). */}
+      <div className="my-4 flex items-center gap-3 text-sm">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-muted-foreground">or continue with</span>
+        <div className="h-px flex-1 bg-border" />
       </div>
 
       {providers.google && (
         <a
           href={hrefFor("google")}
-          className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-white px-4 py-3 text-sm font-medium text-muted-foreground shadow-sm hover:bg-white/[0.04] transition-colors"
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-white/[0.05] px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
         >
           <GoogleIcon />
           Continue with Google
@@ -57,7 +56,7 @@ export function OAuthButtons({ redirect }: { redirect?: string | null }) {
       {providers.apple && (
         <a
           href={hrefFor("apple")}
-          className="flex w-full items-center justify-center gap-3 rounded-md bg-black px-4 py-3 text-sm font-medium text-white hover:bg-card transition-colors"
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-black px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-card"
         >
           <AppleIcon />
           Continue with Apple

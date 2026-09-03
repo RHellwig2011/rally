@@ -102,7 +102,7 @@ const STATUS_TABS: { id: string; label: string }[] = [
 function statusBadge(status: AlumniStatus) {
   switch (status) {
     case "ALUMNI":
-      return "bg-primary-100 text-primary-800";
+      return "bg-[rgba(200,16,46,.12)] text-primary-300";
     case "CURRENT":
       return "bg-success-light text-success-dark";
     default:
@@ -235,7 +235,7 @@ export default function AlumniPage({
   }, [programId, status, search, gradYear]);
 
   const header = (
-    <nav className="bg-white border-b border-border">
+    <nav className="bg-[rgba(10,13,20,.86)] backdrop-blur border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-2">
@@ -265,8 +265,8 @@ export default function AlumniPage({
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Card>
             <CardContent className="p-10 text-center">
-              <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                <LinkIcon className="w-7 h-7 text-primary-600" />
+              <div className="w-14 h-14 bg-[rgba(200,16,46,.12)] rounded-full flex items-center justify-center mx-auto mb-5">
+                <LinkIcon className="w-7 h-7 text-primary-300" />
               </div>
               <h1 className="text-2xl font-bold text-foreground mb-3">
                 This campaign isn&apos;t linked to a program yet
@@ -330,7 +330,7 @@ export default function AlumniPage({
         ? `${summary.totalPeople.toLocaleString()} people across ${summary.rosterRowsScanned.toLocaleString()} roster rows`
         : "",
       icon: GraduationCap,
-      tone: "text-primary-600 bg-primary-100",
+      tone: "text-primary-300 bg-[rgba(200,16,46,.12)]",
     },
     {
       label: "Reachable by email",
@@ -346,7 +346,7 @@ export default function AlumniPage({
       value: summary ? formatCurrency(summary.alumniLifetimeRaised) : "—",
       hint: "Across every season they played",
       icon: DollarSign,
-      tone: "text-secondary-700 bg-secondary-100",
+      tone: "text-secondary-300 bg-[rgba(34,196,139,.12)]",
     },
     {
       label: "Unknown grad year",
@@ -421,7 +421,7 @@ export default function AlumniPage({
                     className={`px-4 py-2 text-sm font-medium transition-colors ${
                       status === tab.id
                         ? "bg-primary text-white"
-                        : "bg-white text-muted-foreground hover:bg-muted"
+                        : "bg-card text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {tab.label}
@@ -435,7 +435,7 @@ export default function AlumniPage({
                   setGradYear(e.target.value);
                   setOffset(0);
                 }}
-                className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground"
+                className="h-10 rounded-md border border-border bg-card text-foreground px-3 text-sm [color-scheme:dark]"
                 aria-label="Filter by graduation year"
               >
                 <option value="">All graduation years</option>
@@ -637,7 +637,7 @@ export default function AlumniPage({
         )}
 
         {/* Why there is no send button here yet. */}
-        <div className="mt-8 rounded-lg border border-border bg-white p-5">
+        <div className="mt-8 rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground mb-1.5">
             Contacting alumni
           </h2>

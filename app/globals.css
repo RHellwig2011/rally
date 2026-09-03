@@ -21,29 +21,17 @@
    ============================================================================ */
 @layer base {
   :root {
-    /* Raw stadium palette. Prefixed so it cannot collide with the shadcn
-       surface tokens below (--accent is already taken by shadcn). Components
-       that need the literal hex — atmosphere layers, glows, red top strips —
-       read these instead of re-typing the value. */
-    --bb-night: #0a0d14; /* page background */
-    --bb-night-2: #12161f; /* card / surface */
-    --bb-night-3: #181e2a; /* raised surface, gradient card top */
-    --bb-night-4: #1b2334; /* alt gradient top, toast/sheet background */
-    --bb-line: rgba(255, 255, 255, 0.1); /* hairline on dark */
-    --bb-border: #262e3d;
-    --bb-txt: #eef1f6;
-    --bb-dim: #8b93a3;
-    --bb-team: #c8102e; /* team red — CTAs, top rules, glows */
-    --bb-team-hot: #ff2e4d; /* marketing-only hot variant */
-    --bb-accent: #22c48b; /* accent green — money-positive */
+    /* Raw stadium palette, prefixed so it cannot collide with the shadcn
+       surface tokens below (--accent is already taken by shadcn). Only the
+       tokens that are actually read are kept — glows, the atmosphere layers,
+       scrollbar, sheet/toast backgrounds — everything else uses the compiled
+       brand scales from tailwind.config.ts. */
+    --bb-night-2: #12161f; /* card / surface (scrollbar track) */
+    --bb-night-4: #1b2334; /* toast/sheet background */
+    --bb-border: #262e3d; /* scrollbar thumb */
+    --bb-team: #c8102e; /* team red — top rule, glows */
     --bb-accent-bright: #3ecf9c; /* glowing totals */
-    --bb-accent-deep: #0e7c5a; /* focus ring / paper accent */
-    --bb-error: #f2614b;
-    --bb-warning: #e8a33d;
-
-    /* Motion, per the brief. */
-    --bb-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
-    --bb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --bb-warning: #e8a33d; /* warning text on the night shell */
 
     /* shadcn surface tokens — HSL channels of the palette above. */
     --background: 222 33% 5.9%; /* #0A0D14 */
@@ -63,7 +51,10 @@
     --accent-foreground: 218 31% 94.9%;
 
     --destructive: 8 87% 62.2%; /* error #F2614B */
-    --destructive-foreground: 0 0% 100%;
+    /* Dark ink on #F2614B — white was 3.19:1, failing AA on destructive
+       buttons/toasts. #2A0A06 is ~10:1. Mirrors warning.foreground in
+       tailwind.config.ts. */
+    --destructive-foreground: 7 75% 9.4%;
 
     --border: 219 23% 19.4%; /* #262E3D */
     --input: 219 23% 19.4%;
@@ -91,7 +82,7 @@
     --accent-foreground: 218 31% 94.9%;
 
     --destructive: 8 87% 62.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 7 75% 9.4%;
 
     --border: 219 23% 19.4%;
     --input: 219 23% 19.4%;
@@ -123,6 +114,21 @@
   /* All money/stats per §2 of the brief. */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  /* Outline display text: transparent fill + stroke. The stroke comes from
+     --outline-stroke so each site keeps its own color/width. Under Windows
+     High Contrast / forced-colors the stroke is dropped, which would leave
+     invisible text — so the media query below restores a real color. */
+  .outline-text {
+    color: transparent;
+    -webkit-text-stroke: var(--outline-stroke, 1.5px rgba(200, 16, 46, 0.85));
+  }
+}
+
+@media (forced-colors: active) {
+  .outline-text {
+    -webkit-text-stroke-width: 0;
+    color: CanvasText;
   }
 }
 

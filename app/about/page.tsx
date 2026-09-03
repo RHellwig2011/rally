@@ -71,7 +71,7 @@ const STATS = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-[#101A2C] antialiased">
+    <div className="min-h-screen bg-background text-foreground antialiased">
       <Navigation />
 
       {/* -------------------------------------------------------------- Hero */}
@@ -92,13 +92,13 @@ export default function AboutPage() {
       </section>
 
       {/* ----------------------------------------------------------- Mission */}
-      <section className="bg-white">
+      <section className="bg-card">
         <div className="mx-auto grid max-w-[1180px] gap-12 px-5 py-16 sm:px-8 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-16">
           <div>
             <h2 className="font-display text-[clamp(28px,4vw,46px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
               Every kid deserves a chance to play, learn, and grow.
             </h2>
-            <div className="mt-6 space-y-5 text-[17px] leading-relaxed text-[#5B6575]">
+            <div className="mt-6 space-y-5 text-[17px] leading-relaxed text-muted-foreground">
               <p>
                 We started Bleacher Backers because we saw too many talented kids
                 miss out simply because fundraising was too complicated, too slow,
@@ -109,7 +109,7 @@ export default function AboutPage() {
                 awkward asks. Coaches and parents spent evenings on spreadsheets,
                 counting cash, and chasing receipts.
               </p>
-              <p className="font-semibold text-[#101A2C]">There had to be a better way.</p>
+              <p className="font-semibold text-foreground">There had to be a better way.</p>
               <p>
                 So we built one — a modern platform that combines personalized
                 outreach, secure banking, and real-time tracking to help teams
@@ -120,7 +120,7 @@ export default function AboutPage() {
 
           {/* Stat panel — hairline grid, tabular figures */}
           <div className="lg:pt-2">
-            <div className="rounded-[20px] border border-[#E4E8EF] bg-[#F5F7FA] p-8 sm:p-10">
+            <div className="rounded-[20px] border border-border bg-background p-8 sm:p-10">
               <dl className="grid grid-cols-2 gap-y-8">
                 {STATS.map((s) => (
                   <div key={s.l}>
@@ -132,7 +132,7 @@ export default function AboutPage() {
                     >
                       {s.v}
                     </dd>
-                    <p className="mt-1 text-[13px] text-[#5B6575]">{s.l}</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">{s.l}</p>
                   </div>
                 ))}
               </dl>
@@ -142,13 +142,13 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------ Values */}
-      <section className="border-y border-[#E4E8EF] bg-[#F5F7FA]">
+      <section className="border-y border-border bg-background">
         <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold tracking-[-0.02em] text-primary">
               What we stand for
             </h2>
-            <p className="max-w-[34ch] text-base text-[#5B6575]">
+            <p className="max-w-[34ch] text-base text-muted-foreground">
               These three tests decide what we build and what we leave out.
             </p>
           </div>
@@ -161,7 +161,7 @@ export default function AboutPage() {
                 <h3 className="mt-3.5 font-display text-[22px] font-semibold text-primary">
                   {v.title}
                 </h3>
-                <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
+                <p className="mt-2.5 text-[15.5px] leading-relaxed text-muted-foreground">
                   {v.body}
                 </p>
               </li>
@@ -171,25 +171,25 @@ export default function AboutPage() {
       </section>
 
       {/* ---------------------------------------------------- Differentiators */}
-      <section className="bg-white">
+      <section className="bg-card">
         <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-24 lg:px-16">
           <h2 className="max-w-[18ch] font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
             How we're different
           </h2>
-          <p className="mt-4 max-w-[46ch] text-lg text-[#5B6575]">
+          <p className="mt-4 max-w-[46ch] text-lg text-muted-foreground">
             Not just another fundraising page — the operating system for a team's
             whole drive.
           </p>
           <div className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
             {DIFFERENTIATORS.map((d) => (
-              <div key={d.title} className="border-t border-[#E4E8EF] pt-6">
+              <div key={d.title} className="border-t border-border pt-6">
                 <span className="font-display text-[12px] font-bold uppercase tracking-[0.14em] text-secondary">
                   {d.label}
                 </span>
                 <h3 className="mt-2.5 font-display text-[20px] font-semibold text-primary">
                   {d.title}
                 </h3>
-                <p className="mt-2 text-[15.5px] leading-relaxed text-[#5B6575]">
+                <p className="mt-2 text-[15.5px] leading-relaxed text-muted-foreground">
                   {d.body}
                 </p>
               </div>
@@ -261,7 +261,7 @@ export default function AboutPage() {
           <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-bold text-secondary transition-transform hover:-translate-y-0.5"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-bold text-[#06231A] transition-transform hover:-translate-y-0.5"
             >
               Start your campaign
               <ArrowRight className="h-5 w-5" />
@@ -277,8 +277,8 @@ export default function AboutPage() {
       </section>
 
       {/* ------------------------------------------------------------ Footer */}
-      <footer className="bg-[#0A101E]">
-        <div className="mx-auto max-w-[1180px] px-5 py-10 text-center text-sm text-[#66738A] sm:px-8 lg:px-16">
+      <footer className="border-t border-border bg-background">
+        <div className="mx-auto max-w-[1180px] px-5 py-10 text-center text-sm text-muted-foreground sm:px-8 lg:px-16">
           <p>
             © {new Date().getFullYear()} Bleacher Backers. All rights reserved. We
             never sell or share your data.

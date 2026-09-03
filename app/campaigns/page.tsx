@@ -63,7 +63,7 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
   const percentage = calculatePercentage(currentAmount, goalAmount);
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary-200">
+    <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-2 hover:border-primary">
       <div className="relative h-48 overflow-hidden">
         {campaign.bannerImageUrl ? (
           // A real uploaded team photo always wins.
@@ -90,7 +90,7 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
             )}
           </>
         )}
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-foreground">
+        <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full text-xs font-semibold text-foreground">
           {campaign.category}
         </div>
       </div>
@@ -241,9 +241,9 @@ export default function CampaignsPage() {
   const isFiltering = Boolean(searchQuery) || selectedCategory !== "All";
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50 shadow-sm">
+      <nav className="border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
@@ -268,7 +268,7 @@ export default function CampaignsPage() {
       <section className="bg-primary text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary-200">
+            <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-primary-100">
               Browse
             </p>
             <h1 className="mt-3 font-display text-[clamp(34px,5.5vw,60px)] font-semibold leading-[1.02] tracking-[-0.02em]">
@@ -288,7 +288,7 @@ export default function CampaignsPage() {
                 placeholder="Search campaigns by team name, organization, or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-6 text-lg rounded-xl border-0 shadow-lg"
+                className="w-full pl-12 pr-4 py-6 text-lg rounded-xl border-0 bg-card shadow-lg"
               />
             </div>
           </div>
@@ -300,7 +300,7 @@ export default function CampaignsPage() {
           starts narrowing. */}
       {!isFiltering && featuredCampaigns.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-8">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="bg-card border border-white/10 rounded-2xl shadow-card p-8">
             <div className="flex items-center gap-2 mb-6">
               <TrendingUp className="w-6 h-6 text-primary" />
               <h2 className="text-2xl font-bold text-foreground">Trending Campaigns</h2>
@@ -317,7 +317,7 @@ export default function CampaignsPage() {
       {/* Filters and Campaigns Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Filter Bar */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div className="bg-card border border-white/10 rounded-xl p-6 mb-8">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
             {/* Category Filter */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -344,7 +344,7 @@ export default function CampaignsPage() {
                 id="campaign-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="border border-border bg-card text-foreground rounded-lg px-4 py-2 text-sm [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="trending">Trending</option>
                 <option value="newest">Newest</option>
@@ -361,7 +361,7 @@ export default function CampaignsPage() {
             <p className="text-muted-foreground">Loading campaigns...</p>
           </div>
         ) : loadError ? (
-          <div className="text-center py-20 bg-white rounded-2xl shadow-md">
+          <div className="text-center py-20 bg-card border border-white/10 rounded-2xl">
             <h3 className="text-2xl font-bold text-foreground mb-2">
               We couldn&apos;t load campaigns
             </h3>
@@ -371,7 +371,7 @@ export default function CampaignsPage() {
             <Button onClick={fetchCampaigns}>Retry</Button>
           </div>
         ) : filteredCampaigns.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl shadow-md">
+          <div className="text-center py-20 bg-card border border-white/10 rounded-2xl">
             <h3 className="text-2xl font-bold text-foreground mb-2">No campaigns found</h3>
             <p className="text-muted-foreground mb-6">
               {searchQuery || selectedCategory !== "All"
@@ -419,7 +419,7 @@ export default function CampaignsPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-white">
+      <footer className="border-t border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved.</p>
