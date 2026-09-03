@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamMemberCard } from './TeamMemberCard';
 import { AddTeamMemberModal } from './AddTeamMemberModal';
-import { CSVImportModal } from './CSVImportModal';
 import { RosterFilters } from './RosterFilters';
 import { EmptyRosterState } from './EmptyRosterState';
 import { RosterStats } from './RosterStats';
@@ -47,7 +46,6 @@ export function TeamRosterPage({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'amountRaised' | 'name' | 'date'>('amountRaised');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   const canManage = isLeader || isGuardian;
@@ -94,7 +92,7 @@ export function TeamRosterPage({
   const handleUpdateMember = async (memberId: string, updates: Partial<TeamMember>) => {
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'x-csrf-token': csrfToken,
@@ -102,13 +100,16 @@ export function TeamRosterPage({
         body: JSON.stringify(updates),
       });
 
-      if (!response.ok) throw new Error('Failed to update member');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update member');
+      }
 
       toast.success('Team member updated successfully');
       fetchMembers();
     } catch (error) {
       console.error('Failed to update member:', error);
-      toast.error('Failed to update team member');
+      toast.error(error instanceof Error ? error.message : 'Failed to update team member');
     }
   };
 
@@ -193,11 +194,8 @@ export function TeamRosterPage({
     }
   };
 
-  // Handle CSV import completion
-  const handleImportComplete = () => {
-    setShowImportModal(false);
-    fetchMembers();
-    toast.success('Team members imported successfully');
+  const goToImport = () => {
+    router.push(`/dashboard/${campaignId}/roster/import`);
   };
 
   // Calculate statistics
@@ -263,10 +261,10 @@ export function TeamRosterPage({
             Add Team Member
           </button>
           <button
-            onClick={() => setShowImportModal(true)}
+            onClick={goToImport}
             className="px-4 py-2 bg-success text-success-foreground rounded-lg hover:brightness-110 transition-all"
           >
-            Import from CSV
+            Import roster
           </button>
           <a
             href={`/api/campaigns/${campaignId}/import-roster`}
@@ -296,7 +294,7 @@ export function TeamRosterPage({
           statusFilter={statusFilter}
           canManage={canManage}
           onAddMember={() => setShowAddModal(true)}
-          onImportCSV={() => setShowImportModal(true)}
+          onImportCSV={goToImport}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -319,14 +317,6 @@ export function TeamRosterPage({
         <AddTeamMemberModal
           onClose={() => setShowAddModal(false)}
           onSave={handleAddMember}
-        />
-      )}
-
-      {showImportModal && (
-        <CSVImportModal
-          campaignId={campaignId}
-          onClose={() => setShowImportModal(false)}
-          onComplete={handleImportComplete}
         />
       )}
 

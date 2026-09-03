@@ -194,12 +194,11 @@ describe("Team Member API Validation Tests", () => {
       expect(() => updateTeamMemberSchema.parse(data)).not.toThrow();
     });
 
-    it("should not allow email updates", () => {
-      const schema = updateTeamMemberSchema;
-      const data = { email: "newemail@example.com" };
-      // Email field should not be in the update schema
-      const parsed = schema.parse(data);
-      expect('email' in parsed).toBe(false);
+    it("should allow in-place email updates and normalize the address", () => {
+      const parsed = updateTeamMemberSchema.parse({
+        email: "NewEmail@Example.com",
+      });
+      expect(parsed.email).toBe("newemail@example.com");
     });
 
     it("should validate updated fields", () => {

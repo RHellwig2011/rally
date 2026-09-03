@@ -23,20 +23,26 @@ import {
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
 import { checkCsrf } from "@/lib/csrf";
+import {
+  isLegacyRosterImportEnabled,
+  LEGACY_ROSTER_IMPORT_GONE,
+} from "@/lib/utils/legacy-roster-import";
 
 /**
  * POST /api/campaigns/[campaignId]/import-roster
- * Import team members from CSV file
- * Requirements:
- * - Max file size: 5 MB
- * - Max rows: 500
- * - Rate limit: 1 import per campaign per hour
- * - Atomic operation: all or nothing
+ *
+ * Legacy CSV import — no attestation. Closed unless ALLOW_LEGACY_ROSTER_IMPORT
+ * is "true". The attested path is POST .../roster-import/commit, reached from
+ * /dashboard/[campaignId]/roster/import.
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
+  if (!isLegacyRosterImportEnabled()) {
+    return NextResponse.json(LEGACY_ROSTER_IMPORT_GONE, { status: 410 });
+  }
+
   try {
     // Check CSRF token
     const csrfCheck = checkCsrf(req);

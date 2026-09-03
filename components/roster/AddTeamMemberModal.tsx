@@ -79,12 +79,7 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
       // Validate
       const validatedData = memberSchema.parse(dataToValidate);
 
-      // For editing, remove email from data (not allowed to change)
-      if (isEditing) {
-        delete (validatedData as any).email;
-      }
-
-      // Submit
+      // Submit (email is patched in place so amountRaised stays on this row)
       await onSave(validatedData);
       onClose();
     } catch (error) {
@@ -153,16 +148,17 @@ export function AddTeamMemberModal({ member, onClose, onSave }: AddTeamMemberMod
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                disabled={isEditing}
                 className={`w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground [color-scheme:dark] focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-[rgba(14,124,90,.35)] ${
                   errors.email ? 'border-warning' : ''
-                } ${isEditing ? 'bg-muted cursor-not-allowed' : ''}`}
+                }`}
                 placeholder="john.doe@example.com"
                 required
               />
               {errors.email && <p className="text-warning text-xs mt-1">{errors.email}</p>}
               {isEditing && (
-                <p className="text-muted-foreground text-xs mt-1">Email cannot be changed after creation</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Changing email keeps this player&apos;s fundraising total on this record.
+                </p>
               )}
             </div>
 
