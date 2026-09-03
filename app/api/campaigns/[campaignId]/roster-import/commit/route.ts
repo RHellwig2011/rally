@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { checkCsrf } from "@/lib/csrf";
+import { generateInvitationToken, invitationTokenExpiry } from "@/lib/onboarding";
 import { z } from "zod";
 import {
   applyMapping,
@@ -467,7 +467,7 @@ export async function POST(
         }
 
         const fundLinkCode = await generateUniqueFundraisingLinkCode(campaignId);
-        const invitationToken = crypto.randomBytes(32).toString("hex");
+        const invitationToken = generateInvitationToken();
 
         const created = await prisma.teamMember.create({
           data: {
@@ -476,6 +476,7 @@ export async function POST(
             amountRaised: BigInt(0),
             fundLinkCode,
             invitationToken,
+            invitationTokenExpiresAt: invitationTokenExpiry(),
             invitationStatus: "PENDING",
             // No invitation is sent here, so this stays null. It is the flag
             // the invite step keys off to know who has not been contacted.

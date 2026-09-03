@@ -3,7 +3,6 @@ import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import crypto from "crypto";
 import {
   createTeamMemberSchema,
   listTeamMembersQuerySchema
@@ -22,6 +21,11 @@ import {
   rateLimitConfigs,
   applyRateLimitHeaders
 } from "@/lib/utils/rate-limit";
+import {
+  generateInvitationToken,
+  invitationTokenExpiry,
+  buildOnboardingLink,
+} from "@/lib/onboarding";
 import { checkCsrf } from "@/lib/csrf";
 
 /**
@@ -148,8 +152,8 @@ export async function POST(
       select: { id: true, fundLinkCode: true },
     });
 
-    // Generate unique invitation token for onboarding
-    const invitationToken = crypto.randomBytes(32).toString('hex');
+    // Generate unique invitation token for onboarding (H14: 14-day expiry)
+    const invitationToken = generateInvitationToken();
 
     const memberFields = {
       name: validatedData.name,
@@ -162,6 +166,7 @@ export async function POST(
       profilePhotoUrl: validatedData.profilePhotoUrl,
       phoneNumber: validatedData.phoneNumber,
       invitationToken,
+      invitationTokenExpiresAt: invitationTokenExpiry(),
       invitationStatus: "PENDING" as const,
       invitationSentAt: new Date(),
     };
@@ -230,7 +235,7 @@ export async function POST(
 
     // Send invitation email with onboarding link
     const fundraisingLink = formatFundraisingLink(campaign.slug, fundLinkCode);
-    const onboardingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
+    const onboardingLink = buildOnboardingLink(teamMember.id, invitationToken);
 
     const emailSent = await sendTeamMemberInvitation(
       validatedData.email,
@@ -265,6 +270,8 @@ export async function POST(
           fundraisingLink,
           invitationStatus: emailSent ? "PENDING" : "EMAIL_FAILED",
           invitationSentAt: teamMember.invitationSentAt,
+          // H7: copyable link, also the fallback when the invite email fails.
+          onboardingLink,
           // True when this re-activated a previously removed player, which is
           // why amountRaised can be non-zero on a freshly "added" member.
           restored: Boolean(softDeleted),
@@ -476,6 +483,14 @@ export async function GET(
       profilePhotoUrl: member.profilePhotoUrl,
       phoneNumber: member.phoneNumber,
       invitationStatus: member.invitationStatus,
+      // H7: coach-copyable onboarding link. Only for members who have not
+      // accepted and still hold a live token; null after claim (the token is
+      // cleared) so a spent link is never shown.
+      onboardingLink:
+        member.invitationStatus !== "ACCEPTED" && member.invitationToken
+          ? buildOnboardingLink(member.id, member.invitationToken)
+          : null,
+      invitationTokenExpiresAt: member.invitationTokenExpiresAt,
       joinedAt: member.joinedAt,
       fundLinkCode: member.fundLinkCode,
       fundraisingLink: member.fundLinkCode

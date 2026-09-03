@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import crypto from "crypto";
 import {
   sendTeamMemberInvitation,
   formatFundraisingLink,
 } from "@/lib/utils/team-member";
+import {
+  generateInvitationToken,
+  invitationTokenExpiry,
+  buildOnboardingLink,
+} from "@/lib/onboarding";
+import { sendTeamMemberInvitationSMS } from "@/lib/services/sms";
 import {
   checkRateLimit,
   getRateLimitIdentifier,
@@ -15,8 +20,14 @@ import { checkCsrf } from "@/lib/csrf";
 
 /**
  * POST /api/campaigns/[campaignId]/team-members/[memberId]/resend-invite
- * Resend invitation email to a team member
+ * Resend invitation to a team member.
  * Requirements: Max once per hour to prevent spam
+ *
+ * H14: every resend ROTATES the invitation token (old links die immediately)
+ * and stamps a fresh 14-day expiry.
+ * H7: members with a phone but no email get the invite by SMS (suppression
+ * is enforced inside lib/services/sms.ts); the onboarding link is also
+ * returned so the coach can copy it directly.
  */
 export async function POST(
   req: NextRequest,
@@ -83,14 +94,21 @@ export async function POST(
         id: memberId,
         campaignId,
         deletedAt: null,
-        email: { not: null }, // Must have email to resend invitation
       }
     });
 
     if (!teamMember) {
       return NextResponse.json(
-        { success: false, error: "Team member not found or has no email address" },
+        { success: false, error: "Team member not found" },
         { status: 404 }
+      );
+    }
+
+    // Need at least one channel to deliver the invitation
+    if (!teamMember.email && !teamMember.phoneNumber) {
+      return NextResponse.json(
+        { success: false, error: "Team member has no email or phone number to send the invitation to" },
+        { status: 400 }
       );
     }
 
@@ -146,65 +164,81 @@ export async function POST(
       }
     }
 
-    // Send invitation email
-    if (!teamMember.fundLinkCode) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Team member missing fundraising link code. Please contact support."
-        },
-        { status: 500 }
-      );
-    }
-
-    // Ensure the member has an invitation token (regenerate if missing) so we
-    // can build the onboarding link the same way the original invite does
-    let invitationToken = teamMember.invitationToken;
-    if (!invitationToken) {
-      invitationToken = crypto.randomBytes(32).toString("hex");
-      await prisma.teamMember.update({
-        where: { id: memberId },
-        data: { invitationToken },
-      });
-    }
-
-    const fundraisingLink = formatFundraisingLink(campaign.slug, teamMember.fundLinkCode);
-    const onboardingLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/player/onboard/${teamMember.id}?token=${invitationToken}`;
-
-    const emailSent = await sendTeamMemberInvitation(
-      teamMember.email!, // Non-null assertion safe because query filters for non-null emails
-      teamMember.name,
-      `${campaign.teamName} - ${campaign.organizationName}`,
-      fundraisingLink,
-      teamMember.personalGoal ? Number(teamMember.personalGoal) / 100 : undefined,
-      onboardingLink
-    );
-
-    if (!emailSent) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to send invitation email. Please try again later."
-        },
-        { status: 500 }
-      );
-    }
-
-    // Update invitation sent timestamp
+    // H14: rotate the token on EVERY resend — any previously sent link stops
+    // working here — and stamp a fresh expiry. Persisted before sending so a
+    // delivered link is always backed by the stored token; if the send below
+    // fails, the coach can still copy this link from the roster.
+    const invitationToken = generateInvitationToken();
     await prisma.teamMember.update({
       where: { id: memberId },
       data: {
+        invitationToken,
+        invitationTokenExpiresAt: invitationTokenExpiry(),
         invitationSentAt: new Date(),
         invitationStatus: "PENDING", // Reset status to pending
-      }
+      },
     });
+
+    const onboardingLink = buildOnboardingLink(teamMember.id, invitationToken);
+    const campaignName = `${campaign.teamName} - ${campaign.organizationName}`;
+
+    let delivered: boolean;
+    let channel: "email" | "sms";
+
+    if (teamMember.email) {
+      channel = "email";
+      if (!teamMember.fundLinkCode) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Team member missing fundraising link code. Please contact support."
+          },
+          { status: 500 }
+        );
+      }
+
+      const fundraisingLink = formatFundraisingLink(campaign.slug, teamMember.fundLinkCode);
+      delivered = await sendTeamMemberInvitation(
+        teamMember.email,
+        teamMember.name,
+        campaignName,
+        fundraisingLink,
+        teamMember.personalGoal ? Number(teamMember.personalGoal) / 100 : undefined,
+        onboardingLink
+      );
+    } else {
+      // H7: SMS invite for a member with a phone but no email. sendSMS runs
+      // the suppression check internally — no caller can bypass it.
+      channel = "sms";
+      delivered = await sendTeamMemberInvitationSMS(
+        teamMember.phoneNumber!,
+        teamMember.name,
+        campaignName,
+        onboardingLink
+      );
+    }
+
+    if (!delivered) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Failed to send invitation ${channel === "sms" ? "SMS" : "email"}. Please try again later.`,
+          // The rotated link is live even though delivery failed — the coach
+          // can copy it from the roster instead of waiting out the rate limit.
+          onboardingLink
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Invitation resent successfully",
+      message: `Invitation resent successfully via ${channel}`,
       sentAt: new Date().toISOString(),
       email: teamMember.email,
-      fundraisingLink
+      channel,
+      onboardingLink,
+      invitationTokenExpiresAt: invitationTokenExpiry().toISOString()
     });
 
   } catch (error) {

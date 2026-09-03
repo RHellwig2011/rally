@@ -16,6 +16,8 @@ interface TeamMember {
   profilePhotoUrl?: string | null;
   fundLinkCode: string;
   invitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REMOVED' | 'EMAIL_FAILED';
+  // Coach-copyable onboarding link; present only while a live invite exists.
+  onboardingLink?: string | null;
 }
 
 interface TeamMemberCardProps {
@@ -25,6 +27,7 @@ interface TeamMemberCardProps {
   onEdit: (member: TeamMember) => void;
   onDelete: (memberId: string) => void;
   onResendInvite: (memberId: string) => void;
+  onCopyInviteLink: (member: TeamMember) => void;
 }
 
 export function TeamMemberCard({
@@ -34,6 +37,7 @@ export function TeamMemberCard({
   onEdit,
   onDelete,
   onResendInvite,
+  onCopyInviteLink,
 }: TeamMemberCardProps) {
   const fundraisingLink = `/raise/${campaignSlug}/player/${member.fundLinkCode}`;
   const progressPercentage = member.personalGoal
@@ -168,6 +172,15 @@ export function TeamMemberCard({
                 className="flex-1 px-3 py-1.5 text-sm bg-success text-success-foreground rounded hover:bg-success/90 transition-colors"
               >
                 Resend Invite
+              </button>
+            )}
+
+            {member.onboardingLink && member.invitationStatus !== 'ACCEPTED' && (
+              <button
+                onClick={() => onCopyInviteLink(member)}
+                className="flex-1 px-3 py-1.5 text-sm border border-border rounded hover:bg-muted transition-colors"
+              >
+                Copy Invite Link
               </button>
             )}
 

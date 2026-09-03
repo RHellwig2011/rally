@@ -22,6 +22,7 @@ interface TeamMember {
   profilePhotoUrl?: string | null;
   fundLinkCode: string;
   invitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REMOVED' | 'EMAIL_FAILED';
+  onboardingLink?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -158,6 +159,22 @@ export function TeamRosterPage({
     } catch (error) {
       console.error('Failed to resend invitation:', error);
       toast.error('Failed to resend invitation');
+    }
+  };
+
+  // H7: copy the onboarding link so the coach can hand it to the player
+  // directly (text, team chat, printed sheet) instead of relying on email.
+  const handleCopyInviteLink = async (member: TeamMember) => {
+    if (!member.onboardingLink) {
+      toast.error('No invite link available for this player');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(member.onboardingLink);
+      toast.success(`Invite link copied for ${member.name}`);
+    } catch (error) {
+      console.error('Failed to copy invite link:', error);
+      toast.error('Could not copy the link — copy it manually instead');
     }
   };
 
@@ -309,6 +326,7 @@ export function TeamRosterPage({
               onEdit={(member) => setSelectedMember(member as TeamMember)}
               onDelete={handleDeleteMember}
               onResendInvite={handleResendInvitation}
+              onCopyInviteLink={handleCopyInviteLink}
             />
           ))}
         </div>
