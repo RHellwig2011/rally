@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { updateTeamMemberSchema } from "@/lib/validations/team-member";
 import {
@@ -8,6 +9,7 @@ import {
   formatFundraisingLink,
   sendTeamMemberInvitation,
 } from "@/lib/utils/team-member";
+import { decideTeamMemberEmailChange } from "@/lib/utils/team-member-email";
 import {
   checkRateLimit,
   getRateLimitIdentifier,
@@ -203,11 +205,29 @@ export async function GET(
 
 /**
  * PUT /api/campaigns/[campaignId]/team-members/[memberId]
- * Update team member details
+ * Update team member details (email is updated in place — see PATCH).
  */
 export async function PUT(
   req: NextRequest,
   { params }: { params: { campaignId: string; memberId: string } }
+) {
+  return updateTeamMember(req, params);
+}
+
+/**
+ * PATCH /api/campaigns/[campaignId]/team-members/[memberId]
+ * Same as PUT. Email changes stay on this row so amountRaised is not orphaned.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { campaignId: string; memberId: string } }
+) {
+  return updateTeamMember(req, params);
+}
+
+async function updateTeamMember(
+  req: NextRequest,
+  params: { campaignId: string; memberId: string }
 ) {
   try {
     // Check CSRF token
@@ -301,31 +321,75 @@ export async function PUT(
     const body = await req.json();
     const validatedData = updateTeamMemberSchema.parse(body);
 
-    // NOTE: Email cannot be changed as per roadmap requirements
-    // If they need to change email, they should delete and re-add
+    // Email is updated in place so amountRaised stays attached to this row.
+    // A live (deletedAt IS NULL) collision is a 409; a clash with a
+    // soft-deleted player is allowed by the partial unique index.
+    let emailUpdate: string | undefined;
+    if (validatedData.email !== undefined) {
+      const hasLiveConflict = await checkDuplicateEmail(
+        campaignId,
+        validatedData.email,
+        memberId
+      );
+      const decision = decideTeamMemberEmailChange({
+        currentEmail: existingMember.email,
+        requestedEmail: validatedData.email,
+        hasLiveConflict,
+      });
+      if (decision.type === "conflict") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A team member with this email already exists in the campaign",
+          },
+          { status: 409 }
+        );
+      }
+      if (decision.type === "update") {
+        emailUpdate = decision.email;
+      }
+    }
 
     // Update team member
-    const updatedMember = await prisma.teamMember.update({
-      where: { id: memberId },
-      data: {
-        ...(validatedData.name && { name: validatedData.name }),
-        ...(validatedData.personalGoal !== undefined && {
-          personalGoal: validatedData.personalGoal
-            ? BigInt(Math.round(validatedData.personalGoal * 100))
-            : null
-        }),
-        ...(validatedData.position !== undefined && { position: validatedData.position }),
-        ...(validatedData.grade !== undefined && { grade: validatedData.grade }),
-        ...(validatedData.profilePhotoUrl !== undefined && { profilePhotoUrl: validatedData.profilePhotoUrl }),
-        ...(validatedData.phoneNumber !== undefined && { phoneNumber: validatedData.phoneNumber }),
-        updatedAt: new Date(),
-      },
-      include: {
-        campaign: {
-          select: { slug: true }
+    let updatedMember;
+    try {
+      updatedMember = await prisma.teamMember.update({
+        where: { id: memberId },
+        data: {
+          ...(validatedData.name && { name: validatedData.name }),
+          ...(emailUpdate !== undefined && { email: emailUpdate }),
+          ...(validatedData.personalGoal !== undefined && {
+            personalGoal: validatedData.personalGoal
+              ? BigInt(Math.round(validatedData.personalGoal * 100))
+              : null
+          }),
+          ...(validatedData.position !== undefined && { position: validatedData.position }),
+          ...(validatedData.grade !== undefined && { grade: validatedData.grade }),
+          ...(validatedData.profilePhotoUrl !== undefined && { profilePhotoUrl: validatedData.profilePhotoUrl }),
+          ...(validatedData.phoneNumber !== undefined && { phoneNumber: validatedData.phoneNumber }),
+          updatedAt: new Date(),
+        },
+        include: {
+          campaign: {
+            select: { slug: true }
+          }
         }
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A team member with this email already exists in the campaign",
+          },
+          { status: 409 }
+        );
       }
-    });
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,

@@ -16,6 +16,9 @@ import {
   Trophy,
   DollarSign,
   AlertCircle,
+  Upload,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +90,14 @@ export default function RosterPage({
     email: "",
     personalGoal: "",
   });
+  const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    personalGoal: "",
+  });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -162,6 +173,127 @@ export default function RosterPage({
     navigator.clipboard.writeText(fundraisingLink);
     setCopiedCode(memberId);
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const openEdit = (member: TeamMember) => {
+    setActionError(null);
+    setEditMember(member);
+    setEditForm({
+      name: member.name,
+      email: member.email,
+      personalGoal:
+        member.personalGoal != null ? String(member.personalGoal) : "",
+    });
+  };
+
+  const handleUpdateMember = async () => {
+    if (!editMember) return;
+    if (!editForm.name || !editForm.email) {
+      setActionError("Name and email are required");
+      return;
+    }
+
+    try {
+      setBusyMemberId(editMember.id);
+      setActionError(null);
+
+      const res = await fetch(
+        `/api/campaigns/${params.campaignId}/team-members/${editMember.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": csrfToken,
+          },
+          body: JSON.stringify({
+            name: editForm.name,
+            email: editForm.email,
+            personalGoal: editForm.personalGoal
+              ? parseFloat(editForm.personalGoal)
+              : null,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update team member");
+      }
+
+      setEditMember(null);
+      await fetchTeamMembers();
+    } catch (err) {
+      console.error("Error updating team member:", err);
+      setActionError(
+        err instanceof Error ? err.message : "Failed to update team member"
+      );
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
+  const handleRemoveMember = async (member: TeamMember) => {
+    if (
+      !confirm(
+        `Remove ${member.name} from the roster? Their donation history will be kept.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBusyMemberId(member.id);
+      setError(null);
+
+      const res = await fetch(
+        `/api/campaigns/${params.campaignId}/team-members/${member.id}`,
+        {
+          method: "DELETE",
+          headers: { "x-csrf-token": csrfToken },
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to remove team member");
+      }
+
+      await fetchTeamMembers();
+    } catch (err) {
+      console.error("Error removing team member:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to remove team member"
+      );
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
+  const handleResendInvite = async (member: TeamMember) => {
+    try {
+      setBusyMemberId(member.id);
+      setError(null);
+
+      const res = await fetch(
+        `/api/campaigns/${params.campaignId}/team-members/${member.id}/resend-invite`,
+        {
+          method: "POST",
+          headers: { "x-csrf-token": csrfToken },
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to resend invitation");
+      }
+    } catch (err) {
+      console.error("Error resending invitation:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to resend invitation"
+      );
+    } finally {
+      setBusyMemberId(null);
+    }
   };
 
   if (isLoading && teamMembers.length === 0) {
@@ -242,6 +374,13 @@ export default function RosterPage({
               Manage your team members and track their fundraising progress
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="lg" variant="outline" asChild>
+              <Link href={`/dashboard/${params.campaignId}/roster/import`}>
+                <Upload className="w-4 h-4 mr-2" />
+                Import roster
+              </Link>
+            </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button size="lg">
@@ -323,6 +462,7 @@ export default function RosterPage({
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -401,10 +541,18 @@ export default function RosterPage({
                 <p className="text-muted-foreground mb-4">
                   Get started by adding your first team member
                 </p>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add Team Member
-                </Button>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button variant="outline" asChild>
+                    <Link href={`/dashboard/${params.campaignId}/roster/import`}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import roster
+                    </Link>
+                  </Button>
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Team Member
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -475,6 +623,7 @@ export default function RosterPage({
                           )}
                         </td>
                         <td className={TD}>
+                          <div className="flex flex-wrap gap-2">
                           {member.fundraisingLink && (
                             <Button
                               variant="outline"
@@ -496,6 +645,36 @@ export default function RosterPage({
                               )}
                             </Button>
                           )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEdit(member)}
+                              disabled={busyMemberId === member.id}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                            {member.invitationStatus !== "ACCEPTED" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleResendInvite(member)}
+                                disabled={busyMemberId === member.id}
+                              >
+                                <Mail className="w-3 h-3 mr-1" />
+                                Resend invite
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveMember(member)}
+                              disabled={busyMemberId === member.id}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Remove
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -505,6 +684,91 @@ export default function RosterPage({
             )}
           </CardContent>
         </Card>
+
+        <Dialog
+          open={editMember !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditMember(null);
+              setActionError(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit team member</DialogTitle>
+              <DialogDescription>
+                Email is updated on this record so fundraising already attributed
+                to them stays attached.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {actionError && (
+                <div className="bg-warning-light border border-warning rounded-lg p-3">
+                  <p className="text-sm text-warning-dark">{actionError}</p>
+                </div>
+              )}
+              <div>
+                <Label htmlFor="edit-name">Full Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, name: e.target.value })
+                  }
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-goal">Personal Fundraising Goal (Optional)</Label>
+                <div className="flex items-center mt-2">
+                  <span className="text-muted-foreground mr-2">$</span>
+                  <Input
+                    id="edit-goal"
+                    type="number"
+                    placeholder="500"
+                    value={editForm.personalGoal}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, personalGoal: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditMember(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateMember}
+                disabled={
+                  !!busyMemberId || !editForm.name || !editForm.email
+                }
+              >
+                {busyMemberId ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
