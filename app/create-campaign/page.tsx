@@ -31,7 +31,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Kicker, SiteHeader, TeamChip } from "@/components/app-chrome";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
+
+// BRIEF §3 amount-chip / option-tile states. Unselected tiles sit on the night
+// wash; the selected one takes the team-red border, inner glow and drop halo.
+const OPTION_TILE =
+  "rounded-xl border transition-all duration-200 ease-spring active:scale-[.97]";
+const OPTION_TILE_OFF =
+  "border-white/10 bg-white/[0.04] text-foreground hover:-translate-y-0.5 hover:border-white/25";
+const OPTION_TILE_ON =
+  "border-primary bg-[rgba(200,16,46,.14)] text-foreground shadow-[0_0_0_1px_#C8102E,0_10px_34px_rgba(200,16,46,.35),inset_0_0_22px_rgba(200,16,46,.12)]";
 
 /**
  * Guided campaign setup.
@@ -518,7 +528,7 @@ export default function CreateCampaignPage() {
       <Shell>
         <Card className="mx-auto max-w-lg">
           <CardContent className="space-y-5 p-6 text-center sm:p-8">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-[rgba(200,16,46,.14)]">
               <UserPlus className="h-7 w-7 text-primary" />
             </div>
             <div className="space-y-2">
@@ -557,13 +567,16 @@ export default function CreateCampaignPage() {
   const stepMeta = STEPS[step - 1];
 
   return (
-    <Shell>
+    <Shell
+      crumb="New campaign"
+      rail={<StepRail current={step} onSelect={goToStep} />}
+    >
       <div ref={headingRef} className="mb-6 scroll-mt-6">
         <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-sm font-semibold text-primary">
+          <Kicker tone="team">
             Step {step} of {TOTAL_STEPS}
-          </span>
-          <span className="text-xs text-muted-foreground">
+          </Kicker>
+          <span className="text-xs tabular text-muted-foreground">
             {Math.round((step / TOTAL_STEPS) * 100)}% done
           </span>
         </div>
@@ -571,18 +584,20 @@ export default function CreateCampaignPage() {
       </div>
 
       <Card>
-        <CardContent className="p-5 sm:p-8">
+        {/* Each step pane fades in on entry (BRIEF §4 screen 06 "pane fade-in").
+            Keying on `step` restarts the animation as the coach advances. */}
+        <CardContent key={step} className="animate-fade-in p-5 sm:p-8">
           <div className="mb-6">
-            <h1 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="font-display text-2xl font-black uppercase leading-[1.05] tracking-[-0.02em] text-foreground [text-shadow:0_2px_0_rgba(200,16,46,.4),0_6px_0_rgba(200,16,46,.14),0_18px_44px_rgba(200,16,46,.18)] sm:text-[32px]">
               {stepMeta.title}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">{stepMeta.subtitle}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{stepMeta.subtitle}</p>
           </div>
 
           {formError && (
-            <div className="mb-6 flex items-start gap-3 rounded-lg border border-warning bg-warning-light p-4">
-              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
-              <p className="text-sm font-medium text-warning-dark">{formError}</p>
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-destructive/40 border-l-[3px] border-l-destructive bg-[rgba(242,97,75,.08)] p-4">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
+              <p className="text-sm font-medium text-foreground">{formError}</p>
             </div>
           )}
 
@@ -638,10 +653,8 @@ export default function CreateCampaignPage() {
                         type="button"
                         onClick={() => update("category", value)}
                         aria-pressed={selected}
-                        className={`flex min-h-[104px] flex-col items-start gap-1 rounded-xl border-2 p-4 text-left transition-all ${
-                          selected
-                            ? "border-primary bg-primary-50 ring-2 ring-primary-100"
-                            : "border-input bg-background hover:border-primary-200 hover:bg-primary-50/40"
+                        className={`flex min-h-[104px] flex-col items-start gap-1 p-4 text-left ${OPTION_TILE} ${
+                          selected ? OPTION_TILE_ON : OPTION_TILE_OFF
                         }`}
                       >
                         <Icon
@@ -674,10 +687,8 @@ export default function CreateCampaignPage() {
                         type="button"
                         onClick={() => update("goalAmount", String(preset))}
                         aria-pressed={selected}
-                        className={`flex h-14 items-center justify-center rounded-xl border-2 text-lg font-semibold transition-all ${
-                          selected
-                            ? "border-primary bg-primary-50 text-primary ring-2 ring-primary-100"
-                            : "border-input bg-background text-foreground hover:border-primary-200"
+                        className={`flex h-14 items-center justify-center text-lg font-semibold tabular ${OPTION_TILE} ${
+                          selected ? OPTION_TILE_ON : OPTION_TILE_OFF
                         }`}
                       >
                         ${preset.toLocaleString()}
@@ -690,7 +701,7 @@ export default function CreateCampaignPage() {
                       update("goalAmount", "");
                       document.getElementById("goalAmount")?.focus();
                     }}
-                    className="flex h-14 items-center justify-center rounded-xl border-2 border-dashed border-input bg-background text-base font-medium text-muted-foreground transition-all hover:border-primary-200 hover:text-foreground"
+                    className="flex h-14 items-center justify-center rounded-xl border border-dashed border-white/20 bg-transparent text-base font-medium text-muted-foreground transition-all duration-200 ease-spring hover:-translate-y-0.5 hover:border-white/35 hover:text-foreground active:scale-[.97]"
                   >
                     A different amount
                   </button>
@@ -717,9 +728,10 @@ export default function CreateCampaignPage() {
                 </div>
               </Field>
 
-              <div className="flex items-start gap-3 rounded-lg bg-muted p-4">
-                <Target className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
-                <p className="text-sm text-muted-foreground">
+              {/* Fee strip — BRIEF §4 screen 06 ".feestrip" */}
+              <div className="flex items-start gap-3 rounded-lg border border-secondary/35 bg-[rgba(34,196,139,.08)] p-4 text-[13px] font-medium">
+                <Target className="mt-0.5 h-5 w-5 flex-shrink-0 text-secondary" />
+                <p className="text-foreground">
                   Bleacher Backers takes a small platform fee — you keep the rest. Every donation
                   shows its exact breakdown in your dashboard.
                 </p>
@@ -741,7 +753,7 @@ export default function CreateCampaignPage() {
                       key={id}
                       type="button"
                       onClick={() => update("description", build(data.teamName.trim() || "our team"))}
-                      className="flex items-center gap-3 rounded-xl border-2 border-input bg-background p-3 text-left transition-all hover:border-primary-200 hover:bg-primary-50/40 sm:flex-col sm:items-start"
+                      className={`flex items-center gap-3 p-3 text-left sm:flex-col sm:items-start ${OPTION_TILE} ${OPTION_TILE_OFF}`}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0 text-primary" />
                       <span className="text-sm font-medium text-foreground">{label}</span>
@@ -798,8 +810,8 @@ export default function CreateCampaignPage() {
                 error={errors.slug}
               >
                 <div
-                  className={`flex items-center overflow-hidden rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring ${
-                    errors.slug || slugStatus === "taken" ? "border-warning" : "border-input"
+                  className={`flex items-center overflow-hidden rounded-lg border bg-white/[0.05] focus-within:border-secondary focus-within:ring-[3px] focus-within:ring-[rgba(14,124,90,.35)] ${
+                    errors.slug || slugStatus === "taken" ? "border-warning" : "border-white/10"
                   }`}
                 >
                   <span className="hidden select-none whitespace-nowrap py-3 pl-3 text-sm text-muted-foreground sm:inline">
@@ -817,7 +829,7 @@ export default function CreateCampaignPage() {
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
-                    className="h-12 border-0 pl-2 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-12 border-0 bg-transparent pl-2 text-base focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                   <div className="w-10 flex-shrink-0 pr-3">
                     {slugStatus === "checking" && (
@@ -829,13 +841,37 @@ export default function CreateCampaignPage() {
                 </div>
               </Field>
 
-              <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Your page will live at
-                </p>
-                <p className="mt-1 break-all font-medium text-primary">
-                  bleacherbackers.com/raise/{data.slug || "your-team"}
-                </p>
+              {/* Live preview of the public page — BRIEF §4 screen 06
+                  ".preview-card": blinking LIVE dot, red rule, goal bar at 0. */}
+              <div className="overflow-hidden rounded-card border border-border bg-[linear-gradient(160deg,#1A2130,#12161F)] shadow-[0_30px_70px_rgba(0,0,0,.5)]">
+                <div className="flex items-center gap-2 border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="h-[7px] w-[7px] animate-pulse rounded-full bg-secondary shadow-[0_0_10px_rgba(34,196,139,.9)]"
+                  />
+                  Live preview
+                </div>
+                <div className="h-[3px] bg-primary shadow-[0_0_16px_#C8102E]" />
+                <div className="p-5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    {data.organizationName || "Your organization"}
+                  </p>
+                  <p className="mt-1 font-display text-[21px] font-extrabold tracking-[-0.02em] text-foreground">
+                    {data.teamName || "Your team"}
+                  </p>
+                  <p className="mt-4 font-display text-[30px] font-black tabular text-foreground">
+                    $0
+                    <span className="ml-2 text-xs font-medium text-muted-foreground">
+                      of {formatMoney(data.goalAmount)} goal
+                    </span>
+                  </p>
+                  <div className="mt-2.5 h-[9px] overflow-hidden rounded-full border border-border bg-[#0D1119]">
+                    <div className="h-full w-0 rounded-full bg-primary shadow-[0_0_14px_#C8102E]" />
+                  </div>
+                  <p className="mt-4 break-all text-center text-[11px] text-muted-foreground">
+                    bleacherbackers.com/raise/{data.slug || "your-team"}
+                  </p>
+                </div>
               </div>
 
               {!errors.slug && slugStatus === "available" && (
@@ -891,10 +927,8 @@ export default function CreateCampaignPage() {
                         type="button"
                         onClick={() => update("endDate", value)}
                         aria-pressed={selected}
-                        className={`h-12 rounded-xl border-2 text-sm font-semibold transition-all ${
-                          selected
-                            ? "border-primary bg-primary-50 text-primary"
-                            : "border-input bg-background text-foreground hover:border-primary-200"
+                        className={`h-12 text-sm font-semibold ${OPTION_TILE} ${
+                          selected ? OPTION_TILE_ON : OPTION_TILE_OFF
                         }`}
                       >
                         {label}
@@ -905,10 +939,8 @@ export default function CreateCampaignPage() {
                     type="button"
                     onClick={() => update("endDate", "")}
                     aria-pressed={!data.endDate}
-                    className={`h-12 rounded-xl border-2 text-sm font-semibold transition-all ${
-                      !data.endDate
-                        ? "border-primary bg-primary-50 text-primary"
-                        : "border-input bg-background text-foreground hover:border-primary-200"
+                    className={`h-12 text-sm font-semibold ${OPTION_TILE} ${
+                      !data.endDate ? OPTION_TILE_ON : OPTION_TILE_OFF
                     }`}
                   >
                     No end date
@@ -937,7 +969,7 @@ export default function CreateCampaignPage() {
           {/* Step 6 — review */}
           {step === 6 && (
             <div className="space-y-6">
-              <div className="divide-y rounded-xl border">
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
                 <ReviewRow label="Team" value={data.teamName} onEdit={() => goToStep(1)} />
                 <ReviewRow label="Part of" value={data.organizationName} onEdit={() => goToStep(1)} />
                 <ReviewRow
@@ -963,9 +995,9 @@ export default function CreateCampaignPage() {
                 />
               </div>
 
-              <div className="flex items-start gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4">
+              <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-[rgba(200,16,46,.10)] p-4">
                 <Rocket className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
-                <p className="text-sm text-primary-900">
+                <p className="text-sm text-foreground">
                   We&apos;ll save this as a <strong>draft</strong>. Nobody can see it or donate until
                   you launch it from your dashboard — so there&apos;s no risk in creating it now.
                 </p>
@@ -993,7 +1025,7 @@ export default function CreateCampaignPage() {
           )}
 
           {/* Navigation */}
-          <div className="mt-8 flex items-center justify-between gap-3 border-t pt-6">
+          <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-6">
             {step === 1 ? (
               <Button variant="ghost" asChild>
                 <Link href="/">
@@ -1027,21 +1059,98 @@ export default function CreateCampaignPage() {
 
 /* ------------------------------- sub-views ------------------------------- */
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({
+  children,
+  rail,
+  crumb,
+}: {
+  children: React.ReactNode;
+  rail?: React.ReactNode;
+  crumb?: string;
+}) {
   return (
-    <div className="min-h-screen bg-muted">
-      <nav className="border-b bg-white">
-        <div className="mx-auto flex h-16 max-w-2xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
-              <span className="font-display text-sm font-bold text-white">BB</span>
-            </div>
-            <span className="text-lg font-bold text-foreground sm:text-xl">Bleacher Backers</span>
-          </Link>
+    <div className="min-h-screen">
+      {/* BRIEF §4 screen 06: header carries a breadcrumb chip next to the wordmark. */}
+      <SiteHeader
+        sticky={false}
+        left={crumb ? <TeamChip className="hidden sm:inline-flex">{crumb}</TeamChip> : undefined}
+      />
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+          {rail ? <div className="lg:sticky lg:top-6">{rail}</div> : null}
+          <div className="min-w-0">{children}</div>
         </div>
-      </nav>
-      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">{children}</main>
+      </main>
     </div>
+  );
+}
+
+/**
+ * Step rail — BRIEF §4 screen 06. Numbered nodes joined by connecting bars:
+ * completed steps fill green, the current step carries the team-red ring.
+ * Horizontal scroll strip on small screens, vertical rail from `lg` up.
+ */
+function StepRail({
+  current,
+  onSelect,
+}: {
+  current: number;
+  onSelect: (step: number) => void;
+}) {
+  return (
+    <ol className="-mx-4 flex gap-0 overflow-x-auto px-4 pb-2 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
+      {STEPS.map((meta, index) => {
+        const number = index + 1;
+        const done = number < current;
+        const active = number === current;
+        const last = number === STEPS.length;
+        return (
+          <li
+            key={meta.title}
+            className="flex flex-none items-center gap-3 lg:flex-col lg:items-stretch lg:gap-0"
+          >
+            <button
+              type="button"
+              onClick={() => onSelect(number)}
+              disabled={number > current}
+              aria-current={active ? "step" : undefined}
+              className="flex items-center gap-3 pr-4 text-left disabled:cursor-not-allowed lg:pr-0"
+            >
+              <span
+                className={`flex h-11 w-11 flex-none items-center justify-center rounded-xl border font-display text-[17px] font-black tabular transition-all duration-300 ease-spring ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_4px_rgba(200,16,46,.28),0_0_26px_rgba(200,16,46,.55)]"
+                    : done
+                      ? "border-secondary bg-transparent text-secondary"
+                      : "border-border bg-card text-muted-foreground"
+                }`}
+              >
+                {done ? <Check className="h-5 w-5" /> : number}
+              </span>
+              <span
+                className={`whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors lg:whitespace-normal ${
+                  active || done ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {meta.title}
+              </span>
+            </button>
+            {!last && (
+              <span
+                aria-hidden="true"
+                className="relative ml-0 h-0.5 w-10 flex-none overflow-hidden rounded-sm bg-border lg:ml-[22px] lg:h-6 lg:w-0.5"
+              >
+                <i
+                  className={`absolute inset-0 origin-left bg-secondary shadow-[0_0_10px_rgba(34,196,139,.8)] transition-transform duration-700 ease-stadium lg:origin-top ${
+                    done ? "scale-x-100 lg:scale-y-100" : "scale-x-0 lg:scale-y-0"
+                  }`}
+                />
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -1060,7 +1169,7 @@ function Field({
 }) {
   return (
     <div>
-      <Label htmlFor={id} className="text-base font-semibold">
+      <Label htmlFor={id} className="text-base font-semibold text-foreground">
         {label}
       </Label>
       {hint && !error && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
@@ -1138,13 +1247,13 @@ function VerifyEmailCard({ email, csrfToken }: { email: string; csrfToken: strin
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-primary-100 bg-primary-50 p-5">
+    <div className="mb-6 rounded-xl border border-primary/40 bg-[rgba(200,16,46,.10)] p-5">
       <div className="flex items-start gap-3">
         <Mail className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h2 className="font-semibold text-primary-900">One quick thing: confirm your email</h2>
-            <p className="mt-1 text-sm text-primary-900">
+            <h2 className="font-display font-bold uppercase tracking-[0.02em] text-foreground">One quick thing: confirm your email</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               Because campaigns collect real money, we need to know your inbox is really yours. Click
               the link we sent{email ? ` to ${email}` : ""}, then come back and tap{" "}
               <strong>Create my campaign</strong> again. Everything you&apos;ve filled in is saved.
@@ -1163,7 +1272,7 @@ function VerifyEmailCard({ email, csrfToken }: { email: string; csrfToken: strin
                 variant="outline"
                 onClick={resend}
                 disabled={state === "sending"}
-                className="h-11 bg-white"
+                className="h-11"
               >
                 {state === "sending" ? (
                   <>
@@ -1215,10 +1324,10 @@ function SuccessScreen({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success-light">
-          <PartyPopper className="h-8 w-8 text-success" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-secondary/40 bg-[rgba(34,196,139,.12)] shadow-[0_0_40px_rgba(34,196,139,.35)]">
+          <PartyPopper className="h-8 w-8 text-secondary" />
         </div>
-        <h1 className="font-display text-3xl font-bold text-foreground">
+        <h1 className="font-display text-3xl font-black uppercase tracking-[-0.02em] text-foreground [text-shadow:0_2px_0_rgba(34,196,139,.4),0_16px_44px_rgba(34,196,139,.25)]">
           Your campaign page is ready!
         </h1>
         <p className="mt-2 text-muted-foreground">
@@ -1230,7 +1339,7 @@ function SuccessScreen({
         <CardContent className="space-y-5 p-5 sm:p-6">
           {steps.map(({ Icon, title, body }, index) => (
             <div key={title} className="flex gap-4">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-50">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-[rgba(200,16,46,.14)]">
                 <Icon className="h-5 w-5 text-primary" />
               </div>
               <div>

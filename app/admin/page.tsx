@@ -167,13 +167,13 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Raised
             </CardTitle>
             <DollarSign className="w-5 h-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="font-display text-3xl font-extrabold tabular text-foreground">
               {formatCurrency(stats.totalRaised * 100)}
             </div>
             <p className={`text-sm mt-1 flex items-center ${stats.growth.donations.trend === 'up' ? 'text-success' : stats.growth.donations.trend === 'down' ? 'text-destructive' : 'text-muted-foreground'}`}>
@@ -185,13 +185,13 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Active Campaigns
             </CardTitle>
             <Activity className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="font-display text-3xl font-extrabold tabular text-foreground">
               {stats.activeCampaigns}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -202,13 +202,13 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Platform Fees
             </CardTitle>
             <Wallet className="w-5 h-5 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="font-display text-3xl font-extrabold tabular text-foreground">
               {formatCurrency(stats.platformFees * 100)}
             </div>
             <p className="text-sm text-muted-foreground mt-1">10% of total raised</p>
@@ -217,13 +217,13 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Users
             </CardTitle>
             <Users className="w-5 h-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+            <div className="font-display text-3xl font-extrabold tabular text-foreground">
               {stats.totalUsers.toLocaleString()}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -237,7 +237,7 @@ export default function AdminOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Donations
             </CardTitle>
           </CardHeader>
@@ -275,7 +275,7 @@ export default function AdminOverviewPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Avg Donation
             </CardTitle>
           </CardHeader>
@@ -319,8 +319,8 @@ export default function AdminOverviewPage() {
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             campaign.status === 'ACTIVE' ? 'bg-success-light text-success-dark' :
                             campaign.status === 'DRAFT' ? 'bg-muted text-foreground' :
-                            campaign.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
+                            campaign.status === 'COMPLETED' ? 'bg-white/[0.08] text-foreground' :
+                            'bg-[rgba(232,163,61,.14)] text-[#E8A33D]'
                           }`}>
                             {campaign.status}
                           </span>
@@ -432,13 +432,13 @@ export default function AdminOverviewPage() {
                   pendingDisbursements.map((disbursement) => (
                     <div
                       key={disbursement.id}
-                      className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"
+                      className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-4"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <p className="font-semibold text-foreground">
                           {formatCurrency(Number(disbursement.requestedAmount))}
                         </p>
-                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                        <span className="text-xs bg-[rgba(232,163,61,.14)] text-[#E8A33D] px-2 py-1 rounded-full">
                           Pending
                         </span>
                       </div>

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Kicker, PageTitle } from '@/components/app-chrome';
 // TODO: Install tabs component - temporarily commented out for Week 1 build
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -246,25 +247,22 @@ export default function PlayerOutreachPage() {
   };
 
   return (
-    <div className="min-h-screen bg-muted py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen px-4 py-12">
+      {/* BRIEF §4 screen 07: centered narrow column. */}
+      <div className="mx-auto max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-secondary mb-2">
-            Spread the word
-          </p>
-          <h1 className="font-display text-[clamp(30px,5vw,44px)] font-semibold tracking-[-0.02em] text-primary mb-2">
-            Share your fundraiser
-          </h1>
+        <div className="mb-8 text-center">
+          <Kicker tone="team">Spread the word</Kicker>
+          <PageTitle className="mb-2 mt-3">Share your fundraiser</PageTitle>
           <p className="text-lg text-muted-foreground">
             Send personalized messages to friends and family
           </p>
         </div>
 
         {success && (
-          <Alert className="mb-6 bg-success-light border-success">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <AlertDescription className="text-success-dark">
+          <Alert variant="success" className="mb-6">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>
               Sent{sentSummary ? ` — ${sentSummary}` : ''}! Text three more people
               when you can.
             </AlertDescription>
@@ -281,8 +279,8 @@ export default function PlayerOutreachPage() {
         {/* Message Type Selection */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary-600" />
+            <CardTitle className="flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]">
+              <Sparkles className="h-5 w-5 text-primary" />
               Step 1: Choose How to Send
             </CardTitle>
           </CardHeader>
@@ -319,16 +317,16 @@ export default function PlayerOutreachPage() {
         {/* Message Composer */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="font-display flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between gap-3 text-[15px] font-extrabold uppercase tracking-[0.04em]">
               <span className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-primary-600" />
+                <Mail className="h-5 w-5 text-primary" />
                 Step 2: Create Your Message
               </span>
               <div className="flex gap-2">
                 <select
                   value={tone}
                   onChange={(e) => setTone(e.target.value as any)}
-                  className="text-sm border rounded-md px-3 py-1"
+                  className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-foreground [color-scheme:dark] focus-visible:border-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(14,124,90,.35)]"
                 >
                   <option value="friendly">Friendly</option>
                   <option value="enthusiastic">Enthusiastic</option>
@@ -413,8 +411,8 @@ export default function PlayerOutreachPage() {
         {/* Recipients */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary-600" />
+            <CardTitle className="flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]">
+              <Users className="h-5 w-5 text-primary" />
               Step 3: Add Recipients
             </CardTitle>
             <CardDescription>
@@ -451,7 +449,7 @@ export default function PlayerOutreachPage() {
                     variant="ghost"
                     onClick={() => removeRecipient(index)}
                   >
-                    <Trash2 className="h-4 w-4 text-warning" />
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 )}
               </div>
@@ -472,7 +470,7 @@ export default function PlayerOutreachPage() {
         <Button
           onClick={sendMessages}
           disabled={sending}
-          className="w-full bg-primary-600 hover:bg-primary-700 h-12 text-lg"
+          className="h-12 w-full text-lg"
           size="lg"
         >
           {sending ? (

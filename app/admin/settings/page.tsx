@@ -357,7 +357,7 @@ export default function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -370,7 +370,7 @@ export default function AdminSettingsPage() {
                   Maintenance Mode
                 </Label>
               </div>
-              <p className="text-sm text-yellow-800 mt-2">
+              <p className="text-sm text-[#E8A33D] mt-2">
                 When enabled, the platform will show a maintenance message to all users
                 except admins. Use this for system updates or critical maintenance.
               </p>

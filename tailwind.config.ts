@@ -31,58 +31,63 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
-        // Brand scales — Bleacher Backers UI, "Navy / Gray / Dark-Green".
-        // Source: Claude Design project "Bleacher Backers UI",
-        // templates/palette-navy-gray-green. Tailwind compiles these into
-        // literal utility classes, so they cannot be driven by the CSS
-        // variables in app/globals.css — the two must be kept in sync by hand.
+        // Brand scales — Bleacher Backers UI, "C · Stadium".
+        // Source: .design-sync/bbc-v3/BRIEF.md (§1 canonical night palette).
+        // Tailwind compiles these into literal utility classes, so they cannot
+        // be driven by the CSS variables in app/globals.css — the two must be
+        // kept in sync by hand.
         primary: {
-          DEFAULT: "#234C93", // Navy — brand / primary actions
-          50: "#EEF3FB",
-          100: "#D6E2F4",
-          200: "#AEC4E6",
-          300: "#7FA0CE",
-          400: "#4E71AE",
-          500: "#234C93",
-          600: "#1D3F7C",
-          700: "#173366",
-          800: "#122952",
-          900: "#0E1F3F",
+          DEFAULT: "#C8102E", // Team red — brand / primary actions / top rules
+          50: "#FDECEF",
+          100: "#FCD5DB",
+          200: "#F8AAB7",
+          300: "#F37287",
+          400: "#EE2F4F",
+          500: "#C8102E",
+          600: "#AA0E28",
+          700: "#890B20",
+          800: "#6D0919",
+          900: "#500713",
           foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#15613F", // Dark green — secondary accent
-          50: "#E8F4EE",
-          100: "#C9E7D8",
-          200: "#9BD3BB",
-          300: "#5DB58C",
-          400: "#2E8E62",
-          500: "#15613F",
-          600: "#124E33",
-          700: "#0E3F2A",
-          800: "#0B3221",
-          900: "#08251A",
-          // Flipped from #1F2937 to white: the secondary surface is now dark
-          // green, so dark text on it would fail contrast.
-          foreground: "#FFFFFF",
+          DEFAULT: "#22C48B", // Accent green — money-positive / secondary accent
+          50: "#EEFCF7",
+          100: "#D4F7EB",
+          200: "#ADF0D9",
+          300: "#74E6BF",
+          400: "#40DDA6",
+          500: "#22C48B",
+          600: "#1DA575",
+          700: "#17825D",
+          800: "#12684A",
+          900: "#0E4E38",
+          // Dark ink on the bright accent green: white-on-#22C48B is ~2:1 and
+          // fails AA, so the foreground flips to the deep end of the ramp.
+          foreground: "#06231A",
         },
         success: {
-          DEFAULT: "#1C7A50",
-          light: "#DCF1E7",
-          600: "#166847",
-          // `dark` is not in the design-system spec, but ~17 call sites use
-          // text-success-dark / bg-success-dark. Dropping the key would make
-          // Tailwind silently emit no class at all, so it is retained here and
-          // set to the spec's own 600 value to stay on-palette.
-          dark: "#166847",
-          foreground: "#FFFFFF",
+          DEFAULT: "#22C48B",
+          // The night shell inverts what "light" and "dark" mean for these
+          // compat keys: `light` is the soft *background* tint and `dark` is
+          // the *text* colour drawn on it. On a dark page that means light =
+          // rgba(34,196,139,.08) over #0A0D14, and dark = the bright glowing
+          // total colour #3ECF9C from the brief. The ~29 existing
+          // bg-success-light / text-success-dark pairs stay legible.
+          light: "#0C1C1E",
+          600: "#1DA575",
+          // `dark` is not in the design-system spec, but ~15 call sites use
+          // text-success-dark. Dropping the key would make Tailwind silently
+          // emit no class at all, so it is retained.
+          dark: "#3ECF9C",
+          foreground: "#06231A",
         },
-        // Red is danger-only and deliberately unchanged by the recolor.
-        // light/dark are retained for the same reason as success.dark above.
+        // Warning is the brief's error/danger red (#F2614B). Same
+        // light-is-background / dark-is-text inversion as success above.
         warning: {
-          DEFAULT: "#EF4444",
-          light: "#FEE2E2",
-          dark: "#991B1B",
+          DEFAULT: "#F2614B",
+          light: "#1D1418",
+          dark: "#F27B72",
           foreground: "#FFFFFF",
         },
         muted: {
@@ -114,6 +119,20 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // BRIEF §1: cards 14-16px, controls 10px (--radius), pills 999px.
+        card: "14px",
+      },
+      // BRIEF §1 easing: standard ease and the spring used by hovers/presses.
+      transitionTimingFunction: {
+        stadium: "cubic-bezier(0.22, 0.8, 0.3, 1)",
+        spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+      boxShadow: {
+        // BRIEF §3: the signature night-card lift, and the two brand glows.
+        card: "0 20px 50px rgba(0, 0, 0, 0.5)",
+        sheet: "0 30px 70px rgba(0, 0, 0, 0.55)",
+        "glow-team": "0 0 18px rgba(200, 16, 46, 0.5)",
+        "glow-accent": "0 0 12px rgba(34, 196, 139, 0.7)",
       },
       keyframes: {
         "accordion-down": {

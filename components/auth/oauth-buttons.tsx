@@ -47,7 +47,7 @@ export function OAuthButtons({ redirect }: { redirect?: string | null }) {
       {providers.google && (
         <a
           href={hrefFor("google")}
-          className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+          className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-white px-4 py-3 text-sm font-medium text-muted-foreground shadow-sm hover:bg-white/[0.04] transition-colors"
         >
           <GoogleIcon />
           Continue with Google
@@ -57,7 +57,7 @@ export function OAuthButtons({ redirect }: { redirect?: string | null }) {
       {providers.apple && (
         <a
           href={hrefFor("apple")}
-          className="flex w-full items-center justify-center gap-3 rounded-md bg-black px-4 py-3 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+          className="flex w-full items-center justify-center gap-3 rounded-md bg-black px-4 py-3 text-sm font-medium text-white hover:bg-card transition-colors"
         >
           <AppleIcon />
           Continue with Apple

@@ -3,65 +3,99 @@
 @tailwind utilities;
 
 /* ============================================================================
-   Surface tokens — Bleacher Backers UI, "Navy / Gray / Dark-Green".
-   Source: Claude Design project "Bleacher Backers UI",
-   templates/palette-navy-gray-green/tokens-navy-gray-green.css
+   Surface tokens — Bleacher Backers UI, "C · Stadium" (stadium night).
+   Source: .design-sync/bbc-v3/BRIEF.md + .design-sync/bbc-v3/c-stadium/*.html
+
+   The design is dark-only: there is no light mode of the app shell. The night
+   palette is therefore the DEFAULT :root token set, and .dark mirrors it so
+   that any `dark:` variant or a `class="dark"` wrapper renders identically
+   rather than falling back to the old navy/gray theme.
 
    These shadcn surface tokens are CSS variables and recolor at runtime. The
    brand SCALES (primary/secondary/success/warning utility classes) are compiled
    by Tailwind and cannot be driven from here — those live in tailwind.config.ts
    and must stay in sync with these values.
+
+   Light only ever appears as an embedded "paper document" (.paper-panel below),
+   never as an app-shell theme.
    ============================================================================ */
 @layer base {
   :root {
-    --background: 210 33% 98%;
-    --foreground: 218 41% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 218 41% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 218 41% 12%;
+    /* Raw stadium palette. Prefixed so it cannot collide with the shadcn
+       surface tokens below (--accent is already taken by shadcn). Components
+       that need the literal hex — atmosphere layers, glows, red top strips —
+       read these instead of re-typing the value. */
+    --bb-night: #0a0d14; /* page background */
+    --bb-night-2: #12161f; /* card / surface */
+    --bb-night-3: #181e2a; /* raised surface, gradient card top */
+    --bb-night-4: #1b2334; /* alt gradient top, toast/sheet background */
+    --bb-line: rgba(255, 255, 255, 0.1); /* hairline on dark */
+    --bb-border: #262e3d;
+    --bb-txt: #eef1f6;
+    --bb-dim: #8b93a3;
+    --bb-team: #c8102e; /* team red — CTAs, top rules, glows */
+    --bb-team-hot: #ff2e4d; /* marketing-only hot variant */
+    --bb-accent: #22c48b; /* accent green — money-positive */
+    --bb-accent-bright: #3ecf9c; /* glowing totals */
+    --bb-accent-deep: #0e7c5a; /* focus ring / paper accent */
+    --bb-error: #f2614b;
+    --bb-warning: #e8a33d;
 
-    --primary: 218 61% 36%;            /* navy #234C93 */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 216 20% 95%;          /* shadcn 'secondary' surface = light gray */
-    --secondary-foreground: 218 41% 15%;
-    --muted: 216 22% 95%;
-    --muted-foreground: 218 12% 43%;
-    --accent: 216 22% 94%;
-    --accent-foreground: 218 41% 15%;
+    /* Motion, per the brief. */
+    --bb-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+    --bb-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    --destructive: 0 84% 60%;          /* red — danger only */
-    --destructive-foreground: 210 40% 98%;
+    /* shadcn surface tokens — HSL channels of the palette above. */
+    --background: 222 33% 5.9%; /* #0A0D14 */
+    --foreground: 218 31% 94.9%; /* #EEF1F6 */
+    --card: 222 27% 9.6%; /* #12161F */
+    --card-foreground: 218 31% 94.9%;
+    --popover: 221 32% 15.5%; /* #1B2334 */
+    --popover-foreground: 218 31% 94.9%;
 
-    --border: 216 20% 88%;
-    --input: 216 20% 88%;
-    --ring: 218 61% 36%;
-    --radius: 0.5rem;
+    --primary: 350 85% 42.4%; /* team red #C8102E */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 27% 12.9%; /* shadcn 'secondary' surface = #181E2A */
+    --secondary-foreground: 218 31% 94.9%;
+    --muted: 220 27% 12.9%; /* #181E2A */
+    --muted-foreground: 220 12% 59.2%; /* #8B93A3 */
+    --accent: 221 32% 15.5%; /* #1B2334 */
+    --accent-foreground: 218 31% 94.9%;
+
+    --destructive: 8 87% 62.2%; /* error #F2614B */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 219 23% 19.4%; /* #262E3D */
+    --input: 219 23% 19.4%;
+    --ring: 159 70% 45.1%; /* accent green #22C48B — input focus */
+    --radius: 0.625rem; /* 10px control radius */
   }
 
+  /* Dark-only design: .dark mirrors :root so `dark:` variants and any
+     class="dark" wrapper stay on the stadium night palette. */
   .dark {
-    --background: 219 36% 8.5%;
-    --foreground: 216 22% 92%;
-    --card: 219 32% 12%;
-    --card-foreground: 216 22% 92%;
-    --popover: 219 32% 12%;
-    --popover-foreground: 216 22% 92%;
+    --background: 222 33% 5.9%;
+    --foreground: 218 31% 94.9%;
+    --card: 222 27% 9.6%;
+    --card-foreground: 218 31% 94.9%;
+    --popover: 221 32% 15.5%;
+    --popover-foreground: 218 31% 94.9%;
 
-    --primary: 214 78% 66%;            /* lifted navy for dark surfaces */
-    --primary-foreground: 219 40% 12%;
-    --secondary: 219 22% 18%;
-    --secondary-foreground: 216 22% 92%;
-    --muted: 219 22% 16%;
-    --muted-foreground: 218 14% 64%;
-    --accent: 219 22% 18%;
-    --accent-foreground: 216 22% 92%;
+    --primary: 350 85% 42.4%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 27% 12.9%;
+    --secondary-foreground: 218 31% 94.9%;
+    --muted: 220 27% 12.9%;
+    --muted-foreground: 220 12% 59.2%;
+    --accent: 221 32% 15.5%;
+    --accent-foreground: 218 31% 94.9%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 8 87% 62.2%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 219 20% 22%;
-    --input: 219 20% 22%;
-    --ring: 214 78% 66%;
+    --border: 219 23% 19.4%;
+    --input: 219 23% 19.4%;
+    --ring: 159 70% 45.1%;
   }
 }
 
@@ -72,6 +106,13 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Money and stats are tabular everywhere in this design. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
   }
 }
 
@@ -79,6 +120,135 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* All money/stats per §2 of the brief. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ============================================================================
+   Paper document panel — the ONLY light surface in the design.
+   Used by pricing/fee breakdowns and consent forms embedded in the night page
+   (BRIEF §3 "Paper document panel", §5). Scoped as a class, never a theme flip.
+   ============================================================================ */
+.paper-panel {
+  --paper: #fafaf7;
+  --paper-surface: #ffffff;
+  --paper-ink: #10141c;
+  --paper-border: #e4e4df;
+  --paper-muted: #5f6672;
+  --paper-accent: #0e7c5a;
+  --paper-error: #b42318;
+  --paper-warning: #b45309;
+
+  position: relative;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  padding: clamp(24px, 4vw, 44px);
+  box-shadow: 0 1px 0 #d8d8d2, 0 20px 60px rgba(0, 0, 0, 0.55),
+    0 60px 120px rgba(0, 0, 0, 0.4);
+  transform: rotate(-0.3deg);
+}
+
+/* Red "tape" strip centered on the top edge. */
+.paper-panel::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%) rotate(0.6deg);
+  width: 120px;
+  height: 26px;
+  border-radius: 2px;
+  background: rgba(200, 16, 46, 0.85);
+  opacity: 0.9;
+}
+
+.paper-panel a {
+  color: var(--paper-accent);
+}
+.paper-panel hr,
+.paper-panel .paper-rule {
+  border: 0;
+  border-top: 1px solid var(--paper-border);
+}
+.paper-panel .paper-muted {
+  color: var(--paper-muted);
+}
+.paper-panel .paper-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Ledger rows: flex space-between with hairline dividers. */
+.paper-panel .paper-ledger {
+  border: 1px solid var(--paper-border);
+  border-radius: 10px;
+  background: var(--paper-surface);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.paper-panel .paper-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--paper-border);
+  font-size: 14px;
+}
+.paper-panel .paper-row:last-child {
+  border-bottom: none;
+}
+.paper-panel .paper-row > :last-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--paper-ink);
+}
+.paper-panel .paper-row > :first-child {
+  color: var(--paper-muted);
+}
+.paper-panel .paper-row.is-negative > :last-child {
+  color: var(--paper-error);
+}
+.paper-panel .paper-row.is-compare {
+  background: #fbf3e4;
+}
+.paper-panel .paper-row.is-compare > :first-child {
+  color: var(--paper-warning);
+}
+.paper-panel .paper-row.is-total {
+  background: #f1f1ec;
+  border-bottom: none;
+  align-items: baseline;
+}
+.paper-panel .paper-row.is-total > :first-child {
+  color: var(--paper-ink);
+  font-weight: 700;
+}
+.paper-panel .paper-row.is-total > :last-child {
+  font-family: var(--font-display), Archivo, sans-serif;
+  font-weight: 800;
+  font-size: clamp(26px, 5vw, 40px);
+  letter-spacing: -0.02em;
+  color: var(--paper-accent);
+}
+
+/* Rotated approval stamp. */
+.paper-panel .paper-stamp {
+  display: inline-block;
+  margin-top: 22px;
+  padding: 6px 12px;
+  border: 2px solid var(--paper-accent);
+  border-radius: 4px;
+  font-family: var(--font-display), Archivo, sans-serif;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-accent);
+  transform: rotate(-2deg);
 }
 
 /* Custom animations */
@@ -91,22 +261,23 @@
   animation: confetti 3s ease-out forwards;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — retinted for the night shell. */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  background: var(--bb-night-2);
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  background: var(--bb-border);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  background: #364054;
 }
 
 /* Smooth transitions */
@@ -114,4 +285,16 @@
   transition-property: color, background-color, border-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+}
+
+/* BRIEF §1: reduced motion kills all animation/transition durations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -195,7 +195,7 @@ export default function ContributePage() {
   // --- Loading -------------------------------------------------------------
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <main className="flex min-h-screen items-center justify-center p-4">
         <div role="status" className="flex items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <span className="sr-only">Loading this invitation…</span>
@@ -207,13 +207,13 @@ export default function ContributePage() {
   // --- Dead / expired link -------------------------------------------------
   if (loadError || !info) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <main className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-warning-light">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-warning/40 bg-warning-light">
               <AlertCircle className="h-6 w-6 text-warning" />
             </div>
-            <CardTitle className="text-center text-xl">Link unavailable</CardTitle>
+            <CardTitle className="text-center text-xl uppercase">Link unavailable</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-center text-sm text-muted-foreground">{loadError}</p>
@@ -238,14 +238,14 @@ export default function ContributePage() {
   if (result) {
     const after = result.contacts;
     return (
-      <main className="min-h-screen bg-muted p-4">
+      <main className="min-h-screen p-4">
         <div className="mx-auto w-full max-w-md pt-8">
           <Card>
             <CardHeader>
-              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-success-light">
+              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-secondary/40 bg-[rgba(34,196,139,.10)] shadow-[0_0_24px_rgba(34,196,139,.35)]">
                 <CheckCircle2 className="h-6 w-6 text-success-dark" />
               </div>
-              <CardTitle className="text-center text-xl">
+              <CardTitle className="text-center text-xl uppercase">
                 Nice &mdash; {info.player.firstName} is closer.
               </CardTitle>
               <CardDescription className="text-center">
@@ -255,8 +255,8 @@ export default function ContributePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {quota > 0 && (
-                <div className="rounded-lg bg-muted p-4 text-center">
-                  <p className="text-sm font-medium text-foreground">
+                <div className="rounded-[12px] border border-white/10 bg-white/[0.04] p-4 text-center">
+                  <p className="text-sm font-medium tabular text-foreground">
                     {after.submitted} of {quota} supporters added
                   </p>
                   {after.quotaMet ? (
@@ -311,18 +311,18 @@ export default function ContributePage() {
 
   // --- Form ----------------------------------------------------------------
   return (
-    <main className="min-h-screen bg-muted px-4 pb-12 pt-6">
+    <main className="min-h-screen px-4 pb-12 pt-6">
       <div className="mx-auto w-full max-w-md space-y-4">
         <header className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-primary/40 bg-[rgba(200,16,46,.12)] shadow-glow-team">
             <Users className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="font-display text-[clamp(24px,6vw,34px)] font-extrabold uppercase leading-[1] tracking-[-0.02em] text-foreground">
             {isGuardian
               ? `You're adding supporters on behalf of ${info.player.firstName}`
               : `Add supporters for ${info.player.firstName}`}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
             {info.team.teamName} &middot; {info.team.organizationName}
           </p>
         </header>
@@ -331,7 +331,7 @@ export default function ContributePage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium text-foreground">
+                <span className="text-sm font-medium tabular text-foreground">
                   {info.contacts.submitted} of {quota} supporters added
                 </span>
                 {info.contacts.quotaMet && (
@@ -346,10 +346,10 @@ export default function ContributePage() {
                 aria-valuemin={0}
                 aria-valuemax={quota}
                 aria-label="Supporters added toward the team goal"
-                className="mt-2 h-2 w-full overflow-hidden rounded-full bg-accent"
+                className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/10"
               >
                 <div
-                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  className="h-full rounded-full bg-secondary shadow-glow-accent transition-all duration-500 ease-stadium"
                   style={{
                     width: `${Math.min(
                       quota > 0 ? (info.contacts.submitted / quota) * 100 : 0,
@@ -367,14 +367,14 @@ export default function ContributePage() {
             <Card key={index}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
+                  <CardTitle className="text-base uppercase">
                     Someone who loves {info.player.firstName}
                   </CardTitle>
                   {rows.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeRow(index)}
-                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-warning"
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-warning"
                       aria-label={`Remove supporter ${index + 1}`}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -417,7 +417,7 @@ export default function ContributePage() {
                       onClick={() =>
                         setShowLastName((prev) => ({ ...prev, [index]: true }))
                       }
-                      className="text-xs font-medium text-primary underline"
+                      className="text-xs font-medium text-secondary underline underline-offset-4"
                     >
                       Add last name
                     </button>
@@ -491,7 +491,7 @@ export default function ContributePage() {
                   type="checkbox"
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-border"
+                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#C8102E]"
                 />
                 <span className="text-sm text-foreground">
                   I know these people personally and they are okay with me
@@ -504,11 +504,9 @@ export default function ContributePage() {
           </Card>
 
           {submitError && (
-            <Alert>
-              <AlertCircle className="h-4 w-4 text-warning" />
-              <AlertDescription className="text-warning">
-                {submitError}
-              </AlertDescription>
+            <Alert variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{submitError}</AlertDescription>
             </Alert>
           )}
 

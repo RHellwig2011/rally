@@ -122,7 +122,7 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading campaign...</p>
@@ -133,7 +133,7 @@ export default function MessagesPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <Button asChild>
@@ -150,7 +150,7 @@ export default function MessagesPage() {
   const percentage = calculatePercentage(currentAmountCents, goalAmountCents);
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -385,7 +385,7 @@ export default function MessagesPage() {
                           <span
                             className={
                               generatedMessage.length > 160
-                                ? "text-orange-600 font-semibold"
+                                ? "text-[#E8A33D] font-semibold"
                                 : ""
                             }
                           >

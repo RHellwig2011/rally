@@ -5,10 +5,25 @@ interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
   value: number;
   max?: number;
   showLabel?: boolean;
+  /**
+   * BRIEF §3 "Progress bar": the fill is accent green by default, with a
+   * team-red variant used by the main campaign/athlete goal bars. Small
+   * roster/participation mini-bars stay on "accent".
+   */
+  variant?: "accent" | "team";
 }
 
+// Fill treatments per variant — colour plus the matching glow.
+const FILL_VARIANTS: Record<"accent" | "team", string> = {
+  accent: "bg-secondary shadow-glow-accent",
+  team: "bg-primary shadow-[0_0_12px_rgba(200,16,46,.7)]",
+};
+
 const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
-  ({ className, value, max = 100, showLabel = false, ...props }, ref) => {
+  (
+    { className, value, max = 100, showLabel = false, variant = "accent", ...props },
+    ref
+  ) => {
     const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
     return (
@@ -21,14 +36,19 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
         className={cn("relative", className)}
         {...props}
       >
-        <div className="h-3 w-full overflow-hidden rounded-full bg-accent">
+        {/* BRIEF §3 "Progress bar": 10px track on rgba(255,255,255,.10),
+            glowing fill, fully pill-rounded. */}
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full bg-primary transition-all duration-500 ease-out"
+            className={cn(
+              "h-full rounded-full transition-all duration-500 ease-stadium",
+              FILL_VARIANTS[variant]
+            )}
             style={{ width: `${percentage}%` }}
           />
         </div>
         {showLabel && (
-          <span className="mt-1 text-xs font-medium text-muted-foreground">
+          <span className="mt-1 text-xs font-medium tabular-nums text-muted-foreground">
             {Math.round(percentage)}%
           </span>
         )}

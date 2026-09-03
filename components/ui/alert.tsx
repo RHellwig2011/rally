@@ -4,15 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
+  // BRIEF §4 screen 11 "edge states": soft tinted backgrounds on the night
+  // shell — error rgba(242,97,75,.08), warning rgba(232,163,61,.08) — rather
+  // than the light-theme yellow-50/green-50 fills.
+  "relative w-full rounded-[12px] border border-white/10 p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
+        default: "bg-white/[0.04] text-foreground",
         destructive:
-          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
-        warning: "border-yellow-500/50 text-yellow-900 bg-yellow-50 dark:border-yellow-500 dark:text-yellow-100 dark:bg-yellow-950 [&>svg]:text-yellow-600",
-        success: "border-green-500/50 text-green-900 bg-green-50 dark:border-green-500 dark:text-green-100 dark:bg-green-950 [&>svg]:text-green-600",
+          "border-destructive/40 bg-[rgba(242,97,75,.08)] text-destructive [&>svg]:text-destructive",
+        warning:
+          "border-[rgba(232,163,61,.45)] bg-[rgba(232,163,61,.08)] text-[#E8A33D] [&>svg]:text-[#E8A33D]",
+        success:
+          "border-secondary/40 bg-[rgba(34,196,139,.08)] text-success-dark [&>svg]:text-success-dark",
       },
     },
     defaultVariants: {
@@ -40,7 +45,7 @@ const AlertTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h5
     ref={ref}
-    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
+    className={cn("mb-1 font-display font-bold leading-none tracking-tight", className)}
     {...props}
   />
 ))

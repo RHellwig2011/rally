@@ -143,7 +143,7 @@ export default function StaffLeaderboardPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted">
+      <div className="min-h-screen">
         {nav}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-center py-24">
@@ -156,7 +156,7 @@ export default function StaffLeaderboardPage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-muted">
+      <div className="min-h-screen">
         {nav}
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Card>
@@ -177,7 +177,7 @@ export default function StaffLeaderboardPage({
   const quotaTracked = minContactsPerPlayer > 0;
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen">
       {nav}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -204,13 +204,13 @@ export default function StaffLeaderboardPage({
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Players Ranked
               </CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {totals.playerCount}
               </div>
               <p className="text-sm text-muted-foreground mt-1">On this campaign</p>
@@ -219,13 +219,13 @@ export default function StaffLeaderboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Total Raised
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {formatCurrency(totals.totalRaised)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Across the roster</p>
@@ -234,13 +234,13 @@ export default function StaffLeaderboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Hidden From Public
               </CardTitle>
               <EyeOff className="w-5 h-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {totals.hiddenFromPublic}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -251,13 +251,13 @@ export default function StaffLeaderboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Need Attention
               </CardTitle>
               <AlertCircle className="w-5 h-5 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {totals.playersNeedingAttention}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -333,8 +333,8 @@ export default function StaffLeaderboardPage({
                         <tr
                           key={entry.id}
                           className={[
-                            "border-b hover:bg-gray-50",
-                            entry.needsAttention ? "bg-red-50/60" : "",
+                            "border-b hover:bg-white/[0.04]",
+                            entry.needsAttention ? "bg-[rgba(242,97,75,.08)]/60" : "",
                             isCutoffRow
                               ? "border-b-2 border-dashed border-primary-400"
                               : "",
@@ -370,7 +370,7 @@ export default function StaffLeaderboardPage({
                             <span
                               className={
                                 entry.amountRaised === 0
-                                  ? "font-semibold text-red-600"
+                                  ? "font-semibold text-destructive"
                                   : "font-semibold text-success"
                               }
                             >
@@ -406,8 +406,8 @@ export default function StaffLeaderboardPage({
                             <span
                               className={
                                 entry.belowContactQuota
-                                  ? "font-semibold text-red-600"
-                                  : "text-gray-900"
+                                  ? "font-semibold text-destructive"
+                                  : "text-foreground"
                               }
                             >
                               {entry.contactCount}

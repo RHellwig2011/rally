@@ -55,11 +55,42 @@ import {
 import { formatCurrency, formatRelativeTime, calculatePercentage } from "@/lib/utils";
 import { exportStatusHistoryToCSV } from "@/lib/utils/export";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  formatWholeDollars,
+  InitialsAvatar,
+  Kicker,
+  PageTitle,
+  SiteHeader,
+  statStyles,
+  TeamChip,
+} from "@/components/app-chrome";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 // The campaign/disbursement/donation APIs return DOLLAR values;
 // formatCurrency expects cents, so convert before formatting.
 const toCents = (dollars: unknown) => Math.round(Number(dollars ?? 0) * 100);
+
+// Night-card silhouette for the loading state — matches the real Card's
+// gradient/hairline/radius so the skeleton doesn't flash a different shape.
+const SKELETON_CARD =
+  "rounded-card border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] p-6 shadow-card";
+
+// The hero total is drawn twice: a solid numeral lifted by the stacked red
+// text-shadow (BRIEF §2), and an offset outline-only copy behind it (BRIEF §4
+// screen 05, "ghost" numeral). Both share the fluid Archivo sizing so they stay
+// registered at any width.
+const RAISED_SIZING =
+  "font-display text-[clamp(52px,9vw,84px)] font-extrabold leading-none tracking-[-0.03em] tabular";
+const RAISED_NUMERAL = `relative z-[2] ${RAISED_SIZING} text-foreground [text-shadow:0_2px_0_rgba(200,16,46,.5),0_6px_0_rgba(200,16,46,.2),0_18px_44px_rgba(200,16,46,.25)]`;
+const RAISED_GHOST = `pointer-events-none absolute left-1 top-[-7px] z-[1] select-none whitespace-nowrap ${RAISED_SIZING} text-transparent [-webkit-text-stroke:1px_rgba(238,241,246,.14)]`;
+
+const { cell: STAT_CELL, num: STAT_NUM, label: STAT_LABEL } = statStyles;
+
+// Card section heads (BRIEF §2): uppercase 15px Archivo rather than the
+// default CardTitle scale, which is sized for hero cards.
+const SECTION_TITLE =
+  "flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]";
 
 // The status enum is stored verbatim; coaches should never read it raw.
 const STATUS_LABELS: Record<string, string> = {
@@ -385,14 +416,16 @@ export default function DashboardPage({
   };
 
   // Helper functions for status
+  // Status pills on the night shell: soft tinted fills with the matching
+  // brief colour for the label (BRIEF §4 screen 11 "edge states").
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'DRAFT': return 'bg-gray-100 text-gray-800';
-      case 'ACTIVE': return 'bg-green-100 text-green-800';
-      case 'PAUSED': return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED': return 'bg-blue-100 text-blue-800';
-      case 'ARCHIVED': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'DRAFT': return 'border-white/10 bg-white/[0.06] text-muted-foreground';
+      case 'ACTIVE': return 'border-secondary/40 bg-[rgba(34,196,139,.12)] text-success-dark';
+      case 'PAUSED': return 'border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.12)] text-[#E8A33D]';
+      case 'COMPLETED': return 'border-white/10 bg-white/[0.08] text-foreground';
+      case 'ARCHIVED': return 'border-white/10 bg-white/[0.06] text-muted-foreground';
+      default: return 'border-white/10 bg-white/[0.06] text-foreground';
     }
   };
 
@@ -472,27 +505,16 @@ export default function DashboardPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted">
-        <nav className="border-b bg-white sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <Link href="/" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-display font-bold text-sm leading-none">BB</span>
-                </div>
-                <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
-              </Link>
-            </div>
-          </div>
-        </nav>
+      <div className="min-h-screen">
+        <SiteHeader />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Skeleton */}
           <div className="mb-8">
-            <div className="h-9 w-96 bg-accent rounded animate-pulse mb-2" />
+            <Skeleton className="h-9 w-96 mb-2" />
             <div className="flex flex-wrap gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-9 w-32 bg-accent rounded animate-pulse" />
+                <Skeleton key={i} className="h-9 w-32" />
               ))}
             </div>
           </div>
@@ -500,13 +522,13 @@ export default function DashboardPage({
           {/* Stats Cards Skeleton */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white border rounded-lg p-6">
+              <div key={i} className={SKELETON_CARD}>
                 <div className="flex justify-between items-center mb-4">
-                  <div className="h-4 w-24 bg-accent rounded animate-pulse" />
-                  <div className="h-5 w-5 bg-accent rounded-full animate-pulse" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-5 rounded-full" />
                 </div>
-                <div className="h-8 w-32 bg-accent rounded animate-pulse mb-2" />
-                <div className="h-3 w-20 bg-accent rounded animate-pulse" />
+                <Skeleton className="h-8 w-32 mb-2" />
+                <Skeleton className="h-3 w-20" />
               </div>
             ))}
           </div>
@@ -515,15 +537,15 @@ export default function DashboardPage({
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
               {/* Progress Card */}
-              <div className="bg-white border rounded-lg p-6 h-64 animate-pulse" />
+              <div className={`${SKELETON_CARD} h-64`} />
               {/* Donations Card */}
-              <div className="bg-white border rounded-lg p-6 h-96 animate-pulse" />
+              <div className={`${SKELETON_CARD} h-96`} />
             </div>
             <div className="space-y-6">
               {/* Banking Card */}
-              <div className="bg-white border rounded-lg p-6 h-80 animate-pulse" />
+              <div className={`${SKELETON_CARD} h-80`} />
               {/* Activity Card */}
-              <div className="bg-white border rounded-lg p-6 h-64 animate-pulse" />
+              <div className={`${SKELETON_CARD} h-64`} />
             </div>
           </div>
         </div>
@@ -533,7 +555,7 @@ export default function DashboardPage({
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-warning mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">Failed to Load Campaign</h2>
@@ -558,40 +580,35 @@ export default function DashboardPage({
   );
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Header */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-display font-bold text-sm leading-none">BB</span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
-            </Link>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/raise/${data.campaign.slug}`}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Public Page
-                </Link>
-              </Button>
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary font-semibold text-sm">AT</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen">
+      {/* Header — BRIEF §3 "Site header (app screens)" */}
+      <SiteHeader
+        left={
+          <TeamChip className="hidden sm:inline-flex">
+            {data.campaign.organizationName} · {data.campaign.teamName}
+          </TeamChip>
+        }
+      >
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/raise/${data.campaign.slug}`}>
+            <Eye className="w-4 h-4 mr-2" />
+            View Public Page
+          </Link>
+        </Button>
+        <InitialsAvatar initials="AT" />
+      </SiteHeader>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Campaign Header */}
+        {/* Campaign Header — BRIEF §4 screen 05 hero */}
         <div className="mb-8">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
+              <Kicker tone="team">
+                Command center · {statusLabel(data.campaign.status)}
+              </Kicker>
+              <PageTitle className="mt-2">
                 {data.campaign.organizationName} {data.campaign.teamName}
-              </h1>
+              </PageTitle>
             </div>
             <div className="flex items-center gap-2">
               {/* Status Badge with Dropdown */}
@@ -744,18 +761,18 @@ export default function DashboardPage({
                   </DialogHeader>
                   {selectedNewStatus && (
                     <div className="space-y-4 py-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="bg-white/[0.04] border border-white/10 rounded-lg p-4">
                         <div className="flex items-start gap-3">
                           {getAvailableStatusTransitions(data.campaign.status).find(
                             t => t.status === selectedNewStatus
                           )?.icon}
                           <div>
-                            <p className="font-semibold text-blue-900">
+                            <p className="font-semibold text-foreground">
                               {getAvailableStatusTransitions(data.campaign.status).find(
                                 t => t.status === selectedNewStatus
                               )?.label}
                             </p>
-                            <p className="text-sm text-blue-700 mt-1">
+                            <p className="text-sm text-foreground mt-1">
                               {getAvailableStatusTransitions(data.campaign.status).find(
                                 t => t.status === selectedNewStatus
                               )?.description}
@@ -879,6 +896,104 @@ export default function DashboardPage({
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+            </div>
+          </div>
+
+          {/* Hero — big raised total with the ghost/outline numeral behind it,
+              days-left pill, goal bar and the pace note (BRIEF §4 screen 05). */}
+          <div className="mb-6 grid gap-6 border-b border-border pb-7 lg:grid-cols-[1.5fr_1fr] lg:items-start">
+            <div>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                <span className="relative inline-block leading-none">
+                  {/* The campaign API returns DOLLARS; the hero prints them
+                      whole, so no cents-conversion is involved here. */}
+                  <span className={RAISED_NUMERAL}>
+                    {formatWholeDollars(Number(data.campaign.currentAmount))}
+                  </span>
+                  <span aria-hidden="true" className={RAISED_GHOST}>
+                    {formatWholeDollars(Number(data.campaign.currentAmount))}
+                  </span>
+                </span>
+                <span className="text-[15px] text-muted-foreground">
+                  raised of{" "}
+                  <b className="tabular font-semibold text-foreground">
+                    {formatCurrency(toCents(data.campaign.goalAmount))}
+                  </b>{" "}
+                  goal
+                </span>
+                {data.stats.daysLeft > 0 && (
+                  <span className="inline-flex items-center gap-[7px] rounded-full bg-primary px-3.5 py-[7px] text-xs font-semibold text-primary-foreground shadow-glow-team">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span className="tabular">{data.stats.daysLeft}</span>{" "}
+                    {data.stats.daysLeft === 1 ? "day" : "days"} left
+                  </span>
+                )}
+              </div>
+
+              {/* BRIEF §3 progress bar, hero variant: 12px track, green fill + glow */}
+              <div
+                role="progressbar"
+                aria-valuenow={Math.min(percentage, 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${percentage} percent of goal raised`}
+                className="mt-4 h-3 overflow-hidden rounded-full border border-border bg-[#161B25]"
+              >
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#0F7A56,#22C48B)] shadow-[0_0_18px_rgba(34,196,139,.55)] transition-[width] duration-1000 ease-stadium"
+                  style={{ width: `${Math.min(percentage, 100)}%` }}
+                />
+              </div>
+
+              <p className="mt-4 max-w-[640px] text-[clamp(15px,2.4vw,19px)] font-medium leading-[1.55] text-foreground">
+                <b className="tabular font-semibold text-secondary [text-shadow:0_0_18px_rgba(34,196,139,.4)]">
+                  {percentage}%
+                </b>{" "}
+                of goal from{" "}
+                <b className="tabular font-semibold text-foreground">
+                  {data.stats.donorCount}
+                </b>{" "}
+                {data.stats.donorCount === 1 ? "supporter" : "supporters"}
+                {data.stats.avgDonation > 0 && (
+                  <>
+                    , averaging{" "}
+                    <b className="tabular font-semibold text-foreground">
+                      {formatCurrency(toCents(data.stats.avgDonation))}
+                    </b>{" "}
+                    a gift
+                  </>
+                )}
+                .
+              </p>
+            </div>
+
+            {/* Goal-completion panel — §3 "Stat blocks" treatment */}
+            <div className="flex flex-col gap-3 rounded-card border border-border bg-[linear-gradient(160deg,#181E2A,#12161F)] p-5 shadow-[0_24px_50px_rgba(0,0,0,.35)]">
+              <Kicker className="tracking-[0.14em]">Goal progress</Kicker>
+              <div className="flex items-baseline gap-2">
+                <b className="font-display text-[44px] font-black leading-none tracking-[-0.02em] tabular text-secondary [text-shadow:0_0_26px_rgba(34,196,139,.45)]">
+                  {percentage}%
+                </b>
+                <span className="text-sm text-muted-foreground">of goal reached</span>
+              </div>
+              <div className="h-[7px] overflow-hidden rounded-full border border-border bg-[#161B25]">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#0F7A56,#22C48B)] shadow-[0_0_12px_rgba(34,196,139,.5)] transition-[width] duration-1000 ease-stadium"
+                  style={{ width: `${Math.min(percentage, 100)}%` }}
+                />
+              </div>
+              <span className="text-[13px] font-medium text-muted-foreground">
+                <b className="tabular font-semibold text-foreground">
+                  {formatCurrency(
+                    Math.max(
+                      toCents(data.campaign.goalAmount) -
+                        toCents(data.campaign.currentAmount),
+                      0
+                    )
+                  )}
+                </b>{" "}
+                still to raise
+              </span>
             </div>
           </div>
 
@@ -1094,13 +1209,13 @@ export default function DashboardPage({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Total Raised
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-success-dark [text-shadow:0_0_18px_rgba(34,196,139,.35)]">
                 {formatCurrency(toCents(banking ? banking.totalRaised : data.campaign.totalRaised))}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -1111,13 +1226,13 @@ export default function DashboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Donors
               </CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {data.stats.donorCount}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -1128,13 +1243,13 @@ export default function DashboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Available Balance
               </CardTitle>
               <Wallet className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Ready to withdraw</p>
@@ -1143,13 +1258,13 @@ export default function DashboardPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Disbursed
               </CardTitle>
               <ArrowUpRight className="w-5 h-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {banking ? formatCurrency(toCents(banking.disbursedTotal)) : "—"}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Total paid out</p>
@@ -1164,56 +1279,59 @@ export default function DashboardPage({
             {/* Fundraising Progress */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SECTION_TITLE}>
                   <BarChart3 className="w-5 h-5" />
                   Fundraising Progress
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Goal Progress</p>
-                      <p className="text-2xl font-bold text-foreground">
-                        {formatCurrency(toCents(data.campaign.currentAmount))} of{" "}
-                        {formatCurrency(toCents(data.campaign.goalAmount))}
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Goal Progress
+                      </p>
+                      <p className="mt-1 font-display text-2xl font-extrabold tabular text-foreground">
+                        {formatCurrency(toCents(data.campaign.currentAmount))}{" "}
+                        <span className="text-base font-semibold text-muted-foreground">
+                          of {formatCurrency(toCents(data.campaign.goalAmount))}
+                        </span>
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl font-bold text-primary">{percentage}%</p>
+                      <p className="font-display text-3xl font-extrabold tabular text-secondary [text-shadow:0_0_20px_rgba(34,196,139,.4)]">
+                        {percentage}%
+                      </p>
                       <p className="text-sm text-muted-foreground">Complete</p>
                     </div>
                   </div>
-                  <div className="w-full bg-accent rounded-full h-3">
+                  {/* BRIEF §3 progress bar */}
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                     <div
-                      className="bg-primary rounded-full h-3 transition-all"
+                      className="h-full rounded-full bg-secondary shadow-glow-accent transition-all duration-500 ease-stadium"
                       style={{ width: `${Math.min(percentage, 100)}%` }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">
-                        {data.stats.donorCount}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Donors</p>
+                  <div className="grid grid-cols-2 gap-3.5 pt-2 sm:grid-cols-4">
+                    <div className={STAT_CELL}>
+                      <p className={STAT_NUM}>{data.stats.donorCount}</p>
+                      <p className={STAT_LABEL}>Donors</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">
+                    <div className={STAT_CELL}>
+                      <p className={STAT_NUM}>
                         {formatCurrency(toCents(data.stats.avgDonation))}
                       </p>
-                      <p className="text-xs text-muted-foreground">Avg Donation</p>
+                      <p className={STAT_LABEL}>Avg Donation</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-success">
+                    <div className={STAT_CELL}>
+                      <p className={`${STAT_NUM} text-success-dark`}>
                         +{data.stats.newDonorsToday}
                       </p>
-                      <p className="text-xs text-muted-foreground">Today</p>
+                      <p className={STAT_LABEL}>Today</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">
-                        {data.stats.daysLeft}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Days Left</p>
+                    <div className={STAT_CELL}>
+                      <p className={STAT_NUM}>{data.stats.daysLeft}</p>
+                      <p className={STAT_LABEL}>Days Left</p>
                     </div>
                   </div>
                 </div>
@@ -1224,7 +1342,7 @@ export default function DashboardPage({
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className={SECTION_TITLE}>
                     <Users className="w-5 h-5" />
                     Recent Donations
                   </CardTitle>
@@ -1258,7 +1376,7 @@ export default function DashboardPage({
                         className="flex items-start justify-between pb-4 border-b last:border-0 last:pb-0"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full border border-white/10 bg-[rgba(200,16,46,.14)] flex items-center justify-center flex-shrink-0">
                             <DollarSign className="w-5 h-5 text-primary" />
                           </div>
                           <div>
@@ -1275,7 +1393,7 @@ export default function DashboardPage({
                             </p>
                           </div>
                         </div>
-                        <span className="font-bold text-success">
+                        <span className="font-semibold tabular text-success-dark">
                           {formatCurrency(toCents(donation.amount))}
                         </span>
                       </div>
@@ -1291,15 +1409,17 @@ export default function DashboardPage({
             {/* Banking Actions */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SECTION_TITLE}>
                   <Wallet className="w-5 h-5" />
                   Banking & Funds
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-muted rounded-lg p-4">
-                  <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-                  <p className="text-3xl font-bold text-foreground">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_10px_26px_rgba(0,0,0,.35)]">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Available Balance
+                  </p>
+                  <p className="font-display text-3xl font-extrabold tabular text-foreground">
                     {banking ? formatCurrency(toCents(banking.availableBalance)) : "—"}
                   </p>
                 </div>
@@ -1359,7 +1479,7 @@ export default function DashboardPage({
                               purpose: e.target.value,
                             })
                           }
-                          className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          className="mt-2 flex h-11 w-full rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-foreground [color-scheme:dark] focus-visible:border-secondary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(14,124,90,.35)]"
                         >
                           <option value="">Select purpose</option>
                           <option value="TOURNAMENT_FEES">
@@ -1392,10 +1512,10 @@ export default function DashboardPage({
                       </div>
                       {disbursementForm.amount &&
                         parseFloat(disbursementForm.amount) >= 500 && (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <div className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-3">
                             <div className="flex items-start gap-2">
-                              <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                              <p className="text-sm text-yellow-900">
+                              <AlertCircle className="w-4 h-4 text-[#E8A33D] mt-0.5" />
+                              <p className="text-sm text-[#E8A33D]">
                                 Gifts over $500 need a parent/guardian to approve.
                                 We&apos;ll email them.
                               </p>
@@ -1448,7 +1568,7 @@ export default function DashboardPage({
             {pendingRequests.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
+                  <CardTitle className={SECTION_TITLE}>
                     <Clock className="w-4 h-4 text-warning" />
                     Pending Requests ({pendingRequests.length})
                   </CardTitle>
@@ -1458,13 +1578,13 @@ export default function DashboardPage({
                     {pendingRequests.map((request) => (
                       <div
                         key={request.id}
-                        className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                        className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-3"
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <p className="font-semibold text-foreground">
+                          <p className="font-display text-lg font-extrabold tabular text-foreground">
                             {formatCurrency(toCents(request.amount))}
                           </p>
-                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                          <span className="rounded-full border border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.14)] px-2 py-1 text-xs font-semibold text-[#E8A33D]">
                             Pending
                           </span>
                         </div>
@@ -1474,7 +1594,7 @@ export default function DashboardPage({
                         <p className="text-xs text-muted-foreground mt-1">
                           Requested {formatRelativeTime(request.createdAt)}
                         </p>
-                        <p className="text-xs text-yellow-700 mt-2">
+                        <p className="text-xs text-[#E8A33D] mt-2">
                           Awaiting guardian approval
                         </p>
                       </div>
@@ -1487,7 +1607,7 @@ export default function DashboardPage({
             {/* Recent Activity */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className={SECTION_TITLE}>
                   <Check className="w-4 h-4 text-success" />
                   Recent Activity
                 </CardTitle>
@@ -1510,7 +1630,7 @@ export default function DashboardPage({
                       >
                         <div className="w-2 h-2 rounded-full bg-success mt-2 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="font-medium text-foreground">
+                          <p className="font-medium tabular text-foreground">
                             {formatCurrency(toCents(disbursement.amount))} -{" "}
                             {PURPOSE_LABELS[disbursement.purpose] || disbursement.purpose}
                           </p>

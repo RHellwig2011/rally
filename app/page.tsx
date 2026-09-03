@@ -1,15 +1,18 @@
 import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SportArtwork } from "@/components/SportArtwork";
 import { MarketingMobileNav } from "@/components/MarketingMobileNav";
 
 /**
  * Marketing home page.
  *
- * Follows the "Kinetic Site" direction from the Bleacher Backers UI design
- * system: Space Grotesk display type set tight and large, a left-anchored hero
- * rather than a centered stack, an uppercase tracked eyebrow in the green
- * accent, hairline-divided stat rows, numbered rules instead of icon chips, and
- * full-bleed navy/green bands to break the page into movements.
+ * "C · Stadium" treatment (.design-sync/bbc-v3/BRIEF.md §4 screens 09 and 10):
+ * a jumbotron hero in Archivo where the second row is outlined rather than
+ * filled, a red kicker eyebrow, the sport-name ticker, numbered section heads
+ * built from an outlined numeral, and a closing CTA band. The pricing block at
+ * the bottom is the one place light appears — the fee breakdown sits on a
+ * `.paper-panel` document (globals.css), a printed page lying on the night.
  */
 
 /**
@@ -20,6 +23,26 @@ import { MarketingMobileNav } from "@/components/MarketingMobileNav";
  * SportArtwork rather than a broken-image reference to a file that isn't there.
  */
 const HERO_PHOTO: string | null = null;
+
+/** BRIEF §2: red kicker/eyebrow — 600/11px Inter, wide tracking, red glow. */
+const KICKER =
+  "font-semibold uppercase tracking-[0.18em] text-primary text-[11px] sm:text-[12px]";
+const KICKER_GLOW = { textShadow: "0 0 14px rgba(200,16,46,.6)" };
+
+/** BRIEF §2: stacked red drop-shadow behind a display heading. */
+const RED_STACK_SHADOW = {
+  textShadow:
+    "0 2px 0 rgba(200,16,46,.5), 0 6px 0 rgba(200,16,46,.2), 0 18px 44px rgba(200,16,46,.25)",
+};
+
+/** BRIEF §3 "sec-num": 700 46px Archivo drawn as an outline, not a fill. */
+const SEC_NUM =
+  "font-display text-[38px] font-bold leading-none tracking-[-0.02em] text-transparent sm:text-[46px]";
+const SEC_NUM_STROKE = { WebkitTextStroke: "1.5px #8B93A3" };
+
+/** Uppercase H2 that sits beside an outlined numeral. */
+const SEC_H2 =
+  "font-display text-[clamp(28px,4.5vw,52px)] font-extrabold uppercase leading-[1] tracking-[-0.02em] text-foreground";
 
 const SPORTS = [
   "BASKETBALL",
@@ -94,188 +117,245 @@ const CAPABILITIES = [
   },
 ];
 
+/**
+ * Pricing tiers. There is only one rate, so these state the whole schedule
+ * rather than pretending to be a good/better/best ladder.
+ */
+const PRICING_LINES = [
+  {
+    label: "Platform fee",
+    figure: "10%",
+    body: "Charged only on money you actually raise. Unlimited players, pages, outreach, and payouts are all inside it.",
+    accent: true,
+  },
+  {
+    label: "Card processing",
+    figure: "2.9% + 30¢",
+    body: "What the card networks charge, passed through per gift. We add nothing on top of it.",
+    accent: false,
+  },
+  {
+    label: "Everything else",
+    figure: "$0",
+    body: "No setup fee, no monthly minimum, no per-seat charge, no contract. Raise nothing and you pay nothing.",
+    accent: false,
+  },
+];
+
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-[#101A2C] antialiased">
+    <div className="min-h-screen text-foreground antialiased">
       {/* ---------------------------------------------------------------- Nav */}
-      <header className="sticky top-0 z-50 border-b border-[#E4E8EF] bg-[#F5F7FA]/85 backdrop-blur">
+      {/* BRIEF §3 "Site header": translucent night bar over a blur, hairline
+          bottom rule. Sits under the fixed red top rule from <Atmosphere />. */}
+      <header className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
         <div className="relative mx-auto flex h-[66px] max-w-[1180px] items-center gap-8 px-5 sm:px-8 lg:px-16">
           <Link
             href="/"
-            className="font-display text-[18px] font-bold tracking-[-0.01em] text-primary"
+            className="flex items-center gap-2 font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground"
           >
+            <span
+              aria-hidden
+              className="h-[9px] w-[9px] rounded-full bg-primary shadow-glow-team"
+            />
             Bleacher&nbsp;Backers
           </Link>
           <nav className="ml-2 hidden gap-7 md:flex">
-            <a href="#how" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+            <a href="#how" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               How it works
             </a>
-            <Link href="/campaigns" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+            <Link href="/campaigns" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               Campaigns
             </Link>
-            <a href="#platform" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+            <a href="#platform" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               Platform
             </a>
-            <a href="#pricing" className="text-[15px] text-[#5B6575] transition-colors hover:text-primary">
+            <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               Pricing
             </a>
           </nav>
           <div className="flex-1" />
           <Link
             href="/login"
-            className="hidden whitespace-nowrap text-[15px] font-semibold text-[#5B6575] transition-colors hover:text-primary md:inline"
+            className="hidden whitespace-nowrap text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground md:inline"
           >
             Sign in
           </Link>
-          <Link
-            href="/signup"
-            className="hidden whitespace-nowrap rounded-lg bg-primary px-[18px] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 md:inline-block"
-          >
-            Start a campaign
-          </Link>
+          <Button asChild className="hidden md:inline-flex">
+            <Link href="/signup">Start a campaign</Link>
+          </Button>
           <MarketingMobileNav />
         </div>
       </header>
 
       {/* -------------------------------------------------------------- Hero */}
-      <section className="mx-auto max-w-[1180px] px-5 pb-8 pt-14 sm:px-8 md:pt-24 lg:px-16 lg:pt-[120px]">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-          <div>
-            <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
-              Youth sports fundraising
-            </p>
-            <h1 className="mt-[18px] font-display text-[clamp(46px,7.5vw,96px)] font-semibold leading-[0.96] tracking-[-0.03em] text-primary">
-              Fund the
-              <br />
-              <span className="text-secondary">season.</span>
-            </h1>
-            <p className="mt-7 max-w-[46ch] text-[19px] leading-relaxed text-[#5B6575]">
-              One place to run the whole drive — personalized outreach to every
-              contact on the roster, a ledger the booster board can audit, and
-              payouts the week the team actually needs them.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/signup"
-                className="rounded-[10px] bg-secondary px-7 py-4 text-[15px] font-semibold text-white transition-transform hover:-translate-y-0.5"
+      {/* BRIEF §4 screen 09: jumbotron. Huge uppercase Archivo, second row
+          outlined with -webkit-text-stroke rather than filled, red glow behind
+          the filled row. */}
+      <section className="relative overflow-hidden border-b border-white/10">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 -top-44 h-[420px] w-[420px] rounded-full opacity-70 blur-[10px]"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(200,16,46,.25), transparent)",
+          }}
+        />
+        <div className="mx-auto max-w-[1180px] px-5 pb-14 pt-14 sm:px-8 md:pt-20 lg:px-16 lg:pt-24">
+          <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+            <div className="relative">
+              <p className={KICKER} style={KICKER_GLOW}>
+                Youth sports fundraising
+              </p>
+              <h1
+                className="mt-4 font-display text-[clamp(52px,8.5vw,104px)] font-extrabold uppercase leading-[0.92] tracking-[-0.03em] text-foreground"
+                style={RED_STACK_SHADOW}
               >
-                Start a campaign
-              </Link>
-              <a
-                href="#how"
-                className="border-b-[1.5px] border-primary-100 pb-1 text-[15px] font-semibold text-primary"
-              >
-                See how it works →
-              </a>
+                Fund the
+                <span
+                  className="block text-transparent"
+                  style={{
+                    WebkitTextStroke: "2px #EEF1F6",
+                    textShadow: "none",
+                  }}
+                >
+                  season.
+                </span>
+              </h1>
+              <p className="mt-7 max-w-[46ch] text-[17px] leading-relaxed text-muted-foreground">
+                One place to run the whole drive — personalized outreach to every
+                contact on the roster, a ledger the booster board can audit, and
+                payouts the week the team actually needs them.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Button asChild size="lg">
+                  <Link href="/signup">Start a campaign</Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <a href="#how">See how it works</a>
+                </Button>
+              </div>
+              <p className="mt-5 text-[13px] text-muted-foreground">
+                No setup fee. No contract. Raise nothing and you pay nothing.
+              </p>
+            </div>
+
+            {/*
+              Product visualization: a campaign page reduced to the three things
+              that actually matter to a donor — who is asking, how far along they
+              are, and where the money goes. Static by design; this is marketing
+              chrome, not live data.
+            */}
+            <div className="relative lg:pl-4">
+              <div
+                aria-hidden
+                className="absolute -inset-x-4 -inset-y-6 rounded-[28px] bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.04)_0_1px,transparent_1px_14px)]"
+              />
+              <Card className="relative">
+                {/* Photo band. The illustrated artwork always fills the band;
+                    a real team photo (HERO_PHOTO) layers on top when present and
+                    reveals the artwork again if the file is missing. */}
+                <div className="relative h-44">
+                  <SportArtwork
+                    seed="Lincoln High Varsity Basketball"
+                    category="SPORTS"
+                  />
+                  {HERO_PHOTO ? (
+                    <img
+                      src={HERO_PHOTO}
+                      alt="A youth sports team"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : null}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 bg-gradient-to-t from-[#12161F] via-transparent to-transparent"
+                  />
+                  <span className="absolute left-4 top-5 rounded-full border border-white/10 bg-[rgba(10,13,20,.7)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+                    Basketball
+                  </span>
+                </div>
+
+                <CardContent className="p-6 pt-6">
+                  <div>
+                    <h2 className="font-display text-[20px] font-bold uppercase tracking-[-0.01em] text-foreground">
+                      Lincoln High Varsity
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Spring tournament travel &amp; new uniforms
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex items-baseline justify-between">
+                    <span className="font-display text-[32px] font-extrabold tabular tracking-[-0.02em] text-foreground">
+                      $6,240
+                    </span>
+                    <span className="text-[13px] tabular text-muted-foreground">
+                      of $10,000
+                    </span>
+                  </div>
+                  <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-[62%] rounded-full bg-secondary shadow-glow-accent" />
+                  </div>
+
+                  <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+                    {[
+                      { n: "Marcus R.", a: "$250", t: "2m ago" },
+                      { n: "The Delgado family", a: "$100", t: "18m ago" },
+                      { n: "Anonymous", a: "$45", t: "1h ago" },
+                    ].map((d) => (
+                      <div key={d.n} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] font-display text-[11px] font-bold text-foreground">
+                            {d.n.charAt(0)}
+                          </span>
+                          <span className="text-foreground">{d.n}</span>
+                        </div>
+                        <div className="flex items-baseline gap-3">
+                          <span className="font-semibold tabular text-secondary">
+                            {d.a}
+                          </span>
+                          <span className="w-14 text-right text-xs tabular text-muted-foreground">
+                            {d.t}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
           {/*
-            Product visualization: a campaign page reduced to the three things
-            that actually matter to a donor — who is asking, how far along they
-            are, and where the money goes. Static by design; this is marketing
-            chrome, not live data.
+            Value props, not metrics. The numbers that used to sit here were
+            invented; nothing in the product backs them, so they're gone rather
+            than restated with a smaller figure.
           */}
-          <div className="relative lg:pl-4">
-            <div
-              aria-hidden
-              className="absolute -inset-x-4 -inset-y-6 rounded-[28px] bg-[repeating-linear-gradient(135deg,rgba(35,76,147,0.05)_0_1px,transparent_1px_14px)]"
-            />
-            <div className="relative overflow-hidden rounded-[20px] border border-[#E4E8EF] bg-white shadow-[0_30px_60px_-30px_rgba(16,24,40,0.28)]">
-              {/* Photo band. The illustrated artwork always fills the band;
-                  a real team photo (HERO_PHOTO) layers on top when present and
-                  reveals the artwork again if the file is missing. */}
-              <div className="relative h-44">
-                <SportArtwork
-                  seed="Lincoln High Varsity Basketball"
-                  category="SPORTS"
-                />
-                {HERO_PHOTO ? (
-                  <img
-                    src={HERO_PHOTO}
-                    alt="A youth sports team"
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                ) : null}
-                <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-secondary backdrop-blur-sm">
-                  Basketball
-                </span>
+          <dl className="mt-14 grid gap-6 divide-y divide-white/10 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-y-0">
+            {VALUE_PROPS.map((v, i) => (
+              <div
+                key={v.head}
+                className={`pt-6 sm:pt-0 ${i === 0 ? "sm:pr-5 lg:pr-10" : "sm:px-5 lg:px-10"}`}
+              >
+                <dt className="font-display text-[clamp(17px,3.2vw,20px)] font-bold uppercase tracking-[-0.01em] text-foreground">
+                  {v.head}
+                </dt>
+                <dd className="mt-2 text-[14px] leading-snug text-muted-foreground">
+                  {v.body}
+                </dd>
               </div>
-
-              <div className="p-6">
-              <div>
-                <h2 className="font-display text-[20px] font-semibold text-primary">
-                  Lincoln High Varsity
-                </h2>
-                <p className="mt-1 text-sm text-[#5B6575]">
-                  Spring tournament travel &amp; new uniforms
-                </p>
-              </div>
-
-              <div className="mt-6 flex items-baseline justify-between">
-                <span className="font-display text-[30px] font-bold tabular-nums text-[#101A2C]">
-                  $6,240
-                </span>
-                <span className="text-[13px] text-[#5B6575]">of $10,000</span>
-              </div>
-              <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-[#EAEDF2]">
-                <div className="h-full w-[62%] rounded-full bg-secondary" />
-              </div>
-
-              <div className="mt-6 space-y-3 border-t border-[#E4E8EF] pt-5">
-                {[
-                  { n: "Marcus R.", a: "$250", t: "2m ago" },
-                  { n: "The Delgado family", a: "$100", t: "18m ago" },
-                  { n: "Anonymous", a: "$45", t: "1h ago" },
-                ].map((d) => (
-                  <div key={d.n} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-50 font-display text-[11px] font-bold text-primary">
-                        {d.n.charAt(0)}
-                      </span>
-                      <span className="text-[#101A2C]">{d.n}</span>
-                    </div>
-                    <div className="flex items-baseline gap-3">
-                      <span className="font-semibold tabular-nums text-[#101A2C]">
-                        {d.a}
-                      </span>
-                      <span className="w-14 text-right text-xs text-[#5B6575]">
-                        {d.t}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              </div>
-            </div>
-          </div>
+            ))}
+          </dl>
         </div>
-
-        {/*
-          Value props, not metrics. The numbers that used to sit here were
-          invented; nothing in the product backs them, so they're gone rather
-          than restated with a smaller figure.
-        */}
-        <dl className="mt-14 grid gap-6 divide-y divide-[#E4E8EF] sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-y-0">
-          {VALUE_PROPS.map((v, i) => (
-            <div
-              key={v.head}
-              className={`pt-6 sm:pt-0 ${i === 0 ? "sm:pr-5 lg:pr-10" : "sm:px-5 lg:px-10"}`}
-            >
-              <dt className="font-display text-[clamp(18px,3.4vw,21px)] font-semibold text-primary">
-                {v.head}
-              </dt>
-              <dd className="mt-1.5 text-[14px] leading-snug text-[#5B6575]">
-                {v.body}
-              </dd>
-            </div>
-          ))}
-        </dl>
       </section>
 
       {/* ----------------------------------------------------------- Marquee */}
-      <div className="overflow-hidden border-y border-[#E4E8EF] py-[15px]">
-        <div className="flex w-max animate-marquee gap-[34px] font-display text-[15px] font-semibold tracking-[0.02em] text-[#5B6575] motion-reduce:animate-none">
+      {/* BRIEF §3 "Ticker": hairline strip, Archivo caps on the track, red dots
+          between items. The track renders SPORTS twice so translateX(-50%)
+          loops seamlessly — see the `marquee` keyframe in tailwind.config. */}
+      <div className="overflow-hidden border-y border-white/10 bg-white/[0.02] py-[13px]">
+        <div className="flex w-max animate-marquee gap-[34px] font-display text-[14px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground motion-reduce:animate-none">
           {[...SPORTS, ...SPORTS].map((s, i) => (
             <span
               key={i}
@@ -284,38 +364,52 @@ export default function Home() {
               className="flex items-center gap-[34px] whitespace-nowrap"
             >
               {s}
-              <span className="text-secondary" aria-hidden>
-                ●
-              </span>
+              <span
+                aria-hidden
+                className="h-[6px] w-[6px] rounded-full bg-primary shadow-glow-team"
+              />
             </span>
           ))}
         </div>
       </div>
 
       {/* --------------------------------------------------------- How it works */}
-      <section id="how" className="bg-white">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
-          <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
-              Live in an afternoon.
-              <br />
-              Funded all season.
-            </h2>
-            <p className="max-w-[34ch] text-base text-[#5B6575]">
+      <section id="how">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+          <div className="flex flex-wrap items-baseline justify-between gap-6">
+            <div className="flex items-baseline gap-4">
+              <span aria-hidden className={SEC_NUM} style={SEC_NUM_STROKE}>
+                01
+              </span>
+              <h2 className={SEC_H2}>
+                Live in an afternoon.
+                <br />
+                Funded all season.
+              </h2>
+            </div>
+            <p className="max-w-[34ch] text-[15px] leading-relaxed text-muted-foreground">
               No setup fees and no contracts — just a clean way to rally a
               community around a roster.
             </p>
           </div>
           <ol className="mt-12 grid gap-[22px] md:grid-cols-3">
             {STEPS.map((s) => (
-              <li key={s.n} className="border-t-2 border-secondary pt-[22px]">
-                <span className="font-display text-[15px] font-bold text-secondary">
+              <li
+                key={s.n}
+                className="rounded-card border border-white/10 bg-[linear-gradient(160deg,#181E2A,#12161F)] p-6 shadow-card"
+              >
+                {/* BRIEF §4 screen 03 "step-num": outlined numeral, red stroke. */}
+                <span
+                  aria-hidden
+                  className="font-display text-[34px] font-extrabold leading-none text-transparent"
+                  style={{ WebkitTextStroke: "1.5px #C8102E" }}
+                >
                   {s.n}
                 </span>
-                <h3 className="mt-3.5 font-display text-[22px] font-semibold text-primary">
+                <h3 className="mt-4 font-display text-[20px] font-bold uppercase tracking-[-0.01em] text-foreground">
                   {s.title}
                 </h3>
-                <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
+                <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
                   {s.body}
                 </p>
               </li>
@@ -325,135 +419,223 @@ export default function Home() {
       </section>
 
       {/* -------------------------------------------------------- Capabilities */}
-      <section id="platform" className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-[clamp(30px,4.4vw,52px)] font-semibold tracking-[-0.02em] text-primary">
-            Everything the drive needs
-          </h2>
-          <Link
-            href="/about"
-            className="border-b-[1.5px] border-primary-100 pb-1 text-[15px] font-semibold text-primary"
-          >
-            Why we built it →
-          </Link>
-        </div>
-        <div className="mt-11 grid gap-[22px] sm:grid-cols-2">
-          {CAPABILITIES.map((c) => (
-            <div
-              key={c.label}
-              className="rounded-[18px] border border-[#E4E8EF] bg-white p-7 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_26px_50px_-26px_rgba(16,24,40,0.3)]"
-            >
-              <span className="font-display text-[12px] font-bold uppercase tracking-[0.14em] text-secondary">
-                {c.label}
+      <section
+        id="platform"
+        className="border-t border-white/10 bg-white/[0.02]"
+      >
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+          <div className="flex flex-wrap items-baseline justify-between gap-4">
+            <div className="flex items-baseline gap-4">
+              <span aria-hidden className={SEC_NUM} style={SEC_NUM_STROKE}>
+                02
               </span>
-              <h3 className="mt-3 font-display text-[21px] font-semibold text-primary">
-                {c.title}
-              </h3>
-              <p className="mt-2.5 text-[15.5px] leading-relaxed text-[#5B6575]">
-                {c.body}
-              </p>
+              <h2 className={SEC_H2}>Everything the drive needs</h2>
             </div>
-          ))}
+            <Link
+              href="/about"
+              className="border-b-[1.5px] border-primary pb-1 text-[15px] font-semibold text-foreground transition-colors hover:text-primary"
+            >
+              Why we built it →
+            </Link>
+          </div>
+          <div className="mt-11 grid gap-[22px] sm:grid-cols-2">
+            {CAPABILITIES.map((c) => (
+              <div
+                key={c.label}
+                className="rounded-card border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] p-7 shadow-card transition-transform duration-200 ease-spring hover:-translate-y-1"
+              >
+                <span
+                  className="font-semibold uppercase tracking-[0.18em] text-primary text-[11px]"
+                  style={KICKER_GLOW}
+                >
+                  {c.label}
+                </span>
+                <h3 className="mt-3 font-display text-[21px] font-bold uppercase tracking-[-0.01em] text-foreground">
+                  {c.title}
+                </h3>
+                <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
+                  {c.body}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ---------------------------------------------------------- Pull quote */}
-      <section className="bg-primary text-white">
-        <div className="mx-auto max-w-[1000px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
-          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-secondary-300">
+      <section className="relative overflow-hidden border-t border-white/10">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[860px] -translate-x-1/2 -translate-y-1/2"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(200,16,46,.18), transparent)",
+          }}
+        />
+        <div className="relative mx-auto max-w-[1000px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
+          <p className={KICKER} style={KICKER_GLOW}>
             Why it works
           </p>
-          <p className="mt-7 font-quote text-[clamp(28px,4.6vw,52px)] leading-[1.16] text-white">
+          <p className="mt-7 font-quote text-[clamp(28px,4.6vw,52px)] leading-[1.16] text-foreground">
             People give when they can see where the money goes.
           </p>
-          <p className="mt-7 font-mono text-xs tracking-[0.1em] text-white/60">
-            EVERY DONATION · EVERY FEE · EVERY PAYOUT · ON ONE LEDGER
+          <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Every donation · every fee · every payout · on one ledger
           </p>
         </div>
       </section>
 
       {/* ------------------------------------------------------------- Pricing */}
-      <section id="pricing" className="bg-white">
-        <div className="mx-auto max-w-[1180px] px-5 py-14 sm:px-8 md:py-20 lg:px-16 lg:py-24">
-          <div className="grid gap-12 md:grid-cols-[0.9fr_1.1fr] md:items-center">
+      {/* BRIEF §4 screen 10: night tier cards, then the fee itemization on an
+          embedded light document (.paper-panel in globals.css). */}
+      <section id="pricing" className="border-t border-white/10 bg-white/[0.02]">
+        <div className="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 md:py-20 lg:px-16 lg:py-24">
+          <div className="flex items-baseline gap-4">
+            <span aria-hidden className={SEC_NUM} style={SEC_NUM_STROKE}>
+              03
+            </span>
             <div>
-              <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
+              <p className={KICKER} style={KICKER_GLOW}>
                 Pricing
               </p>
-              <h2 className="mt-3.5 font-display text-[clamp(30px,4.4vw,52px)] font-semibold leading-[1.05] tracking-[-0.02em] text-primary">
+              <h2 className={`${SEC_H2} mt-3`}>
                 Ten percent.
                 <br />
-                That's the whole page.
+                That&apos;s the whole page.
               </h2>
-              <p className="mt-5 max-w-[40ch] text-base leading-relaxed text-[#5B6575]">
-                No setup fee, no monthly minimum, no per-seat charge. The
-                platform fee and card processing are the only two lines, and
-                both are shown to every donor before they give.
-              </p>
             </div>
+          </div>
+          <p className="mt-6 max-w-[52ch] text-[15px] leading-relaxed text-muted-foreground">
+            No setup fee, no monthly minimum, no per-seat charge. The platform
+            fee and card processing are the only two lines, and both are shown to
+            every donor before they give.
+          </p>
 
-            <div className="rounded-[18px] border border-[#E4E8EF] bg-[#F5F7FA] p-7 sm:p-9">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#5B6575]">
-                On a $100 donation
+          <div className="mt-11 grid gap-[22px] md:grid-cols-3">
+            {PRICING_LINES.map((tier) => (
+              <div
+                key={tier.label}
+                className={`relative overflow-hidden rounded-card border p-7 shadow-card ${
+                  tier.accent
+                    ? "border-primary/60 bg-[linear-gradient(165deg,#241420,#121826)]"
+                    : "border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)]"
+                }`}
+              >
+                {tier.accent && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 top-0 h-[3px] bg-primary shadow-[0_0_12px_#C8102E]"
+                  />
+                )}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {tier.label}
+                </p>
+                <p
+                  className={`mt-3 font-display text-[38px] font-extrabold tabular leading-none tracking-[-0.02em] ${
+                    tier.accent ? "text-primary" : "text-foreground"
+                  }`}
+                  style={tier.accent ? KICKER_GLOW : undefined}
+                >
+                  {tier.figure}
+                </p>
+                <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">
+                  {tier.body}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* The paper document. Light tokens are scoped to .paper-panel — this
+              is a printed page lying on the night shell, not a theme flip. */}
+          <div className="mt-16 flex justify-center">
+            <div className="paper-panel w-full max-w-[720px]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] paper-muted">
+                The paper trail · print this for your booster board
               </p>
-              <dl className="mt-5 space-y-3 text-[15px] tabular-nums">
-                <div className="flex justify-between">
-                  <dt className="text-[#5B6575]">Donor gives</dt>
-                  <dd className="font-semibold text-[#101A2C]">$100.00</dd>
+              <h3 className="mt-3 font-display text-[clamp(22px,4vw,32px)] font-extrabold uppercase leading-none tracking-[-0.02em]">
+                What a $100 gift becomes
+              </h3>
+              <p className="mt-3 max-w-[52ch] text-[14px] leading-relaxed paper-muted">
+                The same arithmetic the donor sees under the donate button,
+                itemized the way it will appear in your payout ledger.
+              </p>
+
+              <div className="paper-ledger">
+                <div className="paper-row">
+                  <span>Donor gives</span>
+                  <span>$100.00</span>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-[#5B6575]">Platform fee (10%)</dt>
-                  <dd className="text-[#5B6575]">−$10.00</dd>
+                <div className="paper-row is-negative">
+                  <span>Platform fee (10%)</span>
+                  <span>−$10.00</span>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-[#5B6575]">Card processing (2.9% + 30¢)</dt>
-                  <dd className="text-[#5B6575]">−$3.20</dd>
+                <div className="paper-row is-negative">
+                  <span>Card processing (2.9% + 30¢)</span>
+                  <span>−$3.20</span>
                 </div>
-                <div className="flex justify-between border-t border-[#E4E8EF] pt-3.5">
-                  <dt className="font-display font-semibold text-primary">
-                    Your team keeps
-                  </dt>
-                  <dd className="font-display text-[22px] font-bold text-secondary">
-                    $86.80
-                  </dd>
+                <div className="paper-row is-total">
+                  <span>Your team keeps</span>
+                  <span>$86.80</span>
                 </div>
-              </dl>
-              <p className="mt-5 text-[13px] leading-relaxed text-[#5B6575]">
+                <div className="paper-row is-compare">
+                  <span>On a $500 gift, your team keeps</span>
+                  <span>$435.20</span>
+                </div>
+              </div>
+
+              <p className="mt-4 text-[13px] leading-relaxed paper-muted">
                 Larger gifts keep a larger share — processing is a flat 30¢ plus
                 a percentage, so a $500 donation nets 87%.
               </p>
+              <span className="paper-stamp">No setup fee · no contract</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* ----------------------------------------------------------------- CTA */}
-      <section className="bg-secondary">
-        <div className="mx-auto max-w-[1180px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
-          <h2 className="font-display text-[clamp(40px,7vw,92px)] font-semibold leading-[0.98] tracking-[-0.03em] text-white">
+      {/* BRIEF §4 screen 09 "ctaband": red glow behind a stacked-shadow H2. */}
+      <section className="relative overflow-hidden border-t border-white/10">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[900px] -translate-x-1/2 -translate-y-1/2"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(200,16,46,.22), transparent)",
+          }}
+        />
+        <div className="relative mx-auto max-w-[1180px] px-5 py-16 text-center sm:px-8 md:py-24 lg:px-16 lg:py-[110px]">
+          <h2
+            className="font-display text-[clamp(38px,7vw,72px)] font-extrabold uppercase leading-[0.98] tracking-[-0.03em] text-foreground"
+            style={{
+              textShadow:
+                "0 4px 0 rgba(200,16,46,.35), 0 20px 60px rgba(0,0,0,.6)",
+            }}
+          >
             Back a team.
             <br />
             Change a season.
           </h2>
-          <p className="mx-auto mt-6 max-w-[44ch] text-lg leading-relaxed text-white/80">
+          <p className="mx-auto mt-6 max-w-[44ch] text-[15px] leading-relaxed text-muted-foreground">
             Every season funded is a promise kept to a kid who just wants to
             play.
           </p>
-          <Link
-            href="/signup"
-            className="mt-9 inline-block rounded-full bg-white px-9 py-4 text-base font-bold text-secondary transition-transform hover:-translate-y-0.5"
-          >
-            Start a campaign
-          </Link>
+          <Button asChild size="lg" className="mt-9">
+            <Link href="/signup">Start a campaign</Link>
+          </Button>
         </div>
       </section>
 
       {/* -------------------------------------------------------------- Footer */}
-      <footer className="bg-[#0A101E] text-[#9AA7BC]">
+      <footer className="border-t border-white/10 bg-white/[0.02] text-muted-foreground">
         <div className="mx-auto max-w-[1180px] px-5 pb-10 pt-12 sm:px-8 md:pt-16 lg:px-16 lg:pt-20">
           <div className="grid gap-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-              <p className="font-display text-[18px] font-bold text-[#F2F6FC]">
+              <p className="flex items-center gap-2 font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
+                <span
+                  aria-hidden
+                  className="h-[9px] w-[9px] rounded-full bg-primary shadow-glow-team"
+                />
                 Bleacher&nbsp;Backers
               </p>
               <p className="mt-3.5 max-w-[30ch] text-sm leading-relaxed">
@@ -486,7 +668,7 @@ export default function Home() {
               },
             ].map((col) => (
               <div key={col.head}>
-                <p className="text-xs uppercase tracking-[0.14em] text-[#66738A]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   {col.head}
                 </p>
                 <ul className="mt-4 flex flex-col gap-2.5">
@@ -494,7 +676,7 @@ export default function Home() {
                     <li key={l.label}>
                       <Link
                         href={l.href}
-                        className="text-sm transition-colors hover:text-white"
+                        className="text-sm transition-colors hover:text-foreground"
                       >
                         {l.label}
                       </Link>
@@ -504,7 +686,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <div className="mt-11 flex flex-wrap justify-between gap-3 border-t border-white/10 pt-5 text-[13px] text-[#66738A]">
+          <div className="mt-11 flex flex-wrap justify-between gap-3 border-t border-white/10 pt-5 text-[13px]">
             <span>© {new Date().getFullYear()} Bleacher Backers. All rights reserved.</span>
             <span>We never sell or share your data.</span>
           </div>

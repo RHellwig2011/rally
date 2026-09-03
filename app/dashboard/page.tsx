@@ -84,7 +84,7 @@ export default function CampaignsListPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted">
+      <div className="min-h-screen">
         <nav className="border-b bg-white sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
@@ -119,7 +119,7 @@ export default function CampaignsListPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-warning mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
@@ -129,7 +129,7 @@ export default function CampaignsListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen">
       {/* Header */}
       <nav className="border-b bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

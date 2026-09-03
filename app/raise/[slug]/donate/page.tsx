@@ -19,10 +19,10 @@ interface Campaign {
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-muted flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center px-5">
       <div className="text-center">
-        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Loading campaign...</p>
+        <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Loading campaign...</p>
       </div>
     </div>
   );
@@ -91,10 +91,12 @@ function DonatePageContent({ params }: { params: { slug: string } }) {
   // Error state
   if (campaignError || !campaign) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
-          <p className="text-muted-foreground mb-4">{campaignError || "This campaign does not exist."}</p>
+          <h1 className="mb-2 font-display text-2xl font-extrabold uppercase tracking-[-0.02em] text-foreground">
+            Campaign not found
+          </h1>
+          <p className="mb-5 text-sm text-muted-foreground">{campaignError || "This campaign does not exist."}</p>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={fetchCampaign}>
               Try again
@@ -109,33 +111,51 @@ function DonatePageContent({ params }: { params: { slug: string } }) {
   }
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Header */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href={`/raise/${params?.slug}`} className="flex items-center space-x-2">
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Back to Campaign</span>
+    <div className="min-h-screen">
+      {/* Site header — BRIEF §3, the same chrome as the campaign page. */}
+      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-4">
+            <Link
+              href={`/raise/${params?.slug}`}
+              className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="font-medium">Back to campaign</span>
             </Link>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-display font-bold text-sm">BB</span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
+              />
+              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
+                Bleacher Backers
+              </span>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Campaign Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Support {campaign.organizationName} {campaign.teamName}
+        <div className="mb-8 text-center">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+            style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}
+          >
+            {campaign.organizationName}
+          </p>
+          <h1
+            className="mt-3 font-display text-[clamp(30px,6vw,46px)] font-extrabold uppercase leading-[0.96] tracking-[-0.03em] text-foreground"
+            style={{
+              textShadow:
+                "0 2px 0 rgba(200,16,46,.5), 0 6px 0 rgba(200,16,46,.2), 0 18px 44px rgba(200,16,46,.25)",
+            }}
+          >
+            Back the {campaign.teamName}
           </h1>
-          <p className="text-muted-foreground">
-            Your donation helps make their goals a reality
+          <p className="mt-4 text-sm text-muted-foreground">
+            Every fee is itemized before you give, never after.
           </p>
         </div>
 
@@ -147,10 +167,15 @@ function DonatePageContent({ params }: { params: { slug: string } }) {
           initialAmount={initialAmount}
         />
 
-        <p className="text-xs text-center text-muted-foreground mt-6">
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           By donating, you agree to our{" "}
-          <Link href="/terms" className="underline">Terms</Link> &{" "}
-          <Link href="/privacy" className="underline">Privacy Policy</Link>
+          <Link href="/terms" className="underline underline-offset-4 transition-colors hover:text-foreground">
+            Terms
+          </Link>{" "}
+          &amp;{" "}
+          <Link href="/privacy" className="underline underline-offset-4 transition-colors hover:text-foreground">
+            Privacy Policy
+          </Link>
         </p>
       </div>
     </div>

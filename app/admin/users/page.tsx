@@ -49,38 +49,38 @@ interface RoleConfigEntry {
 const ROLE_CONFIG: Record<string, RoleConfigEntry> = {
   DONOR: {
     label: "Donor",
-    color: "text-blue-600",
-    bgColor: "bg-blue-100",
+    color: "text-secondary",
+    bgColor: "bg-white/[0.08]",
   },
   PLAYER: {
     label: "Player",
-    color: "text-green-600",
-    bgColor: "bg-green-100",
+    color: "text-success-dark",
+    bgColor: "bg-[rgba(34,196,139,.14)]",
   },
   TEAM_MEMBER: {
     label: "Team Member",
-    color: "text-teal-600",
-    bgColor: "bg-teal-100",
+    color: "text-secondary",
+    bgColor: "bg-white/[0.08]",
   },
   CAMPAIGN_LEADER: {
     label: "Campaign Leader",
-    color: "text-purple-600",
-    bgColor: "bg-purple-100",
+    color: "text-secondary",
+    bgColor: "bg-white/[0.08]",
   },
   GUARDIAN: {
     label: "Guardian",
-    color: "text-indigo-600",
-    bgColor: "bg-indigo-100",
+    color: "text-secondary",
+    bgColor: "bg-white/[0.08]",
   },
   ADMIN: {
     label: "Admin",
-    color: "text-orange-600",
-    bgColor: "bg-orange-100",
+    color: "text-[#E8A33D]",
+    bgColor: "bg-[rgba(232,163,61,.14)]",
   },
   BANK_ADMIN: {
     label: "Bank Admin",
-    color: "text-red-600",
-    bgColor: "bg-red-100",
+    color: "text-destructive",
+    bgColor: "bg-[rgba(242,97,75,.14)]",
   },
 };
 
@@ -88,8 +88,8 @@ function getRoleConfig(role: string): RoleConfigEntry {
   return (
     ROLE_CONFIG[role] ?? {
       label: role,
-      color: "text-gray-600",
-      bgColor: "bg-gray-100",
+      color: "text-muted-foreground",
+      bgColor: "bg-white/[0.06]",
     }
   );
 }
@@ -230,19 +230,19 @@ export default function AdminUsersPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-orange-600">{stats.unverified}</div>
+            <div className="text-2xl font-bold text-[#E8A33D]">{stats.unverified}</div>
             <div className="text-sm text-muted-foreground">Unverified</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-600">{stats.donors}</div>
+            <div className="text-2xl font-bold text-secondary">{stats.donors}</div>
             <div className="text-sm text-muted-foreground">Donors</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-purple-600">{stats.leaders}</div>
+            <div className="text-2xl font-bold text-secondary">{stats.leaders}</div>
             <div className="text-sm text-muted-foreground">Leaders</div>
           </CardContent>
         </Card>
@@ -350,7 +350,7 @@ export default function AdminUsersPage() {
                             Verified
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-orange-600 text-sm">
+                          <span className="flex items-center gap-1 text-[#E8A33D] text-sm">
                             <XCircle className="w-4 h-4" />
                             Unverified
                           </span>

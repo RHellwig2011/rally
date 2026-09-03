@@ -61,26 +61,26 @@ const transactionTypeConfig: Record<string, TypeConfigEntry> = {
   DISBURSEMENT: {
     label: "Disbursement",
     icon: ArrowUpRight,
-    color: "text-blue-600",
-    bgColor: "bg-blue-100",
+    color: "text-secondary",
+    bgColor: "bg-white/[0.08]",
   },
   FEE_COLLECTION: {
     label: "Fee Collection",
     icon: DollarSign,
     color: "text-warning",
-    bgColor: "bg-yellow-100",
+    bgColor: "bg-[rgba(232,163,61,.14)]",
   },
   REFUND: {
     label: "Refund",
     icon: TrendingDown,
-    color: "text-red-600",
-    bgColor: "bg-red-100",
+    color: "text-destructive",
+    bgColor: "bg-[rgba(242,97,75,.14)]",
   },
   ADJUSTMENT: {
     label: "Adjustment",
     icon: ArrowDownRight,
-    color: "text-gray-600",
-    bgColor: "bg-gray-100",
+    color: "text-muted-foreground",
+    bgColor: "bg-white/[0.06]",
   },
 };
 
@@ -89,8 +89,8 @@ function getTypeConfig(type: string): TypeConfigEntry {
     transactionTypeConfig[type] ?? {
       label: type,
       icon: Wallet,
-      color: "text-gray-600",
-      bgColor: "bg-gray-100",
+      color: "text-muted-foreground",
+      bgColor: "bg-white/[0.06]",
     }
   );
 }
@@ -256,7 +256,7 @@ export default function AdminTransactionsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Deposits
             </CardTitle>
             <TrendingUp className="w-5 h-5 text-success" />
@@ -273,10 +273,10 @@ export default function AdminTransactionsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Disbursements
             </CardTitle>
-            <ArrowUpRight className="w-5 h-5 text-blue-600" />
+            <ArrowUpRight className="w-5 h-5 text-secondary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
@@ -290,7 +290,7 @@ export default function AdminTransactionsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Platform Fees
             </CardTitle>
             <DollarSign className="w-5 h-5 text-warning" />
@@ -305,7 +305,7 @@ export default function AdminTransactionsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Refunds
             </CardTitle>
             <TrendingDown className="w-5 h-5 text-warning" />
@@ -453,7 +453,7 @@ export default function AdminTransactionsPage() {
                   <div className="sm:text-right pl-14 sm:pl-0">
                     <div
                       className={`text-xl font-bold mb-1 ${
-                        isNegative ? "text-blue-600" : "text-success"
+                        isNegative ? "text-secondary" : "text-success"
                       }`}
                     >
                       {isNegative ? "-" : "+"}

@@ -37,12 +37,18 @@ interface CampaignSummary {
   bannerImageUrl: string | null;
 }
 
-/** Medal colors for the top three; everyone else gets a plain rank chip. */
+/**
+ * Medal colors for the top three; everyone else gets a plain rank chip.
+ * Night palette: soft tinted fills over the dark shell rather than the old
+ * light-theme -100 washes (BRIEF §1).
+ */
 function rankStyles(rank: number): string {
-  if (rank === 1) return "bg-secondary-100 text-secondary-800 border-secondary-300";
-  if (rank === 2) return "bg-gray-100 text-gray-700 border-gray-300";
-  if (rank === 3) return "bg-orange-100 text-orange-800 border-orange-300";
-  return "bg-primary-50 text-primary-700 border-primary-200";
+  if (rank === 1)
+    return "border-secondary/50 bg-[rgba(34,196,139,.12)] text-secondary shadow-[0_0_16px_rgba(34,196,139,.3)]";
+  if (rank === 2) return "border-white/20 bg-white/[0.08] text-foreground";
+  if (rank === 3)
+    return "border-[rgba(232,163,61,.45)] bg-[rgba(232,163,61,.10)] text-[#E8A33D]";
+  return "border-white/10 bg-white/[0.04] text-muted-foreground";
 }
 
 export default function PublicLeaderboardPage({
@@ -106,10 +112,10 @@ export default function PublicLeaderboardPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading leaderboard...</p>
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading leaderboard...</p>
         </div>
       </div>
     );
@@ -117,12 +123,12 @@ export default function PublicLeaderboardPage({
 
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            Leaderboard Not Available
+          <h1 className="mb-2 font-display text-2xl font-extrabold uppercase tracking-[-0.02em] text-foreground">
+            Leaderboard not available
           </h1>
-          <p className="text-muted-foreground mb-4">
+          <p className="mb-5 text-sm text-muted-foreground">
             {error || "This campaign does not exist or has been removed."}
           </p>
           <div className="flex items-center justify-center gap-3">
@@ -141,22 +147,23 @@ export default function PublicLeaderboardPage({
   const topAmount = entries.length > 0 ? entries[0].amountRaised : 0;
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-display font-bold text-sm leading-none">
-                  BB
-                </span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
+    <div className="min-h-screen">
+      {/* Site header — BRIEF §3, the same chrome as the campaign page. */}
+      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
+              />
+              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
+                Bleacher Backers
+              </span>
             </Link>
             <Button asChild>
               <Link href={`/raise/${params.slug}/donate`}>
-                <Heart className="w-4 h-4 mr-2" />
+                <Heart className="mr-2 h-4 w-4" />
                 Donate
               </Link>
             </Button>
@@ -164,32 +171,33 @@ export default function PublicLeaderboardPage({
         </div>
       </nav>
 
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 h-48 relative">
-        {/* pb-12 offsets the centered content upward so it clears the card
-            that -mt-10 pulls up over this banner. Without it the card's top
-            edge crops the bottom of the team name below. */}
-        <div className="absolute inset-0 flex items-center justify-center pb-12">
-          <div className="text-center text-white px-4">
-            <Trophy className="w-10 h-10 mx-auto mb-3" />
-            <h1 className="text-3xl sm:text-4xl font-bold">Top Fundraisers</h1>
-            <p className="text-lg mt-2 text-primary-100">
-              {campaign.organizationName} {campaign.teamName}
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Masthead */}
+      <header className="mx-auto max-w-3xl px-4 pb-8 pt-10 text-center sm:px-6 lg:px-8">
+        <Trophy className="mx-auto mb-4 h-9 w-9 text-primary" />
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+          style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}
+        >
+          {campaign.organizationName} {campaign.teamName}
+        </p>
+        <h1
+          className="mt-3 font-display text-[clamp(32px,7vw,56px)] font-extrabold uppercase leading-[0.96] tracking-[-0.03em] text-foreground"
+          style={{
+            textShadow:
+              "0 2px 0 rgba(200,16,46,.5), 0 6px 0 rgba(200,16,46,.2), 0 18px 44px rgba(200,16,46,.25)",
+          }}
+        >
+          Top fundraisers
+        </h1>
+      </header>
 
       {/* Main Content */}
-      {/* `relative z-10` for the same reason as app/raise/[slug]/page.tsx: the
-          `relative` banner would otherwise paint over the -mt-10 overlap and
-          hide this card's header row. */}
-      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 pb-16">
+      <div className="mx-auto max-w-3xl px-4 pb-16 sm:px-6 lg:px-8">
         <Card className="shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <Medal className="w-5 h-5 text-secondary" />
+              <CardTitle className="flex items-center gap-2 text-xl uppercase">
+                <Medal className="h-5 w-5 text-secondary" />
                 Top {publicLimit}
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
@@ -202,12 +210,12 @@ export default function PublicLeaderboardPage({
           </CardHeader>
           <CardContent>
             {entries.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
+              <div className="py-12 text-center">
+                <Users className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <h3 className="mb-2 font-display text-lg font-bold uppercase tracking-[-0.01em] text-foreground">
                   No fundraisers on the board yet
                 </h3>
-                <p className="text-muted-foreground mb-4">
+                <p className="mb-5 text-sm text-muted-foreground">
                   Be the first to support this team.
                 </p>
                 <Button asChild>
@@ -231,10 +239,10 @@ export default function PublicLeaderboardPage({
                     <Link
                       key={entry.id}
                       href={entry.fundraisingPath}
-                      className="flex items-center gap-4 p-4 rounded-lg border bg-white hover:border-primary-300 hover:shadow-sm transition"
+                      className="flex items-center gap-4 rounded-[12px] border border-white/10 bg-white/[0.04] p-4 transition-[transform,background-color,border-color] duration-200 ease-spring hover:translate-x-1 hover:border-white/20 hover:bg-white/[0.06]"
                     >
                       <div
-                        className={`w-10 h-10 rounded-full border flex items-center justify-center font-bold flex-shrink-0 ${rankStyles(
+                        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border font-display font-bold tabular ${rankStyles(
                           entry.rank
                         )}`}
                       >
@@ -248,8 +256,8 @@ export default function PublicLeaderboardPage({
                           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-lg font-bold text-primary">
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05]">
+                          <span className="font-display text-lg font-bold text-foreground">
                             {entry.name.charAt(0)}
                           </span>
                         </div>
@@ -257,10 +265,10 @@ export default function PublicLeaderboardPage({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline justify-between gap-2">
-                          <p className="font-semibold text-foreground truncate">
+                          <p className="truncate text-sm font-semibold text-foreground">
                             {entry.name}
                           </p>
-                          <span className="font-semibold text-success flex-shrink-0">
+                          <span className="flex-shrink-0 text-sm font-semibold tabular text-secondary">
                             {formatCurrency(entry.amountRaised)}
                           </span>
                         </div>
@@ -270,15 +278,15 @@ export default function PublicLeaderboardPage({
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-label={`${entry.name}'s total relative to the leader`}
-                          className="mt-2 h-2 bg-muted rounded-full overflow-hidden"
+                          className="mt-2 h-[5px] overflow-hidden rounded-full bg-white/10"
                         >
                           <div
-                            className="h-full bg-primary rounded-full"
+                            className="h-full rounded-full bg-secondary shadow-glow-accent transition-all duration-700 ease-stadium"
                             style={{ width: `${relative}%` }}
                           />
                         </div>
                         {entry.percentOfGoal !== null && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="mt-1.5 text-xs tabular text-muted-foreground">
                             {entry.percentOfGoal}% of personal goal
                           </p>
                         )}
@@ -290,7 +298,7 @@ export default function PublicLeaderboardPage({
             )}
 
             {/* Honest disclosure about what this board is */}
-            <div className="mt-6 pt-5 border-t flex items-start gap-3 text-sm text-muted-foreground">
+            <div className="mt-6 flex items-start gap-3 border-t border-white/10 pt-5 text-sm text-muted-foreground">
               <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
               <p>
                 Only the top {publicLimit} fundraisers are shown publicly. Many

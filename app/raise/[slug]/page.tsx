@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatRelativeTime, calculatePercentage, calculateDaysRemaining } from "@/lib/utils";
+import { MONEY_HERO_SHADOW, formatWholeDollars } from "@/components/app-chrome";
+import { GiftTicker, type GiftTickerItem } from "@/components/gift-ticker";
+import { StickyDonateBar } from "@/components/sticky-donate-bar";
 
 interface CampaignData {
   id: string;
@@ -203,10 +206,10 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading campaign...</p>
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
@@ -214,10 +217,14 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-5">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
-          <p className="text-muted-foreground mb-4">{error || "This campaign does not exist or has been removed."}</p>
+          <h1 className="mb-2 font-display text-2xl font-extrabold uppercase tracking-[-0.02em] text-foreground">
+            Campaign not found
+          </h1>
+          <p className="mb-5 text-sm text-muted-foreground">
+            {error || "This campaign does not exist or has been removed."}
+          </p>
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={fetchCampaign}>
               Try again
@@ -235,6 +242,15 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
   const currentAmount = typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount;
   const percentage = calculatePercentage(currentAmount, goalAmount);
   const daysLeft = calculateDaysRemaining(new Date(campaign.endDate));
+  const donorCount = campaign.stats?.donorCount || campaign.donorCount || 0;
+  // CENTS, like every other amount on this page — formatCurrency divides.
+  const amountToGo = Math.max(0, goalAmount - currentAmount);
+
+  // BRIEF §4 screen 01: the masthead sets the team name in two rows, the second
+  // outlined rather than filled. Single-word names keep the filled treatment.
+  const nameWords = campaign.teamName.trim().split(/\s+/);
+  const nameHead = nameWords.length > 1 ? nameWords.slice(0, -1).join(" ") : campaign.teamName;
+  const nameTail = nameWords.length > 1 ? nameWords[nameWords.length - 1] : "";
 
   // Worked example for the "where does my donation go?" disclosure. Mirrors the
   // fee math in components/DonationForm.tsx: this campaign's platform fee plus
@@ -248,21 +264,46 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
     EXAMPLE_DONATION - examplePlatformFee - exampleProcessingFee
   );
 
+  // Gift ticker items — BRIEF §4 screen 01: team cheer, recent gifts, and
+  // campaign vitals in one loop. Donation amounts are CENTS here.
+  const tickerItems: GiftTickerItem[] = [
+    { bold: `GO ${campaign.teamName.toUpperCase()}` },
+    ...campaign.donations.slice(0, 6).map((d) => ({
+      before: d.donorName,
+      bold: formatWholeDollars(
+        (typeof d.grossAmount === "string"
+          ? parseInt(d.grossAmount)
+          : d.grossAmount) / 100
+      ),
+    })),
+    ...(donorCount > 0
+      ? [{ bold: `${donorCount}`, after: "donors" } as GiftTickerItem]
+      : []),
+    ...(daysLeft > 0
+      ? [{ bold: `${daysLeft} days`, after: "left" } as GiftTickerItem]
+      : []),
+    { bold: `${percentage}%`, after: "funded" },
+  ];
+
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen pb-28 lg:pb-0">
       <Suspense fallback={null}>
         <ReferralTracker />
       </Suspense>
 
-      {/* Navigation */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-display font-bold text-sm leading-none">BB</span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">Bleacher Backers</span>
+      {/* Site header — BRIEF §3: translucent night bar, hairline rule, wordmark
+          with a red dot. Sits below the fixed red top rule from <Atmosphere />. */}
+      <nav className="sticky top-0 z-50 border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-[10px]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-[9px] w-[9px] flex-shrink-0 rounded-full bg-primary shadow-glow-team"
+              />
+              <span className="font-display text-[17px] font-extrabold tracking-[-0.02em] text-foreground">
+                Bleacher Backers
+              </span>
             </Link>
             <Button asChild>
               <Link href={`/raise/${params.slug}/donate`}>Donate to the team</Link>
@@ -271,47 +312,185 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
         </div>
       </nav>
 
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 h-64 relative">
+      {/* Gift ticker — BRIEF §4 screen 01: live gifts and vitals in a
+          marquee loop between the header and the masthead. */}
+      <GiftTicker items={tickerItems} />
+
+      {/* Masthead — school kicker over the big uppercase team name. */}
+      <header className="mx-auto max-w-7xl px-4 pb-6 pt-10 sm:px-6 lg:px-8">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary sm:text-[12px]"
+           style={{ textShadow: "0 0 14px rgba(200,16,46,.6)" }}>
+          {campaign.organizationName}
+        </p>
+        <h1
+          className="mt-3 font-display text-[clamp(38px,7vw,72px)] font-extrabold uppercase leading-[0.94] tracking-[-0.03em] text-foreground"
+          style={{
+            textShadow:
+              "0 2px 0 rgba(200,16,46,.5), 0 6px 0 rgba(200,16,46,.2), 0 18px 44px rgba(200,16,46,.25)",
+          }}
+        >
+          {nameHead}
+          {nameTail && (
+            <span
+              className="block text-transparent"
+              style={{ WebkitTextStroke: "1.5px #8B93A3", textShadow: "none" }}
+            >
+              {nameTail}
+            </span>
+          )}
+        </h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          {campaign.category || "Fundraising campaign"}
+        </p>
+      </header>
+
+      {/* Photo scene — BRIEF §4 screen 01 "scene": a real banner takes the
+          frame with a floodlight bloom at its base and the team crest riding
+          over it; without one the frame is a lit night gradient rather than
+          a flat brand block. */}
+      <div className="relative h-56 overflow-hidden border-y border-white/10 sm:h-72 lg:h-80">
         {campaign.bannerImageUrl ? (
           <>
             <img
               src={campaign.bannerImageUrl}
               alt={campaign.teamName}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
-            {/* The page still needs exactly one h1 when a banner photo replaces
-                the typographic treatment; the scrim keeps it readable. */}
-            <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-6">
-              <div className="text-white">
-                <h1 className="text-3xl sm:text-4xl font-bold">{campaign.teamName}</h1>
-                <p className="text-lg mt-1 text-white/80">{campaign.organizationName}</p>
-              </div>
-            </div>
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent"
+            />
+            {/* Bloom — the floodlight glow rising from the base of the frame. */}
+            <div
+              aria-hidden
+              className="absolute -bottom-[70px] left-1/2 h-[300px] w-[360px] -translate-x-1/2 rounded-full blur-[8px]"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(220,232,255,.38), rgba(200,16,46,.22) 45%, transparent 72%)",
+              }}
+            />
+            {/* Crest — the team logo rides over the photo with a red glow. */}
+            {campaign.logoUrl && (
+              <img
+                src={campaign.logoUrl}
+                alt={`${campaign.teamName} crest`}
+                loading="lazy"
+                className="absolute bottom-5 left-1/2 h-auto w-[120px] -translate-x-1/2 sm:w-[150px]"
+                style={{
+                  filter:
+                    "drop-shadow(0 0 24px rgba(200,16,46,.55)) drop-shadow(0 10px 20px rgba(0,0,0,.65))",
+                }}
+              />
+            )}
           </>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-white">
-              <h1 className="text-4xl font-bold">{campaign.teamName}</h1>
-              <p className="text-xl mt-2 text-primary-100">{campaign.organizationName}</p>
-            </div>
-          </div>
+          <>
+            {campaign.logoUrl ? (
+              <img
+                src={campaign.logoUrl}
+                alt=""
+                aria-hidden
+                className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-lg object-cover"
+                style={{
+                  filter:
+                    "drop-shadow(0 0 24px rgba(200,16,46,.55)) drop-shadow(0 10px 20px rgba(0,0,0,.65))",
+                }}
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-[96px] font-extrabold leading-none text-transparent"
+                style={{ WebkitTextStroke: "2px rgba(255,255,255,.14)" }}
+              >
+                {campaign.teamName.charAt(0)}
+              </span>
+            )}
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  "radial-gradient(60% 60% at 20% 0%, rgba(200,16,46,.22), transparent 65%), radial-gradient(60% 60% at 80% 0%, rgba(120,170,255,.14), transparent 65%)",
+              }}
+            />
+          </>
         )}
       </div>
 
+      {/* Money block — BRIEF §4 screen 01: raised total, goal line, bar, stats,
+          red donate CTA with the fee line beneath it. */}
+      <div className="mx-auto max-w-3xl px-4 pt-10 text-center sm:px-6 lg:px-8">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          Raised so far
+        </p>
+        <p
+          className="mt-2 font-display text-[clamp(48px,11vw,76px)] font-extrabold tabular leading-none tracking-[-0.03em] text-foreground"
+          style={{ textShadow: MONEY_HERO_SHADOW }}
+        >
+          {/* currentAmount is CENTS on this page. */}
+          {formatWholeDollars(currentAmount / 100)}
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          of a <span className="tabular text-foreground">{formatCurrency(goalAmount)}</span> goal
+        </p>
+
+        <Progress variant="team" value={currentAmount} max={goalAmount} className="mt-5" />
+        <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+          <span>
+            <span className="tabular text-foreground">{percentage}%</span> funded
+          </span>
+          <span>
+            <span className="tabular text-foreground">{formatCurrency(amountToGo)}</span> to go
+          </span>
+        </div>
+
+        {/* Three-stat grid — BRIEF §3 "Stat blocks". */}
+        <div className="mt-6 grid grid-cols-3 gap-3.5">
+          {[
+            { v: donorCount, k: "Donors" },
+            { v: daysLeft, k: "Days left" },
+            { v: campaign.updates.length, k: "Updates" },
+          ].map((stat) => (
+            <div
+              key={stat.k}
+              className="rounded-[12px] border border-white/10 bg-white/[0.04] px-3 py-4 shadow-[0_10px_26px_rgba(0,0,0,.35)]"
+            >
+              <p className="text-[22px] font-semibold tabular leading-none text-foreground sm:text-[28px]">
+                {stat.v}
+              </p>
+              <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                {stat.k}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* The sticky bar watches this block — once it scrolls off the top of
+            the viewport, the bar slides up to take over the ask. */}
+        <div id="give">
+        <Button asChild size="lg" className="mt-6 h-[54px] w-full text-base">
+          <Link href={`/raise/${params.slug}/donate`}>
+            <Heart className="mr-2 h-5 w-5" />
+            Donate to the team
+          </Link>
+        </Button>
+        <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3 text-left text-[13px] leading-relaxed text-muted-foreground">
+          No fine print under these lights: on a{" "}
+          <span className="tabular text-foreground">${EXAMPLE_DONATION.toFixed(2)}</span> gift,{" "}
+          <span className="font-semibold tabular text-secondary">
+            ${exampleNet.toFixed(2)}
+          </span>{" "}
+          reaches the team. One platform fee — {feePercent}% — plus card
+          processing, shown before you give, never after.
+        </p>
+        </div>
+      </div>
+
       {/* Main Content */}
-      {/*
-        `relative z-10` is load-bearing, not decoration. -mt-16 lifts this card
-        into the banner above, but that banner is `relative` and this container
-        was static — and CSS paints positioned elements above non-positioned
-        ones regardless of source order. The banner therefore covered the top
-        64px of the card, which is exactly the logo and campaign-title row.
-        Stays below the sticky nav's z-50 so the nav still overlays on scroll.
-      */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 pb-32 lg:pb-16">
-        <div className="grid lg:grid-cols-3 gap-8">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Column - Campaign Info */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6 lg:col-span-2">
             {/* Campaign Card */}
             <Card>
               <CardHeader>
@@ -320,72 +499,78 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                     <img
                       src={campaign.logoUrl}
                       alt={campaign.teamName}
-                      className="w-20 h-20 rounded-lg object-cover"
+                      className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="w-20 h-20 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-3xl font-bold text-primary">
+                    <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05]">
+                      <span className="font-display text-2xl font-extrabold text-primary">
                         {campaign.teamName.charAt(0)}
                       </span>
                     </div>
                   )}
                   <div className="flex-1">
-                    <CardTitle className="text-2xl mb-1">
-                      {campaign.organizationName} {campaign.teamName}
+                    <CardTitle className="mb-1 text-xl uppercase">
+                      About the campaign
                     </CardTitle>
-                    <p className="text-muted-foreground">{campaign.category || 'Fundraising Campaign'}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {campaign.organizationName} {campaign.teamName}
+                    </p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
-                  <h3 className="text-xl font-semibold mb-3">About the Campaign</h3>
-                  {campaign.description.split('\n\n').map((paragraph, i) => (
-                    <p key={i} className="text-foreground mb-3">{paragraph}</p>
-                  ))}
-                </div>
+                {campaign.description.split('\n\n').map((paragraph, i) => (
+                  <p key={i} className="mb-3 text-[15px] leading-relaxed text-muted-foreground last:mb-0">
+                    {paragraph}
+                  </p>
+                ))}
               </CardContent>
             </Card>
 
-            {/* Recent Donors */}
+            {/* Recent gifts feed — BRIEF §4 screen 01 "gifts". */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-warning" />
-                  Recent Donors
+                <CardTitle className="flex items-center gap-2 text-xl uppercase">
+                  <Heart className="h-5 w-5 text-primary" />
+                  Recent gifts
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {campaign.donations.length === 0 ? (
-                  <p className="text-center py-4 text-muted-foreground">
+                  <p className="py-4 text-center text-sm text-muted-foreground">
                     No donations yet. Be the first to back this team.
                   </p>
                 ) : (
-                <div className="space-y-4">
+                <ul className="flex flex-col">
                   {campaign.donations.map((donation) => (
-                    <div key={donation.id} className="flex items-start gap-3 pb-4 border-b last:border-0 last:pb-0">
-                      <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                        <Users className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-foreground">{donation.donorName}</p>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="font-semibold text-success">
-                              {formatCurrency(typeof donation.grossAmount === 'string' ? parseInt(donation.grossAmount) : donation.grossAmount)}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {formatRelativeTime(new Date(donation.createdAt))}
-                            </span>
-                          </div>
+                    <li
+                      key={donation.id}
+                      className="flex gap-3 border-t border-white/10 py-3.5 first:border-t-0 first:pt-0"
+                    >
+                      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[13px] font-semibold text-foreground">
+                        {donation.donorName.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {donation.donorName}
+                          </p>
+                          <span className="flex-shrink-0 text-sm font-semibold tabular text-secondary">
+                            {formatCurrency(typeof donation.grossAmount === 'string' ? parseInt(donation.grossAmount) : donation.grossAmount)}
+                          </span>
                         </div>
                         {donation.donorMessage && (
-                          <p className="text-muted-foreground mt-1 italic">"{donation.donorMessage}"</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            &ldquo;{donation.donorMessage}&rdquo;
+                          </p>
                         )}
+                        <p className="mt-1 text-xs text-muted-foreground/70">
+                          {formatRelativeTime(new Date(donation.createdAt))}
+                        </p>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
                 )}
               </CardContent>
             </Card>
@@ -393,27 +578,36 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
             {/* Cheer Wall */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  📣 Cheer Wall
+                <CardTitle className="flex items-center gap-2 text-xl uppercase">
+                  📣 Cheer wall
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {campaign.cheerMessages && campaign.cheerMessages.length > 0 ? (
                   <div className="space-y-3">
                     {campaign.cheerMessages.map((message) => (
-                      <div key={message.id} className="bg-muted rounded-lg p-4">
-                        <p className="text-foreground mb-2">💬 "{message.message}"</p>
-                        <p className="text-sm text-muted-foreground">- {message.authorName}</p>
+                      <div
+                        key={message.id}
+                        className="rounded-[12px] border border-white/10 bg-white/[0.04] p-4"
+                      >
+                        <p className="mb-2 text-[15px] leading-relaxed text-foreground">
+                          &ldquo;{message.message}&rdquo;
+                        </p>
+                        <p className="text-xs uppercase tracking-[0.08em] text-muted-foreground">
+                          {message.authorName}
+                        </p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center py-4 text-muted-foreground">No messages yet. Be the first to cheer them on!</p>
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    No messages yet. Be the first to cheer them on!
+                  </p>
                 )}
 
                 <Dialog open={cheerDialogOpen} onOpenChange={setCheerDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="w-full mt-4">
+                    <Button variant="outline" className="mt-4 w-full">
                       Leave a Message
                     </Button>
                   </DialogTrigger>
@@ -428,9 +622,9 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
 
                       {cheerSuccess ? (
                         <div className="py-8 text-center">
-                          <div className="text-4xl mb-2">🎉</div>
-                          <p className="text-success font-semibold">Message submitted!</p>
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <div className="mb-2 text-4xl">🎉</div>
+                          <p className="font-semibold text-success-dark">Message submitted!</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
                             Thanks — the team will see this after a quick look.
                           </p>
                         </div>
@@ -456,9 +650,9 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                                 checked={cheerAnonymous}
                                 onChange={(e) => setCheerAnonymous(e.target.checked)}
                                 disabled={cheerSubmitting}
-                                className="w-4 h-4"
+                                className="h-4 w-4 accent-[#C8102E]"
                               />
-                              <Label htmlFor="cheer-anonymous" className="text-sm font-normal cursor-pointer">
+                              <Label htmlFor="cheer-anonymous" className="cursor-pointer text-sm font-normal">
                                 Post anonymously
                               </Label>
                             </div>
@@ -475,7 +669,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                                 maxLength={500}
                                 rows={4}
                               />
-                              <p className="text-xs text-muted-foreground text-right">
+                              <p className="text-right text-xs tabular text-muted-foreground">
                                 {cheerMessage.length}/500 characters
                               </p>
                             </div>
@@ -484,7 +678,7 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                           {cheerError && (
                             <p
                               role="alert"
-                              className="mb-3 rounded-lg border border-warning bg-warning-light px-3 py-2 text-sm text-warning-dark"
+                              className="mb-3 rounded-lg border border-warning/40 bg-warning-light px-3 py-2 text-sm text-warning-dark"
                             >
                               {cheerError}
                             </p>
@@ -515,98 +709,67 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
             {campaign.updates.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Campaign Updates</CardTitle>
+                <CardTitle className="text-xl uppercase">Campaign updates</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <ul className="flex flex-col">
                   {campaign.updates.map((update) => (
-                    <div key={update.id} className="flex items-center gap-3 pb-3 border-b last:border-0">
-                      <Calendar className="w-5 h-5 text-primary flex-shrink-0" />
+                    <li
+                      key={update.id}
+                      className="flex items-center gap-3 border-t border-white/10 py-3 first:border-t-0 first:pt-0"
+                    >
+                      <Calendar className="h-4 w-4 flex-shrink-0 text-primary" />
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">{update.title}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm font-medium text-foreground">{update.title}</p>
+                        <p className="text-xs text-muted-foreground">
                           {formatRelativeTime(new Date(update.publishedAt))}
                         </p>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </CardContent>
             </Card>
             )}
           </div>
 
-          {/* Right Column - Donation Widget.
-              order-first puts the donate card above "About the Campaign" on
-              phones, where a texted link is the usual way in; at lg the
-              source order (info, then widget) takes over again. */}
-          <div className="lg:col-span-1 order-first lg:order-none">
-            <div className="sticky top-20">
-              <Card className="shadow-lg">
+          {/* Right Column — actions. The raised total and progress live in the
+              masthead block above, so this column carries the ways in: quick
+              amounts, the board, sharing, and the fee disclosure. */}
+          <div className="order-first lg:order-none lg:col-span-1">
+            <div className="sticky top-20 space-y-4">
+              <Card>
                 <CardContent className="pt-6">
-                  {/* Progress Section */}
-                  <div className="mb-6">
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-3xl font-bold text-foreground">
-                        {formatCurrency(typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount)}
-                      </span>
-                      <span className="text-muted-foreground">
-                        of {formatCurrency(typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount)}
-                      </span>
-                    </div>
-                    <Progress value={typeof campaign.currentAmount === 'string' ? parseInt(campaign.currentAmount) : campaign.currentAmount} max={typeof campaign.goalAmount === 'string' ? parseInt(campaign.goalAmount) : campaign.goalAmount} className="mb-2" />
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span className="font-semibold text-primary">{percentage}%</span>
-                      <span>{campaign.stats?.donorCount || campaign.donorCount || 0} donors</span>
-                    </div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    A typical gift
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[25, 50, 100].map((quickAmount) => (
+                      <Button key={quickAmount} variant="outline" size="sm" asChild>
+                        <Link href={`/raise/${params.slug}/donate?amount=${quickAmount}`}>
+                          <span className="tabular">${quickAmount}</span>
+                        </Link>
+                      </Button>
+                    ))}
                   </div>
 
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-muted rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-foreground">{campaign.stats?.donorCount || campaign.donorCount || 0}</p>
-                      <p className="text-xs text-muted-foreground">Donors</p>
-                    </div>
-                    <div className="bg-muted rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-foreground">{daysLeft}</p>
-                      <p className="text-xs text-muted-foreground">Days Left</p>
-                    </div>
-                  </div>
-
-                  {/* Donate Button */}
-                  <Button className="w-full mb-4" size="lg" asChild>
+                  <Button className="mt-4 w-full" size="lg" asChild>
                     <Link href={`/raise/${params.slug}/donate`}>
-                      <Heart className="w-4 h-4 mr-2" />
-                      Donate Now
+                      <Heart className="mr-2 h-4 w-4" />
+                      Donate now
                     </Link>
                   </Button>
 
-                  {/* Quick Amounts */}
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-2">A typical gift:</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[25, 50, 100].map((quickAmount) => (
-                        <Button key={quickAmount} variant="outline" size="sm" asChild>
-                          <Link href={`/raise/${params.slug}/donate?amount=${quickAmount}`}>
-                            ${quickAmount}
-                          </Link>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Top Fundraisers */}
-                  <Button variant="outline" className="w-full mb-3" asChild>
+                  <Button variant="outline" className="mt-3 w-full" asChild>
                     <Link href={`/raise/${params.slug}/leaderboard`}>
-                      <Trophy className="w-4 h-4 mr-2" />
-                      Top Fundraisers
+                      <Trophy className="mr-2 h-4 w-4" />
+                      Top fundraisers
                     </Link>
                   </Button>
 
-                  {/* Share Button */}
-                  <Button variant="outline" className="w-full" onClick={handleShare}>
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share Campaign
+                  <Button variant="ghost" className="mt-2 w-full" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Share campaign
                   </Button>
                   {shareNotice && (
                     <p role="status" className="mt-2 text-center text-xs text-muted-foreground">
@@ -615,63 +778,64 @@ export default function CampaignPage({ params }: { params: { slug: string } }) {
                   )}
 
                   {/* Fee Breakdown */}
-                  <div className="mt-6 pt-6 border-t">
+                  <div className="mt-6 border-t border-white/10 pt-5">
                     <details className="cursor-pointer">
-                      <summary className="text-sm font-medium text-foreground mb-2">
+                      <summary className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         Where does the money go?
                       </summary>
-                      <div className="mt-3 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Your gift</span>
-                          <span className="font-semibold">${EXAMPLE_DONATION.toFixed(2)}</span>
+                      <div className="mt-3 text-sm">
+                        <div className="flex justify-between border-b border-dashed border-white/10 py-1.5 text-muted-foreground">
+                          <span>Your gift</span>
+                          <span className="tabular text-foreground">
+                            ${EXAMPLE_DONATION.toFixed(2)}
+                          </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Card processing</span>
-                          <span className="text-muted-foreground">~${exampleProcessingFee.toFixed(2)}</span>
+                        <div className="flex justify-between border-b border-dashed border-white/10 py-1.5 text-muted-foreground">
+                          <span>Card processing</span>
+                          <span className="tabular">~${exampleProcessingFee.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Bleacher Backers keeps</span>
-                          <span className="text-muted-foreground">${examplePlatformFee.toFixed(2)}</span>
+                        <div className="flex justify-between border-b border-dashed border-white/10 py-1.5 text-muted-foreground">
+                          <span>Bleacher Backers keeps</span>
+                          <span className="tabular">${examplePlatformFee.toFixed(2)}</span>
                         </div>
-                        <div className="pt-2 border-t flex justify-between">
-                          <span className="font-semibold text-foreground">The team receives</span>
-                          <span className="font-bold text-success">${exampleNet.toFixed(2)}</span>
+                        <div className="flex justify-between pt-3 text-base font-semibold text-foreground">
+                          <span>The team receives</span>
+                          <span
+                            className="tabular font-bold text-secondary"
+                            style={{ textShadow: "0 0 18px rgba(34,196,139,.4)" }}
+                          >
+                            ${exampleNet.toFixed(2)}
+                          </span>
                         </div>
-                        <p className="pt-2 text-xs text-muted-foreground">
-                          Card companies charge a small processing fee. We show it so nothing is a surprise.
+                        <p className="pt-3 text-xs leading-relaxed text-muted-foreground">
+                          Card companies charge a small processing fee. We show it
+                          so nothing is a surprise.
                         </p>
                       </div>
                     </details>
                   </div>
                 </CardContent>
               </Card>
+
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                {donorCount} {donorCount === 1 ? "person has" : "people have"} backed this team
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile give bar — the donate card scrolls away on a phone, so the
-          raised/goal line and the ask stay pinned. Hidden at lg, where the
-          sticky widget column already does this job. */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">
-              {formatCurrency(currentAmount)}{' '}
-              <span className="font-normal text-muted-foreground">
-                of {formatCurrency(goalAmount)}
-              </span>
-            </p>
-            <p className="text-xs text-muted-foreground">{percentage}% of the goal</p>
-          </div>
-          <Button size="lg" className="flex-shrink-0" asChild>
-            <Link href={`/raise/${params.slug}/donate`}>
-              <Heart className="w-4 h-4 mr-2" />
-              Give now
-            </Link>
-          </Button>
-        </div>
-      </div>
+      {/* Sticky bottom donate bar — BRIEF §4 screen 01. Hidden until the
+          #give block scrolls off the top of the viewport, then it slides up
+          and keeps the ask pinned. Hidden at lg, where the sticky widget
+          column already does this job. */}
+      <StickyDonateBar
+        watchId="give"
+        feeLine={`On a $${EXAMPLE_DONATION} gift, $${exampleNet.toFixed(2)} reaches the team`}
+        ctaLabel="Donate to the team"
+        ctaHref={`/raise/${params.slug}/donate`}
+      />
     </div>
   );
 }

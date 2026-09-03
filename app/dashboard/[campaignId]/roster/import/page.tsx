@@ -279,7 +279,7 @@ export default function RosterImportPage({
   const stepLabels = ["Source", "Match columns", "Confirm"];
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen py-8">
       <div className="mx-auto max-w-5xl px-4">
         <Link
           href={`/dashboard/${params.campaignId}/roster`}
@@ -387,7 +387,7 @@ export default function RosterImportPage({
 
                   {/* Honesty note: we do not talk to Hudl's servers, and we are
                       not going to imply otherwise with a "Connect" button. */}
-                  <div className="flex gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                  <div className="flex gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm text-foreground">
                     <Info className="h-4 w-4 shrink-0 mt-0.5" />
                     <p>
                       Hudl does not offer a public roster API, so there is no way
@@ -532,7 +532,7 @@ export default function RosterImportPage({
                 {liveValidation.warnings.map((message) => (
                   <div
                     key={message}
-                    className="flex gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900"
+                    className="flex gap-2 rounded-lg border border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.08)] p-3 text-sm text-[#E8A33D]"
                   >
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <div>{message}</div>
@@ -890,10 +890,10 @@ function Stat({
   tone: "green" | "blue" | "gray" | "red";
 }) {
   const tones = {
-    green: "bg-green-50 text-green-700",
-    blue: "bg-blue-50 text-blue-700",
-    gray: "bg-gray-50 text-gray-700",
-    red: "bg-red-50 text-red-700",
+    green: "bg-[rgba(34,196,139,.08)] text-success-dark",
+    blue: "bg-white/[0.04] text-foreground",
+    gray: "bg-white/[0.04] text-muted-foreground",
+    red: "bg-[rgba(242,97,75,.08)] text-destructive",
   };
   return (
     <div className={`rounded-lg p-4 ${tones[tone]}`}>
@@ -905,10 +905,10 @@ function Stat({
 
 function OutcomeBadge({ outcome }: { outcome: RowResult["outcome"] }) {
   const styles: Record<RowResult["outcome"], string> = {
-    created: "bg-green-100 text-green-800",
-    updated: "bg-blue-100 text-blue-800",
-    skipped: "bg-gray-100 text-gray-700",
-    failed: "bg-red-100 text-red-700",
+    created: "bg-[rgba(34,196,139,.14)] text-success-dark",
+    updated: "bg-white/[0.08] text-foreground",
+    skipped: "bg-white/[0.06] text-muted-foreground",
+    failed: "bg-[rgba(242,97,75,.14)] text-destructive",
   };
   const labels: Record<RowResult["outcome"], string> = {
     created: "Added",

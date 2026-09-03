@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Kicker, PageTitle } from '@/components/app-chrome';
 import { Loader2, CheckCircle2, Users, Mail, Phone, AlertCircle } from 'lucide-react';
 
 interface TeamMemberInfo {
@@ -161,7 +162,7 @@ export default function TeamMemberOnboardingPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary-600" />
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading your invitation...</p>
         </div>
       </div>
@@ -175,7 +176,7 @@ export default function TeamMemberOnboardingPage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-warning mb-2">
               <AlertCircle className="h-6 w-6" />
-              <CardTitle className="font-display">Oops!</CardTitle>
+              <CardTitle className="text-[15px] font-extrabold uppercase tracking-[0.04em]">Oops!</CardTitle>
             </div>
             <CardDescription className="text-base">{error}</CardDescription>
           </CardHeader>
@@ -191,7 +192,7 @@ export default function TeamMemberOnboardingPage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-success mb-2">
               <CheckCircle2 className="h-8 w-8" />
-              <CardTitle className="font-display">You&apos;re already on the team</CardTitle>
+              <CardTitle className="text-[15px] font-extrabold uppercase tracking-[0.04em]">You&apos;re already on the team</CardTitle>
             </div>
             <CardDescription className="text-base">
               Here&apos;s your page. Share it with family and the gifts come to you.
@@ -226,7 +227,7 @@ export default function TeamMemberOnboardingPage() {
           <CardHeader>
             <div className="flex items-center gap-2 text-success mb-2">
               <CheckCircle2 className="h-8 w-8" />
-              <CardTitle className="font-display">All Set!</CardTitle>
+              <CardTitle className="text-[15px] font-extrabold uppercase tracking-[0.04em]">All Set!</CardTitle>
             </div>
             <CardDescription className="text-base">
               Ask a parent to text your page to family tonight. That&apos;s the
@@ -251,8 +252,9 @@ export default function TeamMemberOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen px-4 py-12">
+      {/* BRIEF §4 screen 08: the dark stadium shell, narrow centred column. */}
+      <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
           {teamMemberInfo?.campaign.logoUrl && (
@@ -262,12 +264,10 @@ export default function TeamMemberOnboardingPage() {
               className="h-20 w-20 object-contain mx-auto mb-4"
             />
           )}
-          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-secondary mb-2">
-            You're on the roster
-          </p>
-          <h1 className="font-display text-[clamp(30px,5vw,44px)] font-semibold tracking-[-0.02em] text-primary mb-2">
+          <Kicker tone="team">You&apos;re on the roster</Kicker>
+          <PageTitle className="mb-2 mt-3">
             Welcome, {teamMemberInfo?.teamMember.name}! 🎉
-          </h1>
+          </PageTitle>
           <p className="text-lg text-muted-foreground">
             {teamMemberInfo?.campaign.teamName} — {teamMemberInfo?.campaign.organizationName}
           </p>
@@ -277,54 +277,58 @@ export default function TeamMemberOnboardingPage() {
         {currentStep === 1 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2">
-                <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
+              <CardTitle className="flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-display font-black tabular text-primary-foreground shadow-glow-team">
                   1
                 </div>
                 How This Works
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
-                <h3 className="font-display font-semibold text-primary mb-2">Your Fundraising Journey</h3>
-                <ul className="space-y-2 text-sm text-primary-800">
+              {/* Consent / "what we collect" copy lives on the light paper
+                  document embedded in the night page — BRIEF §3 "Paper document
+                  panel", §4 screen 08. Colours come from the .paper-panel scope,
+                  so nothing in here uses the night text tokens. */}
+              <div className="paper-panel">
+                <h3 className="font-display text-lg font-extrabold uppercase tracking-[-0.01em]">
+                  Your fundraising journey
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span>Your coach has invited you to join the team fundraiser</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
-                    <span>You'll get your own personal fundraising page to share with family and friends</span>
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
+                    <span>You&apos;ll get your own personal fundraising page to share with family and friends</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span>People can donate directly to support you and the team</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span>Your parents will receive updates about your fundraising progress</span>
                   </li>
                 </ul>
-              </div>
 
-              <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4">
-                <h3 className="font-semibold text-secondary-900 mb-2">
+                <hr className="paper-rule my-5" />
+
+                <h3 className="font-display text-lg font-extrabold uppercase tracking-[-0.01em]">
                   Just a parent we can update when gifts come in
                 </h3>
-                <p className="text-sm text-secondary-800 mb-3">
-                  Two minutes, then you&apos;re done:
-                </p>
-                <ul className="space-y-2 text-sm text-secondary-800">
+                <p className="paper-muted mt-2 text-sm">Two minutes, then you&apos;re done:</p>
+                <ul className="mt-3 space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <Mail className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
+                    <Mail className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span><strong>Your email</strong> (optional) - So we can send you updates</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Phone className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
+                    <Phone className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span><strong>Your phone</strong> (optional) - For text notifications</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <Users className="h-5 w-5 text-secondary-600 flex-shrink-0 mt-0.5" />
+                    <Users className="h-5 w-5 flex-shrink-0 text-[#0E7C5A]" />
                     <span><strong>Your parent(s) contact info</strong> (required) - So they can stay informed</span>
                   </li>
                 </ul>
@@ -332,7 +336,7 @@ export default function TeamMemberOnboardingPage() {
 
               <Button
                 onClick={() => setCurrentStep(2)}
-                className="w-full bg-primary-600 hover:bg-primary-700"
+                className="w-full"
                 size="lg"
               >
                 Got It! Let's Get Started
@@ -345,8 +349,8 @@ export default function TeamMemberOnboardingPage() {
         {currentStep === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2">
-                <div className="bg-primary-100 text-primary-600 rounded-full h-8 w-8 flex items-center justify-center font-bold">
+              <CardTitle className="flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-display font-black tabular text-primary-foreground shadow-glow-team">
                   2
                 </div>
                 Your Contact Information
@@ -359,7 +363,7 @@ export default function TeamMemberOnboardingPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Player Contact Info */}
                 <div className="space-y-4">
-                  <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+                  <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Your Contact Info <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                   </h3>
 
@@ -390,8 +394,8 @@ export default function TeamMemberOnboardingPage() {
                   </div>
                 </div>
 
-                <div className="border-t pt-6">
-                  <h3 className="font-display font-semibold text-foreground flex items-center gap-2 mb-4">
+                <div className="border-t border-border pt-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     <Users className="h-5 w-5" />
                     Parent/Guardian Contact Info <span className="text-sm font-normal text-warning">(Required)</span>
                   </h3>
@@ -463,9 +467,9 @@ export default function TeamMemberOnboardingPage() {
                 )}
 
                 {showSecondParent && (
-                  <div className="border-t pt-6">
+                  <div className="border-t border-border pt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+                      <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         Second Parent/Guardian <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                       </h3>
                       <Button
@@ -557,7 +561,7 @@ export default function TeamMemberOnboardingPage() {
                   <Button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-primary-600 hover:bg-primary-700"
+                    className="w-full"
                   >
                     {submitting ? (
                       <>
@@ -570,10 +574,12 @@ export default function TeamMemberOnboardingPage() {
                   </Button>
                 </div>
 
-                <p className="text-xs text-center text-muted-foreground">
-                  By completing this form, you agree to share this information with your coach and team administrators.
-                  Your parents will receive notifications about your fundraising activities.
-                </p>
+                {/* The agreement itself is legal copy, so it sits on paper too. */}
+                <div className="paper-panel !p-5 text-center text-xs leading-relaxed">
+                  By completing this form, you agree to share this information with your coach and
+                  team administrators. Your parents will receive notifications about your
+                  fundraising activities.
+                </div>
               </form>
             </CardContent>
           </Card>

@@ -28,7 +28,7 @@ export function MarketingMobileNav() {
         aria-controls="marketing-mobile-menu"
         aria-label={open ? "Close menu" : "Open menu"}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-10 items-center justify-center rounded-lg text-[#5B6575] transition-colors hover:text-primary"
+        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground"
       >
         {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
@@ -36,7 +36,7 @@ export function MarketingMobileNav() {
       {open && (
         <div
           id="marketing-mobile-menu"
-          className="absolute inset-x-0 top-[66px] border-b border-[#E4E8EF] bg-[#F5F7FA] px-5 pb-5 pt-2 sm:px-8"
+          className="absolute inset-x-0 top-[66px] border-b border-border bg-[rgba(10,13,20,.96)] px-5 pb-5 pt-2 backdrop-blur-[10px] sm:px-8"
         >
           <nav className="flex flex-col">
             {LINKS.map((link) => (
@@ -44,7 +44,7 @@ export function MarketingMobileNav() {
                 key={link.label}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="border-b border-[#E4E8EF] py-3 text-[15px] text-[#5B6575] transition-colors last:border-0 hover:text-primary"
+                className="border-b border-white/10 py-3 text-[15px] text-muted-foreground transition-colors last:border-0 hover:text-foreground"
               >
                 {link.label}
               </Link>
@@ -52,7 +52,7 @@ export function MarketingMobileNav() {
             <Link
               href="/signup"
               onClick={() => setOpen(false)}
-              className="mt-4 rounded-lg bg-primary px-[18px] py-3 text-center text-sm font-semibold text-white"
+              className="mt-4 rounded-lg bg-primary px-[18px] py-3 text-center text-sm font-semibold text-primary-foreground shadow-[0_0_0_1px_rgba(255,255,255,.12)_inset,0_8px_24px_rgba(200,16,46,.4)]"
             >
               Start a campaign
             </Link>

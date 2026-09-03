@@ -122,7 +122,7 @@ export default function CheerWallModerationPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -202,7 +202,7 @@ export default function CheerWallModerationPage() {
                           Approved
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#E8A33D] bg-[rgba(232,163,61,.14)] px-2 py-0.5 rounded-full">
                           <Clock className="w-3 h-3" />
                           Pending
                         </span>

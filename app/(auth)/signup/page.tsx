@@ -129,7 +129,7 @@ function SignupForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-background px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">

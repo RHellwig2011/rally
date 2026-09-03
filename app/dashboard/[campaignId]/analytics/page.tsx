@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading analytics...</p>
@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
 
   if (!analytics) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Analytics Not Available</h1>
           <Button asChild>
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
   const averageDonation = donations.length > 0 ? currentAmount / donations.length : 0;
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -166,7 +166,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {formatCurrency(currentAmount)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {donations.length}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -205,7 +205,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {formatCurrency(Math.round(averageDonation))}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -222,7 +222,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {uniqueDonorCount}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -425,11 +425,11 @@ export default function AnalyticsPage() {
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                             index === 0
-                              ? "bg-yellow-100 text-yellow-700"
+                              ? "bg-[rgba(232,163,61,.14)] text-[#E8A33D]"
                               : index === 1
                               ? "bg-muted text-foreground"
                               : index === 2
-                              ? "bg-orange-100 text-orange-700"
+                              ? "bg-[rgba(232,163,61,.14)] text-[#E8A33D]"
                               : "bg-muted text-muted-foreground"
                           }`}
                         >

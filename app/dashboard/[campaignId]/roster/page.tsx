@@ -30,8 +30,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Kicker,
+  PageTitle,
+  SiteHeader,
+  tableStyles,
+} from "@/components/app-chrome";
 import { formatCurrency } from "@/lib/utils";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
+
+const { th: TH, td: TD, tr: TR } = tableStyles;
+
+// Night-card silhouette used by the loading state.
+const SKELETON_CARD =
+  "rounded-card border border-white/10 bg-[linear-gradient(165deg,#1B2334,#121826)] p-6 shadow-card";
 
 interface TeamMember {
   id: string;
@@ -153,60 +166,49 @@ export default function RosterPage({
 
   if (isLoading && teamMembers.length === 0) {
     return (
-      <div className="min-h-screen bg-muted">
-        <nav className="border-b bg-white sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <Link href="/" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">R</span>
-                </div>
-                <span className="text-2xl font-bold text-foreground">Rally</span>
-              </Link>
-            </div>
-          </div>
-        </nav>
+      <div className="min-h-screen">
+        <SiteHeader />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Skeleton */}
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-2">
-              <div className="h-9 w-48 bg-accent rounded animate-pulse" />
-              <div className="h-4 w-96 bg-accent rounded animate-pulse" />
+              <Skeleton className="h-9 w-48" />
+              <Skeleton className="h-4 w-96" />
             </div>
-            <div className="h-11 w-40 bg-accent rounded animate-pulse" />
+            <Skeleton className="h-11 w-40" />
           </div>
 
           {/* Stats Cards Skeleton */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white border rounded-lg p-6">
+              <div key={i} className={SKELETON_CARD}>
                 <div className="flex justify-between items-center mb-4">
-                  <div className="h-4 w-32 bg-accent rounded animate-pulse" />
-                  <div className="h-5 w-5 bg-accent rounded-full animate-pulse" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-5 w-5 rounded-full" />
                 </div>
-                <div className="h-8 w-16 bg-accent rounded animate-pulse mb-2" />
-                <div className="h-3 w-28 bg-accent rounded animate-pulse" />
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-28" />
               </div>
             ))}
           </div>
 
           {/* Table Skeleton */}
-          <div className="bg-white border rounded-lg p-6">
-            <div className="h-6 w-48 bg-accent rounded animate-pulse mb-6" />
+          <div className={SKELETON_CARD}>
+            <Skeleton className="h-6 w-48 mb-6" />
             <div className="overflow-x-auto">
               <div className="space-y-4">
                 {/* Table Header */}
-                <div className="flex gap-4 pb-3 border-b">
+                <div className="flex gap-4 border-b border-border pb-3">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                    <div key={i} className="h-4 flex-1 bg-accent rounded animate-pulse" />
+                    <Skeleton key={i} className="h-4 flex-1" />
                   ))}
                 </div>
                 {/* Table Rows */}
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex gap-4 py-3">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((j) => (
-                      <div key={j} className="h-4 flex-1 bg-accent rounded animate-pulse" />
+                      <Skeleton key={j} className="h-4 flex-1" />
                     ))}
                   </div>
                 ))}
@@ -219,32 +221,23 @@ export default function RosterPage({
   }
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen">
       {/* Header */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
-              </div>
-              <span className="text-2xl font-bold text-foreground">Rally</span>
-            </Link>
-            <Button variant="ghost" asChild>
-              <Link href={`/dashboard/${params.campaignId}`}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/dashboard/${params.campaignId}`}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Link>
+        </Button>
+      </SiteHeader>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Team Roster</h1>
+            <Kicker tone="team">Roster</Kicker>
+            <PageTitle className="mb-2 mt-2">Team Roster</PageTitle>
             <p className="text-muted-foreground">
               Manage your team members and track their fundraising progress
             </p>
@@ -336,13 +329,13 @@ export default function RosterPage({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Total Members
               </CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {teamMembers.length}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Active team members</p>
@@ -351,13 +344,13 @@ export default function RosterPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Total Raised by Team
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {formatDollars(
                   teamMembers.reduce((sum, m) => sum + Number(m.amountRaised), 0)
                 )}
@@ -368,7 +361,7 @@ export default function RosterPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Top Fundraiser
               </CardTitle>
               <Trophy className="w-5 h-5 text-warning" />
@@ -393,7 +386,7 @@ export default function RosterPage({
         {/* Team Members Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-[15px] font-extrabold uppercase tracking-[0.04em]">
               <Users className="w-5 h-5" />
               Team Members ({teamMembers.length})
             </CardTitle>
@@ -417,76 +410,63 @@ export default function RosterPage({
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Rank
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Name
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Email
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Amount Raised
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Personal Goal
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Donations
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Status
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-foreground">
-                        Actions
-                      </th>
+                    <tr>
+                      <th className={TH}>Rank</th>
+                      <th className={TH}>Name</th>
+                      <th className={TH}>Email</th>
+                      <th className={`${TH} text-right`}>Amount Raised</th>
+                      <th className={`${TH} text-right`}>Personal Goal</th>
+                      <th className={`${TH} text-right`}>Donations</th>
+                      <th className={TH}>Status</th>
+                      <th className={TH}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {teamMembers.map((member, index) => (
-                      <tr key={member.id} className="border-b hover:bg-muted">
-                        <td className="py-4 px-4">
+                      <tr key={member.id} className={TR}>
+                        <td className={TD}>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground">#{index + 1}</span>
-                            {index === 0 && <Trophy className="w-4 h-4 text-warning" />}
+                            <span className="font-semibold tabular text-foreground">
+                              #{index + 1}
+                            </span>
+                            {index === 0 && <Trophy className="w-4 h-4 text-[#E8A33D]" />}
                           </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <p className="font-medium text-foreground">{member.name}</p>
+                        <td className={TD}>
+                          <p className="font-semibold text-foreground">{member.name}</p>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className={TD}>
                           <p className="text-sm text-muted-foreground">{member.email}</p>
                         </td>
-                        <td className="py-4 px-4">
-                          <p className="font-semibold text-success">
+                        <td className={`${TD} text-right`}>
+                          {/* Positive money column reads accent green — BRIEF §3 */}
+                          <p className="font-semibold text-success-dark">
                             {formatDollars(member.amountRaised)}
                           </p>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className={`${TD} text-right`}>
                           <p className="text-sm text-muted-foreground">
                             {member.personalGoal != null
                               ? formatDollars(member.personalGoal)
                               : '-'}
                           </p>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className={`${TD} text-right`}>
                           <p className="text-sm text-muted-foreground">{member.donationCount}</p>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className={TD}>
                           {member.invitationStatus === "ACCEPTED" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-light text-success-dark">
+                            <span className="inline-flex items-center rounded-full border border-secondary/40 bg-[rgba(34,196,139,.12)] px-2.5 py-0.5 text-xs font-semibold text-success-dark">
                               <Check className="w-3 h-3 mr-1" />
                               Active
                             </span>
                           ) : member.invitationStatus === "PENDING" ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <span className="inline-flex items-center rounded-full border border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.12)] px-2.5 py-0.5 text-xs font-semibold text-[#E8A33D]">
                               <Mail className="w-3 h-3 mr-1" />
                               Invited
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-light text-warning-dark">
+                            <span className="inline-flex items-center rounded-full border border-destructive/40 bg-[rgba(242,97,75,.12)] px-2.5 py-0.5 text-xs font-semibold text-destructive">
                               <AlertCircle className="w-3 h-3 mr-1" />
                               {member.invitationStatus === "EMAIL_FAILED"
                                 ? "Email Failed"
@@ -494,7 +474,7 @@ export default function RosterPage({
                             </span>
                           )}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className={TD}>
                           {member.fundraisingLink && (
                             <Button
                               variant="outline"

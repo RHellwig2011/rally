@@ -286,7 +286,7 @@ export default function EnhancedDashboardPage({
                   <div className="flex items-center gap-3 flex-1">
                     <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                       {index === 0 ? (
-                        <Trophy className="w-4 h-4 text-yellow-600" />
+                        <Trophy className="w-4 h-4 text-[#E8A33D]" />
                       ) : (
                         <span className="text-sm font-semibold">{index + 1}</span>
                       )}

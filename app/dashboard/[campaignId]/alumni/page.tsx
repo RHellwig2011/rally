@@ -107,7 +107,7 @@ function statusBadge(status: AlumniStatus) {
       return "bg-success-light text-success-dark";
     default:
       // Unknown is a prompt for a human decision, not an error.
-      return "bg-gray-100 text-gray-600";
+      return "bg-white/[0.06] text-muted-foreground";
   }
 }
 
@@ -260,7 +260,7 @@ export default function AlumniPage({
   // spans seasons. A standalone campaign has no history to draw on.
   if (programResolved && !programId) {
     return (
-      <div className="min-h-screen bg-muted">
+      <div className="min-h-screen">
         {header}
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Card>
@@ -313,7 +313,7 @@ export default function AlumniPage({
 
   if (!programResolved) {
     return (
-      <div className="min-h-screen bg-muted">
+      <div className="min-h-screen">
         {header}
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -353,12 +353,12 @@ export default function AlumniPage({
       value: summary ? summary.totalUnknown.toLocaleString() : "—",
       hint: "Not classified — add a graduation year",
       icon: Users,
-      tone: "text-gray-600 bg-gray-100",
+      tone: "text-muted-foreground bg-white/[0.06]",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen">
       {header}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -508,7 +508,7 @@ export default function AlumniPage({
                       <tr
                         key={row.key}
                         className={
-                          row.suppressed ? "bg-red-50/50" : "hover:bg-gray-50"
+                          row.suppressed ? "bg-[rgba(242,97,75,.08)]/50" : "hover:bg-white/[0.04]"
                         }
                       >
                         <td className="px-6 py-4">
@@ -569,8 +569,8 @@ export default function AlumniPage({
                             <div
                               className={
                                 row.emailSuppressed
-                                  ? "text-red-600 line-through"
-                                  : "text-gray-700"
+                                  ? "text-destructive line-through"
+                                  : "text-muted-foreground"
                               }
                             >
                               {row.email}

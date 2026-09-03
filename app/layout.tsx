@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, Instrument_Serif } from "next/font/google";
+import { Inter, Archivo, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { Atmosphere } from "@/components/atmosphere";
 
-// Type system, per the "Bleacher Backers UI" design system:
-//   Space Grotesk  — display/headings. Geometric and slightly athletic.
-//   Inter          — body copy and UI.
+// Type system, per the "C · Stadium" design brief (§2):
+//   Archivo (600/700/800) — display/headings/numbers-as-display.
+//   Inter (400/500/600)   — body copy and UI.
 //   Instrument Serif (italic) — pull quotes only.
-// Exposed as CSS variables so Tailwind's font-display/font-serif utilities
+// Exposed as CSS variables so Tailwind's font-display/font-quote utilities
 // can reach them (see tailwind.config.ts fontFamily).
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
-const spaceGrotesk = Space_Grotesk({
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["600", "700", "800"],
   variable: "--font-display",
 });
 
@@ -44,9 +45,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} ${instrumentSerif.variable}`}
+      className={`${inter.variable} ${archivo.variable} ${instrumentSerif.variable}`}
     >
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {/* Fixed floodlights / grain / red top rule behind every route. */}
+        <Atmosphere />
+        {children}
+      </body>
     </html>
   );
 }

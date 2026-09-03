@@ -78,25 +78,25 @@ const statusConfig: Record<string, StatusConfigEntry> = {
     label: "Paused",
     icon: Pause,
     color: "text-warning",
-    bgColor: "bg-yellow-100",
+    bgColor: "bg-[rgba(232,163,61,.14)]",
   },
   COMPLETED: {
     label: "Completed",
     icon: CheckCircle,
-    color: "text-gray-600",
-    bgColor: "bg-gray-100",
+    color: "text-muted-foreground",
+    bgColor: "bg-white/[0.06]",
   },
   DRAFT: {
     label: "Draft",
     icon: Clock,
-    color: "text-gray-400",
-    bgColor: "bg-gray-50",
+    color: "text-muted-foreground",
+    bgColor: "bg-white/[0.04]",
   },
   ARCHIVED: {
     label: "Archived",
     icon: Archive,
-    color: "text-gray-400",
-    bgColor: "bg-gray-50",
+    color: "text-muted-foreground",
+    bgColor: "bg-white/[0.04]",
   },
 };
 
@@ -105,8 +105,8 @@ function getStatusConfig(status: string): StatusConfigEntry {
     statusConfig[status] ?? {
       label: status,
       icon: Clock,
-      color: "text-gray-600",
-      bgColor: "bg-gray-100",
+      color: "text-muted-foreground",
+      bgColor: "bg-white/[0.06]",
     }
   );
 }

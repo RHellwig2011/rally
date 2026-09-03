@@ -246,7 +246,7 @@ export default function OutreachPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
@@ -257,7 +257,7 @@ export default function OutreachPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <Button asChild>
@@ -283,7 +283,7 @@ export default function OutreachPage() {
     sendResult?.results.filter((r) => r.status !== "SENT") ?? [];
 
   return (
-    <div className="min-h-screen bg-muted py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -367,10 +367,10 @@ export default function OutreachPage() {
         )}
 
         {sendResult && !cleanRun && !totalFailure && (
-          <Card className="mb-8 border-yellow-200 bg-yellow-50">
+          <Card className="mb-8 border-[rgba(232,163,61,.4)] bg-[rgba(232,163,61,.08)]">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
-                <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-[#E8A33D] rounded-full flex items-center justify-center flex-shrink-0">
                   <Check className="w-6 h-6 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -626,7 +626,7 @@ export default function OutreachPage() {
                       <span
                         className={
                           message.length > 160
-                            ? "text-orange-600 font-semibold"
+                            ? "text-[#E8A33D] font-semibold"
                             : "text-success"
                         }
                       >
@@ -692,7 +692,7 @@ export default function OutreachPage() {
                 )}
 
                 {messageType === "sms" && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-3">
                     <p className="text-xs text-foreground">
                       <strong>Note:</strong> SMS messages are charged per message sent.
                       Messages over 160 characters count as multiple messages.
