@@ -41,6 +41,7 @@ interface DonationFormProps {
   playerName?: string;
   /** Preselected amount in dollars, e.g. from a ?amount=25 quick link. */
   initialAmount?: number;
+  referralCode?: string;
 }
 
 const SUGGESTED_AMOUNTS = [25, 50, 100, 250, 500];
@@ -53,6 +54,7 @@ function DonationFormInner({
   campaignSlug,
   playerName,
   initialAmount,
+  referralCode,
 }: DonationFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -182,6 +184,7 @@ function DonationFormInner({
           amount: selectedAmount,
           isAnonymous,
           coverFees,
+          ...(referralCode && { referralCode }),
         }),
       });
 

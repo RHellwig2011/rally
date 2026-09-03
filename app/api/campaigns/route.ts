@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
         // leader explicitly launches it (DRAFT -> ACTIVE from the dashboard).
         status: "DRAFT",
         primaryLeaderId: user.id,
+        minContactsPerPlayer: validatedData.minContactsPerPlayer ?? 0,
         // Connect guardian if found
         ...(guardianUser && {
           guardians: {

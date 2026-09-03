@@ -90,7 +90,14 @@ export const createCampaignSchema = z.object({
     .min(50, "Approval threshold must be at least $50")
     .max(10000, "Approval threshold cannot exceed $10,000")
     .optional()
-    .default(500), // Default $500 as per original code
+    .default(500),
+
+  minContactsPerPlayer: z.number()
+    .int()
+    .min(0)
+    .max(50)
+    .optional()
+    .default(0),
 }).refine((data) => {
   // Validate that end date is after start date
   if (data.endDate) {
@@ -170,6 +177,12 @@ export const updateCampaignSchema = z.object({
     .min(1900, "Season year must be 1900 or later")
     .max(2200, "Season year cannot exceed 2200")
     .nullable()
+    .optional(),
+
+  minContactsPerPlayer: z.number()
+    .int()
+    .min(0)
+    .max(50)
     .optional(),
 });
 

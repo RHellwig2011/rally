@@ -324,7 +324,9 @@ export function TeamRosterPage({
               onEdit={(member) => setSelectedMember(member as TeamMember)}
               onDelete={handleDeleteMember}
               onResendInvite={handleResendInvitation}
-              onCopyInviteLink={handleCopyInviteLink}
+              onCopyInviteLink={(m) => {
+                void handleCopyInviteLink(m as unknown as TeamMember);
+              }}
             />
           ))}
         </div>

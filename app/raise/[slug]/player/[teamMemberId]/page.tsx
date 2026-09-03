@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -70,6 +70,8 @@ interface PlayerPageData {
 export default function PlayerFundraisingPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const referralFromUrl = searchParams?.get("ref") || undefined;
   const [data, setData] = useState<PlayerPageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -558,6 +560,7 @@ export default function PlayerFundraisingPage() {
             teamMemberId={data.teamMember.id}
             playerName={data.teamMember.name}
             platformFeePercent={data.campaign.platformFeePercent}
+            referralCode={referralFromUrl || data.referralCode || undefined}
           />
         </div>
 

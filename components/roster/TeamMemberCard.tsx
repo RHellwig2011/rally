@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { InviteContactsButton } from "@/components/roster/InviteContactsButton";
 
 interface TeamMember {
   id: string;
@@ -183,6 +184,8 @@ export function TeamMemberCard({
                 Copy Invite Link
               </button>
             )}
+
+            <InviteContactsButton teamMemberId={member.id} />
 
             {member.invitationStatus !== 'REMOVED' && (
               <button
