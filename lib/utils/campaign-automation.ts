@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/prisma";
 import { sendCampaignStatusChangeNotification } from "@/lib/email";
+import { processScheduledOutreach } from "@/lib/outreach";
 
 /**
  * Check and auto-complete campaigns that have reached their end date
@@ -290,6 +291,9 @@ export async function runCampaignAutomation(): Promise<{
   reminders: number;
   warnings: number;
   errors: number;
+  outreachClaimed: number;
+  outreachSent: number;
+  outreachFailed: number;
 }> {
   console.log('🤖 Running campaign automation...');
 
@@ -298,6 +302,9 @@ export async function runCampaignAutomation(): Promise<{
     reminders: 0,
     warnings: 0,
     errors: 0,
+    outreachClaimed: 0,
+    outreachSent: 0,
+    outreachFailed: 0,
   };
 
   try {
@@ -314,6 +321,12 @@ export async function runCampaignAutomation(): Promise<{
     // Check campaign health
     const healthResults = await checkCampaignHealth();
     results.warnings = healthResults.warnings.length;
+
+    // Due SCHEDULED outreach — claim SCHEDULED→SENDING then deliver.
+    const outreachResults = await processScheduledOutreach();
+    results.outreachClaimed = outreachResults.claimed;
+    results.outreachSent = outreachResults.sent;
+    results.outreachFailed = outreachResults.failed;
 
     console.log('✅ Campaign automation complete:', results);
     return results;

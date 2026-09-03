@@ -67,6 +67,9 @@ export async function middleware(request: NextRequest) {
     "/api/referrals/track",
     "/api/help/chat",
     "/api/webhooks/stripe",
+    // Resend open/click webhooks authenticate by Svix signature inside the
+    // handler (RESEND_WEBHOOK_SECRET). Same convention as Stripe.
+    "/api/webhooks/resend",
     // RFC 8058 one-click unsubscribe: mailbox providers GET/POST here with no
     // cookies. The HMAC token in the query string is the authorization.
     "/api/unsubscribe",

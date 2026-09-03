@@ -94,6 +94,9 @@ async function handleCronRequest(req: NextRequest, method: 'GET' | 'POST') {
         remindersSent: results.reminders,
         warningsFound: results.warnings,
         errors: results.errors,
+        outreachClaimed: results.outreachClaimed,
+        outreachSent: results.outreachSent,
+        outreachFailed: results.outreachFailed,
       },
     });
   } catch (error) {
