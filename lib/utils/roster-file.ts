@@ -66,9 +66,32 @@ function normalizeHeaders(rawHeaders: string[]): string[] {
 /**
  * `matrix` is the raw grid including the header line. Leading blank lines are
  * skipped: exports frequently start with an empty or title row.
+ *
+ * Title rows are also skipped: real Hudl/TeamSnap/school exports often put a
+ * merged banner cell ("Lincoln High — Athletes") above the real header line.
+ * A row whose cells are (almost) all the same single value — merged cells
+ * surface as the value repeated or one value plus blanks — is not a header
+ * row when the row after it looks like one (several distinct non-blank
+ * cells), so we drop it rather than importing "Column 2..7" garbage.
  */
+function looksLikeTitleRow(row: string[], next: string[] | undefined): boolean {
+  if (!next) return false;
+  const nonBlank = row.filter((cell) => !isBlank(cell));
+  const distinct = new Set(nonBlank.map((cell) => cell.trim()));
+  const nextNonBlank = next.filter((cell) => !isBlank(cell));
+  const nextDistinct = new Set(nextNonBlank.map((cell) => cell.trim()));
+  // ≤1 distinct value up top (single title, or merged-cell repetition) while
+  // the next row carries several distinct cells — that next row is the header.
+  return distinct.size <= 1 && nextDistinct.size >= 2;
+}
+
 function matrixToRoster(matrix: string[][], sourceLabel: string): ParsedRosterFile {
-  const nonEmpty = matrix.filter((row) => !rowIsEmpty(row));
+  let nonEmpty = matrix.filter((row) => !rowIsEmpty(row));
+
+  // Peel any leading title rows (there can be more than one banner line).
+  while (nonEmpty.length > 1 && looksLikeTitleRow(nonEmpty[0], nonEmpty[1])) {
+    nonEmpty = nonEmpty.slice(1);
+  }
 
   if (nonEmpty.length === 0) {
     throw new RosterFileError(
@@ -264,7 +287,12 @@ export async function parseRosterXlsx(
     );
   }
 
-  const worksheet = workbook.worksheets[0];
+  // Hudl and Excel both ship workbooks whose first sheet is an empty
+  // "Sheet1" with the data on a later tab. Read the first sheet that has
+  // any content instead of failing on a technicality the coach can't see.
+  const worksheet =
+    workbook.worksheets.find((ws) => (ws.actualRowCount ?? 0) > 0) ??
+    workbook.worksheets[0];
   if (!worksheet) {
     throw new RosterFileError(`${sourceLabel} has no worksheets in it.`);
   }

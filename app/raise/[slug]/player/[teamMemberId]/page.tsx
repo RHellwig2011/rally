@@ -25,6 +25,8 @@ import { StickyDonateBar } from "@/components/sticky-donate-bar";
 import DonationForm from "@/components/DonationForm";
 
 interface PlayerPageData {
+  /** True when this is a staff/self preview of a private or draft profile. */
+  preview?: boolean;
   teamMember: {
     id: string;
     name: string;
@@ -218,6 +220,17 @@ export default function PlayerFundraisingPage() {
       </SiteHeader>
 
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        {data.preview && (
+          <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/40 bg-[rgba(242,166,75,.08)] p-4 text-sm">
+            <Lock className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning-dark" />
+            <p className="text-foreground">
+              <span className="font-semibold">Preview — only you can see this page.</span>{" "}
+              This player&apos;s profile is private or the campaign isn&apos;t live yet, so
+              supporters can&apos;t open it. It goes public when the profile is made
+              public and the campaign is active.
+            </p>
+          </div>
+        )}
         {/* Back link to the team campaign — BRIEF §4 screen 02. */}
         <Link
           href={`/raise/${data.campaign.slug}`}
