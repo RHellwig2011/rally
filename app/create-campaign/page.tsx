@@ -66,6 +66,12 @@ interface WizardData {
   category: Category;
   goalAmount: string;
   description: string;
+  /** Story-template tiles selected in step 3 (STORY_TEMPLATES ids). */
+  storySelections: string[];
+  /** Whether the "Something else" custom tile is on. */
+  storyCustomOn: boolean;
+  /** The coach's short custom line for the "Something else" tile. */
+  storyCustomText: string;
   slug: string;
   /** Once the coach edits the URL by hand we stop regenerating it from the team name. */
   slugTouched: boolean;
@@ -128,6 +134,45 @@ const STORY_TEMPLATES: {
       `Thank you for being part of our season.`,
   },
 ];
+
+/** The paragraph woven in for the "Something else" tile. */
+function storyCustomParagraph(text: string): string {
+  return `We're also raising money for ${text.trim()}.`;
+}
+
+/**
+ * Rebuild the step-3 description after a story-tile toggle or a custom-text
+ * change. Paragraphs are split on blank lines; any paragraph that isn't a
+ * currently-known template/custom paragraph is treated as hand-written and
+ * kept (in place) — so the coach's own text or their edits to a template are
+ * never clobbered. Template paragraphs always come back in STORY_TEMPLATES
+ * order, then the custom paragraph last.
+ */
+function rebuildStoryDescription(
+  current: string,
+  selections: string[],
+  customOn: boolean,
+  customText: string,
+  team: string
+): string {
+  const known = new Set(STORY_TEMPLATES.map((t) => t.build(team)));
+  const custom = customOn && customText.trim() ? storyCustomParagraph(customText) : null;
+  if (custom) known.add(custom);
+
+  const handWritten = current
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p && !known.has(p))
+    // Any previously woven custom paragraph (e.g. the coach since deleted the
+    // text in the input) is generated text too, not a hand-written one.
+    .filter((p) => !/^We're also raising money for .+\.$/.test(p));
+
+  const selected = selections
+    .map((id) => STORY_TEMPLATES.find((t) => t.id === id)?.build(team))
+    .filter((p): p is string => Boolean(p));
+
+  return [...handWritten, ...selected, ...(custom ? [custom] : [])].join("\n\n");
+}
 
 const SLUG_RE = /^[a-z0-9-]+$/;
 const STORAGE_KEY = "bleacher-backers:new-campaign";
@@ -197,6 +242,9 @@ const EMPTY_DATA: WizardData = {
   category: "SPORTS",
   goalAmount: "",
   description: "",
+  storySelections: [],
+  storyCustomOn: false,
+  storyCustomText: "",
   slug: "",
   slugTouched: false,
   startDate: "",
@@ -346,6 +394,48 @@ export default function CreateCampaignPage() {
       return next;
     });
   }, []);
+
+  /**
+   * Step-3 story tiles: apply a selection / custom-tile change, rebuild the
+   * description from the current selections, and surface the existing
+   * over-limit error immediately when the combined text exceeds 1,000 chars
+   * (nothing is silently truncated).
+   */
+  const applyStoryChange = useCallback(
+    (patch: { selections?: string[]; customOn?: boolean; customText?: string }) => {
+      const team = data.teamName.trim() || "our team";
+      const selections = patch.selections ?? data.storySelections;
+      const customOn = patch.customOn ?? data.storyCustomOn;
+      const customText = patch.customText ?? data.storyCustomText;
+      const description = rebuildStoryDescription(
+        data.description,
+        selections,
+        customOn,
+        customText,
+        team
+      );
+      setFormError(null);
+      setData((prev) => ({
+        ...prev,
+        description,
+        storySelections: selections,
+        storyCustomOn: customOn,
+        storyCustomText: customText,
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.description;
+        return next;
+      });
+      if (description.length > 1000) {
+        setErrors((prev) => ({
+          ...prev,
+          description: "That's over 1,000 characters. Trim it down a little.",
+        }));
+      }
+    },
+    [data]
+  );
 
   const validate = useCallback(
     (target: number): Record<string, string> => {
@@ -747,21 +837,59 @@ export default function CreateCampaignPage() {
               <div>
                 <Label className="text-base font-semibold">Need a starting point?</Label>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Tap one and edit it — a few personal details go a long way.
+                  Tap any that apply and edit them — a few personal details go a long way.
                 </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  {STORY_TEMPLATES.map(({ id, label, Icon, build }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => update("description", build(data.teamName.trim() || "our team"))}
-                      className={`flex items-center gap-3 p-3 text-left sm:flex-col sm:items-start ${OPTION_TILE} ${OPTION_TILE_OFF}`}
-                    >
-                      <Icon className="h-5 w-5 flex-shrink-0 text-primary" />
-                      <span className="text-sm font-medium text-foreground">{label}</span>
-                    </button>
-                  ))}
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {STORY_TEMPLATES.map(({ id, label, Icon }) => {
+                    const selected = data.storySelections.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() =>
+                          applyStoryChange({
+                            selections: selected
+                              ? data.storySelections.filter((s) => s !== id)
+                              : [...data.storySelections, id],
+                          })
+                        }
+                        aria-pressed={selected}
+                        className={`flex items-center gap-3 p-3 text-left sm:flex-col sm:items-start ${OPTION_TILE} ${
+                          selected ? OPTION_TILE_ON : OPTION_TILE_OFF
+                        }`}
+                      >
+                        <Icon
+                          className={`h-5 w-5 flex-shrink-0 ${selected ? "text-primary" : "text-muted-foreground"}`}
+                        />
+                        <span className="text-sm font-medium text-foreground">{label}</span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => applyStoryChange({ customOn: !data.storyCustomOn })}
+                    aria-pressed={data.storyCustomOn}
+                    className={`flex items-center gap-3 p-3 text-left sm:flex-col sm:items-start ${OPTION_TILE} ${
+                      data.storyCustomOn ? OPTION_TILE_ON : OPTION_TILE_OFF
+                    }`}
+                  >
+                    <Sparkles
+                      className={`h-5 w-5 flex-shrink-0 ${data.storyCustomOn ? "text-primary" : "text-muted-foreground"}`}
+                    />
+                    <span className="text-sm font-medium text-foreground">Something else</span>
+                  </button>
                 </div>
+                {data.storyCustomOn && (
+                  <Input
+                    id="storyCustomText"
+                    value={data.storyCustomText}
+                    onChange={(e) => applyStoryChange({ customText: e.target.value })}
+                    placeholder="e.g. new goals, field paint, a team banquet"
+                    maxLength={120}
+                    autoComplete="off"
+                    className="mt-3 h-11 text-base"
+                  />
+                )}
               </div>
 
               <Field
