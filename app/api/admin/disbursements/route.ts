@@ -38,14 +38,19 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get('status');
     const campaignId = searchParams.get('campaignId');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const rawLimit = parseInt(searchParams.get('limit') || '50');
+    const rawOffset = parseInt(searchParams.get('offset') || '0');
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 100);
+    const offset = Number.isNaN(rawOffset) ? 0 : Math.max(rawOffset, 0);
+    const allowedSortFields = ['createdAt', 'requestedAt', 'requestedAmount', 'status', 'approvedAt'];
+    const requestedSortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortBy = allowedSortFields.includes(requestedSortBy) ? requestedSortBy : 'createdAt';
     const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
     // Build where clause
+    const validStatuses = ['PENDING', 'APPROVED', 'PROCESSING', 'REJECTED', 'COMPLETED', 'CANCELLED'];
     const where: any = {};
-    if (status) where.status = status;
+    if (status && validStatuses.includes(status)) where.status = status;
     if (campaignId) {
       where.bankingAccount = {
         campaignId: campaignId
@@ -111,37 +116,48 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Format response
-    const formattedDisbursements = disbursements.map(d => ({
+    // Format response — canonical shape consumed by /admin and /admin/disbursements.
+    // All money values are integer CENTS (BigInt converted via Number()).
+    const requests = disbursements.map(d => ({
       id: d.id,
-      amount: Number(d.requestedAmount) / 100,
+      campaignId: d.campaignId,
+      requestedAmount: Number(d.requestedAmount),
       purpose: d.purpose,
+      description: d.description,
+      receiptsUrls: d.receiptsUrls,
       status: d.status,
       rejectionReason: d.rejectionReason,
-      campaign: {
-        id: d.bankingAccount.campaign.id,
-        name: `${d.bankingAccount.campaign.teamName} - ${d.bankingAccount.campaign.organizationName}`,
-        slug: d.bankingAccount.campaign.slug,
-        status: d.bankingAccount.campaign.status,
-      },
-      requestedBy: {
+      requestedAt: d.requestedAt,
+      createdAt: d.createdAt,
+      approvedAt: d.approvedAt,
+      disbursementDate: d.disbursementDate,
+      requestedByUser: {
         id: d.requestedByUser.id,
-        name: `${d.requestedByUser.firstName} ${d.requestedByUser.lastName}`,
+        firstName: d.requestedByUser.firstName,
+        lastName: d.requestedByUser.lastName,
         email: d.requestedByUser.email,
       },
-      approvedBy: d.approvedByUser ? {
+      approvedByUser: d.approvedByUser ? {
         id: d.approvedByUser.id,
-        name: `${d.approvedByUser.firstName} ${d.approvedByUser.lastName}`,
+        firstName: d.approvedByUser.firstName,
+        lastName: d.approvedByUser.lastName,
         email: d.approvedByUser.email,
       } : null,
-      createdAt: d.createdAt,
-      requestedAt: d.requestedAt,
-      approvedAt: d.approvedAt,
+      bankingAccount: {
+        availableBalance: Number(d.bankingAccount.availableBalance),
+        campaign: {
+          id: d.bankingAccount.campaign.id,
+          teamName: d.bankingAccount.campaign.teamName,
+          organizationName: d.bankingAccount.campaign.organizationName,
+          slug: d.bankingAccount.campaign.slug,
+          status: d.bankingAccount.campaign.status,
+        },
+      },
     }));
 
     return NextResponse.json({
       success: true,
-      disbursements: formattedDisbursements,
+      requests,
       pagination: {
         total,
         limit,
@@ -149,12 +165,12 @@ export async function GET(req: NextRequest) {
         hasMore: offset + limit < total,
       },
       summary: {
-        totalAmount: Number(stats._sum.requestedAmount || 0) / 100,
+        totalAmount: Number(stats._sum.requestedAmount || 0),
         totalCount: stats._count,
         byStatus: statusCounts.map(s => ({
           status: s.status,
           count: s._count,
-          totalAmount: Number(s._sum.requestedAmount || 0) / 100,
+          totalAmount: Number(s._sum.requestedAmount || 0),
         }))
       }
     });

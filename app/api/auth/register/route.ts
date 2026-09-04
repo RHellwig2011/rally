@@ -1,5 +1,6 @@
 import { registerUser } from "@/lib/auth";
 import { sendEmailVerification } from "@/lib/email";
+import { checkAuthRateLimit } from "@/lib/utils/rate-limiter";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,6 +10,9 @@ const registerSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Terms of Service" }),
+  }),
 });
 
 export async function POST(req: NextRequest) {
@@ -16,7 +20,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = registerSchema.parse(body);
 
-    const { user, verificationToken } = await registerUser(validated);
+    // Bounds account-creation floods and the outbound verification email they
+    // would trigger.
+    const rateLimitCheck = checkAuthRateLimit(req, validated.email);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
+
+    const { user, verificationToken } = await registerUser({
+      ...validated,
+      termsAccepted: true,
+    });
 
     // Send verification email (don't await - let it happen in background)
     sendEmailVerification({
@@ -48,9 +62,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (error instanceof Error && error.message.includes("already in use")) {
+      return NextResponse.json(
+        { success: false, error: "User with this email already exists" },
+        { status: 409 }
+      );
+    }
+
+    console.error("Registration error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Registration failed" },
-      { status: 400 }
+      { success: false, error: "Registration failed. Please try again." },
+      { status: 500 }
     );
   }
 }

@@ -15,8 +15,9 @@ interface Campaign {
   organizationName: string;
   teamName: string;
   description: string;
-  goalAmount: string;
-  currentAmount: string;
+  // Dollar values (the campaign API divides cents by 100 before responding)
+  goalAmount: number;
+  currentAmount: number;
   logoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
@@ -99,10 +100,10 @@ export default function PostersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading campaign...</p>
+          <p className="text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
@@ -110,9 +111,9 @@ export default function PostersPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <Button asChild>
             <Link href="/dashboard">Go to Dashboard</Link>
           </Button>
@@ -121,13 +122,14 @@ export default function PostersPage() {
     );
   }
 
-  const goalAmount = parseInt(campaign.goalAmount);
-  const currentAmount = parseInt(campaign.currentAmount);
+  // API returns dollars; formatCurrency expects cents
+  const goalAmount = Math.round(Number(campaign.goalAmount) * 100);
+  const currentAmount = Math.round(Number(campaign.currentAmount) * 100);
   const percentage = calculatePercentage(currentAmount, goalAmount);
   const size = sizes[selectedSize];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -139,11 +141,11 @@ export default function PostersPage() {
           </Button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
                 <Sparkles className="w-8 h-8 text-primary" />
                 Generate Posters
               </h1>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Create beautiful shareable graphics for your campaign
               </p>
             </div>
@@ -165,13 +167,13 @@ export default function PostersPage() {
                     onClick={() => setSelectedSize(key as keyof typeof sizes)}
                     className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
                       selectedSize === key
-                        ? 'border-primary bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-200'
+                        ? 'border-primary bg-[rgba(200,16,46,.12)]'
+                        : 'border-border hover:border-primary-200'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        selectedSize === key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'
+                        selectedSize === key ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                       }`}>
                         {key === 'instagram' && <Instagram className="w-5 h-5" />}
                         {key === 'facebook' && <Facebook className="w-5 h-5" />}
@@ -179,8 +181,8 @@ export default function PostersPage() {
                         {key === 'story' && <Instagram className="w-5 h-5" />}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{sizeInfo.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="font-semibold text-foreground">{sizeInfo.name}</p>
+                        <p className="text-xs text-muted-foreground">
                           {sizeInfo.width} × {sizeInfo.height}px
                         </p>
                       </div>
@@ -202,8 +204,8 @@ export default function PostersPage() {
                     onClick={() => setSelectedTemplate(template)}
                     className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all capitalize ${
                       selectedTemplate === template
-                        ? 'border-primary bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-200'
+                        ? 'border-primary bg-[rgba(200,16,46,.12)]'
+                        : 'border-border hover:border-primary-200'
                     }`}
                   >
                     {template}
@@ -251,7 +253,7 @@ export default function PostersPage() {
                 <CardTitle>Preview</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-gray-100 rounded-xl p-8 flex items-center justify-center min-h-[600px]">
+                <div className="bg-muted rounded-xl p-8 flex items-center justify-center min-h-[600px]">
                   <div
                     ref={posterRef}
                     className="bg-white shadow-2xl rounded-xl overflow-hidden"
@@ -292,7 +294,7 @@ export default function PostersPage() {
                           <div className="text-sm font-semibold mt-2">{percentage}% funded</div>
                         </div>
 
-                        <div className="bg-white text-gray-900 py-3 px-4 rounded-lg font-bold text-center">
+                        <div className="bg-white text-[#101A2C] py-3 px-4 rounded-lg font-bold text-center">
                           rally.com/{campaign.slug}
                         </div>
                       </div>
@@ -300,21 +302,21 @@ export default function PostersPage() {
 
                     {/* Classic Template */}
                     {selectedTemplate === 'classic' && (
-                      <div className="w-full h-full p-8 flex flex-col justify-center items-center bg-white text-gray-900">
+                      <div className="w-full h-full p-8 flex flex-col justify-center items-center bg-white text-[#101A2C]">
                         {campaign.logoUrl && (
                           <img src={campaign.logoUrl} alt="Logo" className="w-24 h-24 rounded-full mb-6 object-cover" />
                         )}
                         <h2 className="text-4xl font-bold mb-3 text-center">Support {campaign.teamName}</h2>
-                        <p className="text-xl text-gray-600 mb-8 text-center">{campaign.organizationName}</p>
+                        <p className="text-xl text-[#5F6672] mb-8 text-center">{campaign.organizationName}</p>
 
-                        <div className="w-full max-w-md bg-gray-50 rounded-2xl p-6 mb-8">
+                        <div className="w-full max-w-md bg-[#F5F7FA] rounded-2xl p-6 mb-8">
                           <div className="flex justify-between items-baseline mb-4">
                             <div className="text-3xl font-bold" style={{ color: campaign.primaryColor }}>
                               {formatCurrency(currentAmount)}
                             </div>
-                            <div className="text-gray-600">of {formatCurrency(goalAmount)}</div>
+                            <div className="text-[#5F6672]">of {formatCurrency(goalAmount)}</div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+                          <div className="w-full bg-[#E4E8EF] rounded-full h-4 mb-2">
                             <div
                               className="rounded-full h-4 transition-all duration-500"
                               style={{
@@ -323,7 +325,7 @@ export default function PostersPage() {
                               }}
                             ></div>
                           </div>
-                          <div className="text-center text-sm font-semibold text-gray-700">{percentage}% Complete</div>
+                          <div className="text-center text-sm font-semibold text-[#101A2C]">{percentage}% Complete</div>
                         </div>
 
                         <div
@@ -350,8 +352,8 @@ export default function PostersPage() {
                             <div className="text-6xl font-black mb-4" style={{ color: campaign.primaryColor }}>
                               {percentage}%
                             </div>
-                            <div className="text-3xl font-bold text-gray-900 mb-2">FUNDED</div>
-                            <div className="h-2 bg-gray-200 rounded-full mb-6">
+                            <div className="text-3xl font-bold text-[#101A2C] mb-2">FUNDED</div>
+                            <div className="h-2 bg-[#E4E8EF] rounded-full mb-6">
                               <div
                                 className="h-2 rounded-full"
                                 style={{
@@ -363,19 +365,19 @@ export default function PostersPage() {
                           </div>
 
                           <div>
-                            <h2 className="text-4xl font-bold text-gray-900 mb-3">
+                            <h2 className="text-4xl font-bold text-[#101A2C] mb-3">
                               {campaign.organizationName}
                             </h2>
-                            <p className="text-2xl text-gray-700 mb-8">{campaign.teamName}</p>
+                            <p className="text-2xl text-[#101A2C] mb-8">{campaign.teamName}</p>
 
                             <div className="grid grid-cols-2 gap-4 mb-8">
-                              <div className="bg-white p-4 rounded-xl shadow-md">
-                                <div className="text-2xl font-bold text-gray-900">{formatCurrency(currentAmount)}</div>
-                                <div className="text-sm text-gray-600">Raised</div>
+                              <div className="bg-white border border-[#E4E8EF] p-4 rounded-xl shadow-md">
+                                <div className="text-2xl font-bold text-[#101A2C]">{formatCurrency(currentAmount)}</div>
+                                <div className="text-sm text-[#5F6672]">Raised</div>
                               </div>
-                              <div className="bg-white p-4 rounded-xl shadow-md">
-                                <div className="text-2xl font-bold text-gray-900">{formatCurrency(goalAmount)}</div>
-                                <div className="text-sm text-gray-600">Goal</div>
+                              <div className="bg-white border border-[#E4E8EF] p-4 rounded-xl shadow-md">
+                                <div className="text-2xl font-bold text-[#101A2C]">{formatCurrency(goalAmount)}</div>
+                                <div className="text-sm text-[#5F6672]">Goal</div>
                               </div>
                             </div>
 
@@ -392,27 +394,27 @@ export default function PostersPage() {
 
                     {/* Minimal Template */}
                     {selectedTemplate === 'minimal' && (
-                      <div className="w-full h-full p-12 flex flex-col justify-center bg-white">
+                      <div className="w-full h-full p-12 flex flex-col justify-center bg-white text-[#101A2C]">
                         <div className="text-center">
-                          <div className="text-sm uppercase tracking-widest text-gray-500 mb-8">Fundraising Campaign</div>
-                          <h1 className="text-5xl font-light text-gray-900 mb-3">{campaign.teamName}</h1>
-                          <p className="text-xl text-gray-600 mb-12">{campaign.organizationName}</p>
+                          <div className="text-sm uppercase tracking-widest text-[#5F6672] mb-8">Fundraising Campaign</div>
+                          <h1 className="text-5xl font-light text-[#101A2C] mb-3">{campaign.teamName}</h1>
+                          <p className="text-xl text-[#5F6672] mb-12">{campaign.organizationName}</p>
 
                           <div className="max-w-md mx-auto mb-12">
                             <div className="flex justify-between items-baseline mb-3">
-                              <span className="text-4xl font-light text-gray-900">{formatCurrency(currentAmount)}</span>
-                              <span className="text-lg text-gray-500">/ {formatCurrency(goalAmount)}</span>
+                              <span className="text-4xl font-light text-[#101A2C]">{formatCurrency(currentAmount)}</span>
+                              <span className="text-lg text-[#5F6672]">/ {formatCurrency(goalAmount)}</span>
                             </div>
-                            <div className="w-full h-1 bg-gray-200 rounded-full">
+                            <div className="w-full h-1 bg-[#E4E8EF] rounded-full">
                               <div
-                                className="h-1 rounded-full bg-gray-900"
+                                className="h-1 rounded-full bg-[#101A2C]"
                                 style={{ width: `${Math.min(percentage, 100)}%` }}
                               ></div>
                             </div>
                           </div>
 
-                          <div className="border-2 border-gray-900 py-3 px-8 inline-block rounded-full">
-                            <span className="font-semibold text-gray-900">rally.com/{campaign.slug}</span>
+                          <div className="border-2 border-[#101A2C] py-3 px-8 inline-block rounded-full">
+                            <span className="font-semibold text-[#101A2C]">rally.com/{campaign.slug}</span>
                           </div>
                         </div>
                       </div>

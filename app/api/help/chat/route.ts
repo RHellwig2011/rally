@@ -1,5 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { z } from "zod";
+import { checkRouteRateLimit } from "@/lib/utils/with-rate-limit";
+import { RATE_LIMITS } from "@/lib/utils/rate-limiter";
+
+// This route is intentionally anonymous (the public /help page calls it), so
+// the only things standing between it and an unmetered OpenAI bill are the
+// rate limit and these bounds.
+const MAX_MESSAGE_CHARS = 2000;
+const MAX_HISTORY_MESSAGES = 5;
+const MAX_BODY_BYTES = 32 * 1024;
+
+const chatSchema = z.object({
+  message: z.string().trim().min(1).max(MAX_MESSAGE_CHARS),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(MAX_MESSAGE_CHARS),
+      })
+    )
+    .max(50)
+    .optional()
+    .default([]),
+});
 
 const RALLY_CONTEXT = `You are a helpful AI assistant for Rally, a modern fundraising platform for youth teams, clubs, and school groups.
 
@@ -46,8 +70,7 @@ AI FEATURES:
 BANKING & PAYOUTS:
 - Funds held in secure campaign banking accounts
 - Transparent tracking of all transactions
-- Guardian approval required for large withdrawals (configurable threshold)
-- One-click payouts to linked bank account
+- Payouts require a completed Stripe Connect account and BANK_ADMIN approval. Approver cannot be the same person who requested the disbursement.
 - Real-time balance updates
 
 SUPPORT:
@@ -81,22 +104,42 @@ When answering questions:
 
 Remember: You're here to help teams succeed with their fundraising goals!`;
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { message, history = [] } = body;
+    const rateLimitCheck = checkRouteRateLimit(req, RATE_LIMITS.CHAT);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
 
-    if (!message || typeof message !== "string") {
+    // Bound the payload before parsing it, so oversized bodies are rejected
+    // rather than buffered into JSON.parse.
+    const raw = await req.text();
+    if (raw.length > MAX_BODY_BYTES) {
       return NextResponse.json(
-        { success: false, error: "Message is required" },
+        { success: false, error: "Request body is too large" },
+        { status: 413 }
+      );
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(raw);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON body" },
         { status: 400 }
       );
     }
+
+    const parsed = chatSchema.safeParse(parsedBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request" },
+        { status: 400 }
+      );
+    }
+
+    const { message, history } = parsed.data;
 
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -122,16 +165,19 @@ export async function POST(req: NextRequest) {
       },
     ];
 
-    // Add recent history (last 5 messages for context)
-    const recentHistory = history.slice(-5);
-    recentHistory.forEach((msg: Message) => {
-      if (msg.role === "user" || msg.role === "assistant") {
-        messages.push({
-          role: msg.role,
-          content: msg.content,
-        });
-      }
-    });
+    // Only the caller's own turns are replayed. Echoing back client-supplied
+    // "assistant" turns would let anyone fabricate a conversation in which the
+    // assistant already agreed to ignore RALLY_CONTEXT, turning this into a
+    // general-purpose model proxy billed to us.
+    history
+      .filter((msg) => msg.role === "user")
+      .slice(-MAX_HISTORY_MESSAGES)
+      .forEach((msg) => {
+        const content = msg.content.trim();
+        if (content) {
+          messages.push({ role: "user", content });
+        }
+      });
 
     // Add current message
     messages.push({

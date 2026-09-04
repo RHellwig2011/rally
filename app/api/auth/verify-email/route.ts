@@ -28,9 +28,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (
+      error instanceof Error &&
+      error.message === "Invalid or expired verification token"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired verification token" },
+        { status: 400 }
+      );
+    }
+
+    console.error("Email verification error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Email verification failed" },
-      { status: 400 }
+      { success: false, error: "Email verification failed. Please try again." },
+      { status: 500 }
     );
   }
 }

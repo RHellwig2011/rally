@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, calculatePercentage } from "@/lib/utils";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 interface Campaign {
   id: string;
@@ -15,8 +16,9 @@ interface Campaign {
   organizationName: string;
   teamName: string;
   description: string;
-  goalAmount: string;
-  currentAmount: string;
+  // Dollar values (the campaign API divides cents by 100 before responding)
+  goalAmount: number;
+  currentAmount: number;
 }
 
 const messageTypes = [
@@ -44,6 +46,7 @@ export default function MessagesPage() {
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [subject, setSubject] = useState("");
   const [copied, setCopied] = useState(false);
+  const { csrfToken } = useCsrfToken();
 
   useEffect(() => {
     fetchCampaign();
@@ -77,9 +80,10 @@ export default function MessagesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
         },
         body: JSON.stringify({
-          messageType: selectedType,
+          type: selectedType,
           tone: selectedTone,
         }),
       });
@@ -87,9 +91,13 @@ export default function MessagesPage() {
       const data = await response.json();
 
       if (data.success) {
-        setGeneratedMessage(data.message);
-        if (data.subject) {
-          setSubject(data.subject);
+        if (selectedType === "email" && data.message && typeof data.message === "object") {
+          setSubject(data.message.subject || "");
+          setGeneratedMessage(data.message.body || "");
+        } else if (selectedType === "video") {
+          setGeneratedMessage(data.script || "");
+        } else {
+          setGeneratedMessage(typeof data.message === "string" ? data.message : "");
         }
       } else {
         setGeneratedMessage("Failed to generate message. Please try again.");
@@ -114,10 +122,10 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading campaign...</p>
+          <p className="text-muted-foreground">Loading campaign...</p>
         </div>
       </div>
     );
@@ -125,9 +133,9 @@ export default function MessagesPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Campaign Not Found</h1>
           <Button asChild>
             <Link href="/dashboard">Go to Dashboard</Link>
           </Button>
@@ -136,12 +144,13 @@ export default function MessagesPage() {
     );
   }
 
-  const goalAmount = parseInt(campaign.goalAmount);
-  const currentAmount = parseInt(campaign.currentAmount);
-  const percentage = calculatePercentage(currentAmount, goalAmount);
+  // API returns dollars; formatCurrency expects cents
+  const goalAmountCents = Math.round(Number(campaign.goalAmount) * 100);
+  const currentAmountCents = Math.round(Number(campaign.currentAmount) * 100);
+  const percentage = calculatePercentage(currentAmountCents, goalAmountCents);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -153,11 +162,11 @@ export default function MessagesPage() {
           </Button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
                 <Sparkles className="w-8 h-8 text-primary" />
                 AI Message Generator
               </h1>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Create personalized fundraising messages with AI
               </p>
             </div>
@@ -174,21 +183,21 @@ export default function MessagesPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Team</div>
-                  <div className="font-semibold text-gray-900">
+                  <div className="text-sm text-muted-foreground mb-1">Team</div>
+                  <div className="font-semibold text-foreground">
                     {campaign.organizationName} {campaign.teamName}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Progress</div>
-                  <div className="font-semibold text-gray-900">
-                    {formatCurrency(currentAmount)} of {formatCurrency(goalAmount)}
+                  <div className="text-sm text-muted-foreground mb-1">Progress</div>
+                  <div className="font-semibold text-foreground">
+                    {formatCurrency(currentAmountCents)} of {formatCurrency(goalAmountCents)}
                   </div>
                   <div className="text-sm text-primary">{percentage}% funded</div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Campaign URL</div>
-                  <div className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                  <div className="text-sm text-muted-foreground mb-1">Campaign URL</div>
+                  <div className="text-sm font-mono bg-muted px-2 py-1 rounded">
                     rally.com/{campaign.slug}
                   </div>
                 </div>
@@ -210,7 +219,7 @@ export default function MessagesPage() {
                       className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
                         selectedType === type.id
                           ? "border-primary bg-primary-50"
-                          : "border-gray-200 hover:border-primary-200"
+                          : "border-border hover:border-primary-200"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -218,14 +227,14 @@ export default function MessagesPage() {
                           className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                             selectedType === type.id
                               ? "bg-primary text-white"
-                              : "bg-gray-100 text-gray-600"
+                              : "bg-muted text-muted-foreground"
                           }`}
                         >
                           <Icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">{type.label}</p>
-                          <p className="text-xs text-gray-500">{type.description}</p>
+                          <p className="font-semibold text-foreground">{type.label}</p>
+                          <p className="text-xs text-muted-foreground">{type.description}</p>
                         </div>
                       </div>
                     </button>
@@ -247,11 +256,11 @@ export default function MessagesPage() {
                     className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
                       selectedTone === tone.id
                         ? "border-primary bg-primary-50"
-                        : "border-gray-200 hover:border-primary-200"
+                        : "border-border hover:border-primary-200"
                     }`}
                   >
-                    <p className="font-semibold text-gray-900">{tone.label}</p>
-                    <p className="text-xs text-gray-500">{tone.description}</p>
+                    <p className="font-semibold text-foreground">{tone.label}</p>
+                    <p className="text-xs text-muted-foreground">{tone.description}</p>
                   </button>
                 ))}
               </CardContent>
@@ -317,15 +326,15 @@ export default function MessagesPage() {
                     <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Sparkles className="w-10 h-10 text-primary" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
                       Ready to Generate Your Message
                     </h3>
-                    <p className="text-gray-600 max-w-md mx-auto mb-6">
+                    <p className="text-muted-foreground max-w-md mx-auto mb-6">
                       Select your message type and tone, then click "Generate Message" to create
                       a personalized fundraising message powered by AI.
                     </p>
                     <div className="bg-primary-50 rounded-lg p-4 max-w-md mx-auto">
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         <strong>💡 Tip:</strong> Generate multiple versions with different tones
                         to see what resonates best with your audience!
                       </p>
@@ -338,10 +347,10 @@ export default function MessagesPage() {
                     <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Sparkles className="w-10 h-10 text-primary animate-pulse" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
                       Creating Your Message...
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-muted-foreground">
                       Our AI is crafting the perfect message for your campaign
                     </p>
                   </div>
@@ -351,17 +360,17 @@ export default function MessagesPage() {
                   <div className="space-y-4">
                     {subject && (
                       <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                        <label className="text-sm font-semibold text-foreground mb-2 block">
                           Subject Line
                         </label>
-                        <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
-                          <p className="font-semibold text-gray-900">{subject}</p>
+                        <div className="bg-muted rounded-lg p-4 border-2 border-border">
+                          <p className="font-semibold text-foreground">{subject}</p>
                         </div>
                       </div>
                     )}
 
                     <div>
-                      <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                      <label className="text-sm font-semibold text-foreground mb-2 block">
                         Message Body
                       </label>
                       <Textarea
@@ -370,13 +379,13 @@ export default function MessagesPage() {
                         rows={selectedType === "sms" ? 6 : 15}
                         className="font-sans text-base"
                       />
-                      <div className="flex justify-between items-center mt-2 text-sm text-gray-500">
+                      <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                         <span>{generatedMessage.length} characters</span>
                         {selectedType === "sms" && (
                           <span
                             className={
                               generatedMessage.length > 160
-                                ? "text-orange-600 font-semibold"
+                                ? "text-[#E8A33D] font-semibold"
                                 : ""
                             }
                           >
@@ -389,7 +398,7 @@ export default function MessagesPage() {
                     </div>
 
                     <div className="bg-primary-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-foreground">
                         <strong>💡 Pro Tip:</strong> Feel free to edit the message to add your
                         personal touch or specific details before sending!
                       </p>
@@ -412,8 +421,8 @@ export default function MessagesPage() {
                         1
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">Choose Message Type</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="font-semibold text-foreground">Choose Message Type</p>
+                        <p className="text-sm text-muted-foreground">
                           Select email, SMS, social post, or video script based on how you'll reach supporters
                         </p>
                       </div>
@@ -423,8 +432,8 @@ export default function MessagesPage() {
                         2
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">Select Tone</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="font-semibold text-foreground">Select Tone</p>
+                        <p className="text-sm text-muted-foreground">
                           Pick the tone that matches your relationship with your audience
                         </p>
                       </div>
@@ -434,8 +443,8 @@ export default function MessagesPage() {
                         3
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">Generate & Customize</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="font-semibold text-foreground">Generate & Customize</p>
+                        <p className="text-sm text-muted-foreground">
                           Let AI create your message, then edit it to make it perfect
                         </p>
                       </div>
@@ -445,8 +454,8 @@ export default function MessagesPage() {
                         4
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">Copy & Send</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="font-semibold text-foreground">Copy & Send</p>
+                        <p className="text-sm text-muted-foreground">
                           Copy the message and paste it into your email or SMS tool
                         </p>
                       </div>

@@ -1,21 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuthStore } from "@/lib/store/authStore";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
-export default function SignupPage() {
+/**
+ * Mirrors the role routing in app/(auth)/login/page.tsx. Kept in step by hand:
+ * signup lands people in the same place a fresh sign-in would.
+ *
+ * `?redirect=` wins when it is a same-site path (e.g. a coach sent here from
+ * the create-campaign wizard's sign-in gate must land back in the wizard).
+ * Same isSameSitePath rule as the login page: "//evil.com" and backslash
+ * variants resolve off-origin, so reject anything but a plain local path.
+ */
+function isSameSitePath(redirect: string) {
+  return (
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    !redirect.includes("\\")
+  );
+}
+
+function destinationFor(role: string | undefined, redirect: string | null) {
+  if (redirect && isSameSitePath(redirect)) return redirect;
+  if (role === "ADMIN" || role === "BANK_ADMIN") return "/admin";
+  if (role === "PLAYER") return "/player";
+  return "/campaigns";
+}
+
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const setUser = useAuthStore((state) => state.setUser);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
+    acceptedTerms: false,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +68,11 @@ export default function SignupPage() {
       return;
     }
 
+    if (!formData.acceptedTerms) {
+      setError("You must accept the Terms of Service and Privacy Policy");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -50,7 +84,8 @@ export default function SignupPage() {
           lastName: formData.lastName,
           email: formData.email,
           password: formData.password,
-          role: "CAMPAIGN_LEADER", // Default role for new signups
+          role: "CAMPAIGN_LEADER",
+          acceptedTerms: true,
         }),
       });
 
@@ -60,8 +95,39 @@ export default function SignupPage() {
         throw new Error(data.error || "Signup failed");
       }
 
-      // Show success message and redirect to login
-      router.push("/login?message=Account created! Please sign in.");
+      // They just chose a password — making them type it again on a login
+      // screen is a step for nothing. Sign them in with the same credentials
+      // and only fall back to /login if that second call fails.
+      try {
+        const loginResponse = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        const loginData = await loginResponse.json();
+
+        if (loginResponse.ok) {
+          if (loginData.user) {
+            setUser(loginData.user);
+          }
+          router.push(destinationFor(loginData.user?.role, searchParams?.get("redirect") ?? null));
+          router.refresh();
+          return;
+        }
+      } catch (loginErr) {
+        console.error("Auto sign-in after signup failed:", loginErr);
+      }
+
+      // ?created=1 rather than a raw sentence in the query string; login owns
+      // the copy. Preserve ?redirect= so the wizard gate round-trips.
+      const redirect = searchParams?.get("redirect");
+      router.push(
+        `/login?created=1${redirect && isSameSitePath(redirect) ? `&redirect=${encodeURIComponent(redirect)}` : ""}`
+      );
     } catch (err: any) {
       setError(err.message || "Failed to create account");
     } finally {
@@ -70,23 +136,29 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-50 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
+      {/* No opaque background here — the global Atmosphere (floodlights,
+          grain) must show through; body carries the night background. */}
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">R</span>
+              <span className="text-white font-display font-bold text-xl">BB</span>
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-center">Create your account</CardTitle>
+          <CardTitle className="font-display text-2xl font-semibold text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Start your fundraising campaign today
+            For coaches and team parents. Players usually join from a link the
+            coach sends.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div
+                role="alert"
+                className="bg-warning-light border border-warning text-warning-dark px-4 py-3 rounded-lg text-sm"
+              >
                 {error}
               </div>
             )}
@@ -155,7 +227,7 @@ export default function SignupPage() {
                 disabled={loading}
                 className="h-12"
               />
-              <p className="text-xs text-gray-500">Must be at least 8 characters</p>
+              <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
             </div>
 
             <div className="space-y-2">
@@ -174,6 +246,31 @@ export default function SignupPage() {
               />
             </div>
 
+            <div className="flex items-start gap-2 text-sm">
+              <input
+                id="acceptedTerms"
+                name="acceptedTerms"
+                type="checkbox"
+                className="mt-1"
+                checked={formData.acceptedTerms}
+                onChange={(e) =>
+                  setFormData({ ...formData, acceptedTerms: e.target.checked })
+                }
+                required
+                disabled={loading}
+              />
+              <Label htmlFor="acceptedTerms" className="font-normal leading-snug">
+                I agree to the{" "}
+                <Link href="/terms" className="text-primary-300 hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="text-primary-300 hover:underline">
+                  Privacy Policy
+                </Link>
+              </Label>
+            </div>
+
             <Button
               type="submit"
               className="w-full"
@@ -182,29 +279,31 @@ export default function SignupPage() {
               {loading ? "Creating account..." : "Create account"}
             </Button>
 
-            <div className="text-center text-xs text-gray-500 mt-4">
+            <OAuthButtons redirect={searchParams?.get("redirect")} />
+
+            <div className="text-center text-xs text-muted-foreground mt-4">
               By signing up, you agree to our{" "}
-              <Link href="/terms" className="text-primary hover:underline">
+              <Link href="/terms" className="text-primary-300 hover:underline">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="text-primary hover:underline">
+              <Link href="/privacy" className="text-primary-300 hover:underline">
                 Privacy Policy
               </Link>
             </div>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-2 text-gray-500">or</span>
-              </div>
+            <div className="my-4 flex items-center gap-3 text-sm">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-muted-foreground">or</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
 
             <div className="text-center text-sm">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary font-semibold hover:underline">
+              <Link
+                href={`/login${searchParams?.get("redirect") ? `?redirect=${encodeURIComponent(searchParams.get("redirect")!)}` : ""}`}
+                className="text-primary-300 font-semibold hover:underline"
+              >
                 Sign in
               </Link>
             </div>
@@ -212,5 +311,14 @@ export default function SignupPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  // useSearchParams() needs a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   );
 }

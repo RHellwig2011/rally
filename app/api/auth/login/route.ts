@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginUser } from "@/lib/auth";
+import { loginUser, ACCESS_TOKEN_MAX_AGE_SEC, REFRESH_COOKIE_MAX_AGE_SEC } from "@/lib/auth";
+import {
+  checkLoginRateLimit,
+  recordFailedLogin,
+  clearFailedLogins,
+} from "@/lib/utils/rate-limiter";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -12,16 +17,27 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = loginSchema.parse(body);
 
-    const ip = (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "") as string;
-    const result = await loginUser(validated.email, validated.password, ip);
+    // Throttle before spending a bcrypt comparison on the submitted password.
+    const rateLimitCheck = checkLoginRateLimit(req, validated.email);
+    if (rateLimitCheck.limited) {
+      return rateLimitCheck.response!;
+    }
 
-    // For MVP, we'll skip email verification check
-    // if (!result.user.emailVerified) {
-    //   return NextResponse.json(
-    //     { success: false, error: "Please verify your email before logging in" },
-    //     { status: 401 }
-    //   );
-    // }
+    const ip = (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "") as string;
+
+    let result;
+    try {
+      result = await loginUser(validated.email, validated.password, ip);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Invalid credentials") {
+        recordFailedLogin(validated.email);
+      }
+      throw err;
+    }
+
+    // Correct password: release the account's failed-attempt budget so a
+    // guesser cannot keep a legitimate user locked out.
+    clearFailedLogins(validated.email);
 
     const response = NextResponse.json(
       {
@@ -32,11 +48,14 @@ export async function POST(req: NextRequest) {
     );
 
     // Set secure cookies
+    // Keep these attributes identical to the ones /api/auth/refresh re-issues,
+    // otherwise a refreshed session lands on a different cookie scope.
     response.cookies.set("sessionToken", result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: "/",
+      maxAge: ACCESS_TOKEN_MAX_AGE_SEC,
     });
 
     if (result.refresh) {
@@ -44,7 +63,7 @@ export async function POST(req: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: REFRESH_COOKIE_MAX_AGE_SEC,
         sameSite: "lax",
       });
     }
@@ -58,9 +77,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (error instanceof Error && error.message === "Invalid credentials") {
+      return NextResponse.json(
+        { success: false, error: "Invalid email or password" },
+        { status: 401 }
+      );
+    }
+
+    console.error("Login error:", error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Login failed" },
-      { status: 401 }
+      { success: false, error: "An error occurred. Please try again." },
+      { status: 500 }
     );
   }
 }

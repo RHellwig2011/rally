@@ -3,6 +3,7 @@ import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { checkCsrf } from "@/lib/csrf";
+import { runMoneyTransaction } from "@/lib/donations";
 
 const rejectSchema = z.object({
   reason: z.string().min(10, "Please provide a detailed reason for rejection").max(500),
@@ -40,18 +41,19 @@ export async function PUT(
       );
     }
 
-    // Check authorization - only BANK_ADMIN
-    if (user.role !== 'BANK_ADMIN') {
+    // Check authorization - only BANK_ADMIN or ADMIN
+    if (user.role !== 'BANK_ADMIN' && user.role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: "Only BANK_ADMIN can reject disbursements" },
+        { success: false, error: "Only banking admins can reject disbursements" },
         { status: 403 }
       );
     }
 
     const requestId = params.requestId;
 
-    // Parse request body
-    const body = await req.json();
+    // Parse request body (an absent/malformed body must surface as a 400
+    // validation error, not a 500 from the JSON parser)
+    const body = await req.json().catch(() => ({}));
     const validatedData = rejectSchema.parse(body);
 
     // Get disbursement request
@@ -105,11 +107,15 @@ export async function PUT(
       );
     }
 
-    // Process rejection in transaction
-    await prisma.$transaction(async (tx) => {
-      // Update disbursement request
-      await tx.disbursementRequest.update({
-        where: { id: requestId },
+    // Process rejection in transaction. The conditional updateMany is the
+    // concurrency guard: only one caller ever transitions PENDING -> REJECTED,
+    // so a double-click cannot release the pendingDisbursement reservation
+    // twice (which would drive the running balance negative). Lock contention
+    // against concurrent writers of the same BankingAccount row is retried
+    // rather than surfaced as a 500.
+    const rejected = await runMoneyTransaction(async (tx) => {
+      const transitioned = await tx.disbursementRequest.updateMany({
+        where: { id: requestId, status: 'PENDING' },
         data: {
           status: 'REJECTED',
           rejectionReason: validatedData.reason,
@@ -118,7 +124,11 @@ export async function PUT(
         }
       });
 
-      // Return funds to available balance
+      if (transitioned.count === 0) {
+        return false;
+      }
+
+      // Release the reservation held against the account
       await tx.bankingAccount.update({
         where: { id: disbursementRequest.bankingAccountId },
         data: {
@@ -127,7 +137,16 @@ export async function PUT(
           }
         }
       });
+
+      return true;
     });
+
+    if (!rejected) {
+      return NextResponse.json(
+        { success: false, error: "Disbursement request has already been processed" },
+        { status: 400 }
+      );
+    }
 
     // Send notification to campaign leader
     const campaign = disbursementRequest.bankingAccount.campaign;
@@ -185,11 +204,9 @@ export async function PUT(
       );
     }
 
+    // Never surface raw error text to the caller
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to reject disbursement"
-      },
+      { success: false, error: "Failed to reject disbursement" },
       { status: 500 }
     );
   }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Save,
   Loader2,
@@ -14,10 +13,16 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Kicker, PageTitle, SiteHeader, TeamChip } from "@/components/app-chrome";
+
+// Card section heads (BRIEF §2): uppercase Archivo at component-head scale.
+const SECTION_TITLE =
+  "text-[15px] font-extrabold uppercase tracking-[0.04em]";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 interface TeamMemberProfile {
   id: string;
@@ -42,6 +47,7 @@ export default function PlayerProfileEditor() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { csrfToken } = useCsrfToken();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [profile, setProfile] = useState<TeamMemberProfile | null>(null);
@@ -53,7 +59,7 @@ export default function PlayerProfileEditor() {
     position: "",
     grade: "",
     favoriteQuote: "",
-    isProfilePublic: true,
+    isProfilePublic: false,
   });
 
   useEffect(() => {
@@ -101,7 +107,10 @@ export default function PlayerProfileEditor() {
       setIsSaving(true);
       const res = await fetch(`/api/team-members/${params?.teamMemberId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
         body: JSON.stringify(formData),
       });
 
@@ -132,10 +141,10 @@ export default function PlayerProfileEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-muted-foreground">Loading profile...</p>
         </div>
       </div>
     );
@@ -143,9 +152,9 @@ export default function PlayerProfileEditor() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Profile not found</p>
+          <p className="text-warning mb-4">Profile not found</p>
           <Button onClick={() => router.push('/player')}>Go to Dashboard</Button>
         </div>
       </div>
@@ -155,58 +164,44 @@ export default function PlayerProfileEditor() {
   const playerPageUrl = `/raise/${profile.campaign.slug}/player/${profile.id}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/player" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-              >
-                <Link href={playerPageUrl} target="_blank">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview Page
-                  <ExternalLink className="w-3 h-3 ml-1" />
-                </Link>
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                size="sm"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader
+        left={
+          <TeamChip className="hidden sm:inline-flex">
+            {profile.campaign.organizationName} · {profile.campaign.teamName}
+          </TeamChip>
+        }
+      >
+        <Button variant="outline" size="sm" asChild>
+          <Link href={playerPageUrl} target="_blank">
+            <Eye className="w-4 h-4 mr-2" />
+            Preview Page
+            <ExternalLink className="w-3 h-3 ml-1" />
+          </Link>
+        </Button>
+        <Button onClick={handleSave} disabled={isSaving} size="sm">
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
+      </SiteHeader>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* BRIEF §4 screen 07: centered narrow column. */}
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Edit Your Profile
-          </h1>
-          <p className="text-gray-600">
+          <Kicker tone="team">My page</Kicker>
+          <PageTitle className="mb-2 mt-2">Edit Your Profile</PageTitle>
+          <p className="text-muted-foreground">
             Customize your fundraising page for {profile.campaign.organizationName} {profile.campaign.teamName}
           </p>
         </div>
@@ -215,28 +210,30 @@ export default function PlayerProfileEditor() {
           {/* Profile Photo */}
           <Card>
             <CardHeader>
-              <CardTitle>Profile Photo</CardTitle>
+              <CardTitle className={SECTION_TITLE}>Profile Photo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.profilePhotoUrl && (
                 <div className="relative w-40 h-40">
-                  <Image
+                  {/* User-supplied remote URL: plain <img>, not next/image */}
+                  <img
                     src={formData.profilePhotoUrl}
                     alt="Profile photo"
                     width={160}
                     height={160}
-                    className="w-full h-full rounded-full object-cover border-4 border-gray-200"
+                    loading="lazy"
+                    className="h-full w-full rounded-full border-2 border-white/15 object-cover shadow-card"
                   />
                   <button
                     onClick={() => setFormData({ ...formData, profilePhotoUrl: "" })}
-                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute right-0 top-0 rounded-full bg-destructive p-1 text-white shadow-[0_0_14px_rgba(242,97,75,.5)] transition-transform duration-200 ease-spring hover:brightness-110 active:scale-95"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               )}
               <div>
-                <Label htmlFor="profilePhotoUrl">Photo URL</Label>
+                <Label htmlFor="profilePhotoUrl">Link to a photo of you</Label>
                 <Input
                   id="profilePhotoUrl"
                   type="url"
@@ -246,8 +243,10 @@ export default function PlayerProfileEditor() {
                     setFormData({ ...formData, profilePhotoUrl: e.target.value })
                   }
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Upload your photo to a service like Imgur or use a direct image URL
+                <p className="text-sm text-muted-foreground mt-1">
+                  Ask a parent: open the photo in Google Photos or iCloud, tap
+                  Share &rarr; Copy Link, paste it here. A school portrait link
+                  works too.
                 </p>
               </div>
             </CardContent>
@@ -256,7 +255,7 @@ export default function PlayerProfileEditor() {
           {/* Profile Video */}
           <Card>
             <CardHeader>
-              <CardTitle>Profile Video (Optional)</CardTitle>
+              <CardTitle className={SECTION_TITLE}>Profile Video (Optional)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.profileVideoUrl && (
@@ -270,14 +269,14 @@ export default function PlayerProfileEditor() {
                   </video>
                   <button
                     onClick={() => setFormData({ ...formData, profileVideoUrl: "" })}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute right-2 top-2 rounded-full bg-destructive p-1 text-white shadow-[0_0_14px_rgba(242,97,75,.5)] transition-transform duration-200 ease-spring hover:brightness-110 active:scale-95"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               )}
               <div>
-                <Label htmlFor="profileVideoUrl">Video URL</Label>
+                <Label htmlFor="profileVideoUrl">Link to a video of you</Label>
                 <Input
                   id="profileVideoUrl"
                   type="url"
@@ -287,8 +286,9 @@ export default function PlayerProfileEditor() {
                     setFormData({ ...formData, profileVideoUrl: e.target.value })
                   }
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Share a video introduction or message to your supporters
+                <p className="text-sm text-muted-foreground mt-1">
+                  Same idea as the photo: record a quick hello, then paste the
+                  share link here.
                 </p>
               </div>
             </CardContent>
@@ -297,7 +297,7 @@ export default function PlayerProfileEditor() {
           {/* Personal Story */}
           <Card>
             <CardHeader>
-              <CardTitle>Your Story</CardTitle>
+              <CardTitle className={SECTION_TITLE}>Your Story</CardTitle>
             </CardHeader>
             <CardContent>
               <Label htmlFor="personalStory">Tell supporters about yourself and why you're fundraising</Label>
@@ -311,7 +311,7 @@ export default function PlayerProfileEditor() {
                 }
                 className="mt-2"
               />
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 {formData.personalStory.length} characters
               </p>
             </CardContent>
@@ -320,7 +320,7 @@ export default function PlayerProfileEditor() {
           {/* Additional Info */}
           <Card>
             <CardHeader>
-              <CardTitle>Additional Information</CardTitle>
+              <CardTitle className={SECTION_TITLE}>Additional Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -366,7 +366,7 @@ export default function PlayerProfileEditor() {
           {/* Privacy */}
           <Card>
             <CardHeader>
-              <CardTitle>Privacy Settings</CardTitle>
+              <CardTitle className={SECTION_TITLE}>Privacy Settings</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center space-x-2">
@@ -377,13 +377,13 @@ export default function PlayerProfileEditor() {
                   onChange={(e) =>
                     setFormData({ ...formData, isProfilePublic: e.target.checked })
                   }
-                  className="rounded border-gray-300"
+                  className="h-[18px] w-[18px] rounded border-white/20 bg-white/[0.05] accent-[#22C48B]"
                 />
                 <Label htmlFor="isProfilePublic" className="font-normal">
-                  Make my profile page public (recommended for fundraising)
+                  Show my page to anyone with the link (needed so family can give)
                 </Label>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 When public, anyone with your link can view your fundraising page
               </p>
             </CardContent>

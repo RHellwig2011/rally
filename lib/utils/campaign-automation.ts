@@ -5,6 +5,8 @@
 
 import prisma from "@/lib/prisma";
 import { sendCampaignStatusChangeNotification } from "@/lib/email";
+import { processScheduledOutreach } from "@/lib/outreach";
+import { nextStretchGoalAmount } from "@/lib/stretch-goal";
 
 /**
  * Check and auto-complete campaigns that have reached their end date
@@ -282,6 +284,67 @@ export async function checkCampaignHealth(): Promise<{
 }
 
 /**
+ * Stretch goals on ACTIVE campaigns that opted into autoStretchGoal.
+ *
+ * Concurrent-tick safe: updateMany is keyed on the observed goalAmount, so a
+ * second tick that still sees the old goal is a no-op.
+ */
+export async function applyAutoStretchGoals(): Promise<{
+  stretched: number;
+  errors: number;
+}> {
+  const stats = { stretched: 0, errors: 0 };
+
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      status: "ACTIVE",
+      autoStretchGoal: true,
+    },
+    select: {
+      id: true,
+      currentAmount: true,
+      goalAmount: true,
+      originalGoalAmount: true,
+      stretchGoalPercent: true,
+      stretchGoalTriggerPercent: true,
+    },
+  });
+
+  for (const campaign of campaigns) {
+    try {
+      const next = nextStretchGoalAmount({
+        currentAmount: campaign.currentAmount,
+        goalAmount: campaign.goalAmount,
+        originalGoalAmount: campaign.originalGoalAmount,
+        stretchPercent: campaign.stretchGoalPercent,
+        triggerPercent: campaign.stretchGoalTriggerPercent,
+      });
+      if (next === null) continue;
+
+      const original = campaign.originalGoalAmount ?? campaign.goalAmount;
+      const result = await prisma.campaign.updateMany({
+        where: {
+          id: campaign.id,
+          goalAmount: campaign.goalAmount,
+          autoStretchGoal: true,
+          status: "ACTIVE",
+        },
+        data: {
+          goalAmount: next,
+          originalGoalAmount: original,
+        },
+      });
+      if (result.count === 1) stats.stretched++;
+    } catch (error) {
+      console.error(`Failed to stretch goal for campaign ${campaign.id}:`, error);
+      stats.errors++;
+    }
+  }
+
+  return stats;
+}
+
+/**
  * Run all automated campaign checks
  * This is the main function to call from a cron job
  */
@@ -290,6 +353,10 @@ export async function runCampaignAutomation(): Promise<{
   reminders: number;
   warnings: number;
   errors: number;
+  outreachClaimed: number;
+  outreachSent: number;
+  outreachFailed: number;
+  goalsStretched: number;
 }> {
   console.log('🤖 Running campaign automation...');
 
@@ -298,6 +365,10 @@ export async function runCampaignAutomation(): Promise<{
     reminders: 0,
     warnings: 0,
     errors: 0,
+    outreachClaimed: 0,
+    outreachSent: 0,
+    outreachFailed: 0,
+    goalsStretched: 0,
   };
 
   try {
@@ -314,6 +385,16 @@ export async function runCampaignAutomation(): Promise<{
     // Check campaign health
     const healthResults = await checkCampaignHealth();
     results.warnings = healthResults.warnings.length;
+
+    // Due SCHEDULED outreach — claim SCHEDULED→SENDING then deliver.
+    const outreachResults = await processScheduledOutreach();
+    results.outreachClaimed = outreachResults.claimed;
+    results.outreachSent = outreachResults.sent;
+    results.outreachFailed = outreachResults.failed;
+
+    const stretchResults = await applyAutoStretchGoals();
+    results.goalsStretched = stretchResults.stretched;
+    results.errors += stretchResults.errors;
 
     console.log('✅ Campaign automation complete:', results);
     return results;

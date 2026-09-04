@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
+import { checkCsrf } from "@/lib/csrf";
 
 // Validation schema for a single contact
 const contactSchema = z.object({
@@ -26,6 +27,12 @@ const importContactsSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Verify authentication (throws if not authenticated)
     const user = await verifyAuth(req);
 
@@ -33,8 +40,8 @@ export async function POST(req: NextRequest) {
     const validatedData = importContactsSchema.parse(body);
 
     // Verify user owns this team member record
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: validatedData.teamMemberId },
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { id: validatedData.teamMemberId, deletedAt: null },
     });
 
     if (!teamMember) {
@@ -116,6 +123,11 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure - return it as-is
+    if (error instanceof NextResponse) {
+      return error;
+    }
+
     console.error("Contact import error:", error);
 
     if (error instanceof z.ZodError) {
@@ -132,11 +144,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Detail is logged above; don't leak internal error messages to the client.
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to import contacts",
-      },
+      { success: false, error: "Failed to import contacts" },
       { status: 500 }
     );
   }
@@ -162,8 +172,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Verify ownership
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: teamMemberId },
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { id: teamMemberId, deletedAt: null },
     });
 
     if (!teamMember) {
@@ -186,15 +196,28 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
+    // Contact.donationAmount is a BigInt - JSON.stringify throws on BigInt,
+    // so convert to Number before responding
+    const serializedContacts = contacts.map((contact) => ({
+      ...contact,
+      donationAmount:
+        contact.donationAmount === null ? null : Number(contact.donationAmount),
+    }));
+
     return NextResponse.json(
       {
         success: true,
-        contacts,
+        contacts: serializedContacts,
         total: contacts.length,
       },
       { status: 200 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure - return it as-is
+    if (error instanceof NextResponse) {
+      return error;
+    }
+
     console.error("Failed to fetch contacts:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch contacts" },

@@ -63,7 +63,12 @@ export const updateTeamMemberSchema = z.object({
     .trim()
     .optional(),
 
-  // NOTE: Email cannot be changed (for consistency)
+  // Email is updated in place (H6). A live (campaignId, email) collision is a
+  // 409 at the handler; the schema only validates format.
+  email: z.preprocess(
+    (val) => typeof val === 'string' ? val.trim().toLowerCase() : val,
+    z.string().email("Invalid email format")
+  ).optional(),
 
   personalGoal: z.number()
     .positive("Personal goal must be greater than zero")
@@ -120,7 +125,7 @@ export const listTeamMembersQuerySchema = z.object({
     .default("desc")
     .optional(),
 
-  status: z.enum(["all", "pending", "accepted", "rejected"])
+  status: z.enum(["all", "pending", "accepted", "email_failed", "expired"])
     .default("all")
     .optional(),
 

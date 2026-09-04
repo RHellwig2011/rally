@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUserFromToken } from "@/lib/auth";
 
 /**
  * GET /api/campaigns/[campaignId]/recent-donations
  * Get recent donation activity feed for a campaign
  * Returns last 20 donations with donor info (respecting anonymity)
+ *
+ * PRIVATE: this feed carries donor names, amounts, donor messages and the
+ * supported player's name. Its only consumer is the campaign owner's dashboard
+ * (app/dashboard/[campaignId]/page.tsx), so it is restricted to the campaign
+ * leader, its guardians, and admins. The public campaign page uses the
+ * anonymity-scrubbed /api/donations feed instead.
  */
 export async function GET(
   req: NextRequest,
@@ -13,18 +20,41 @@ export async function GET(
   try {
     const campaignId = params.campaignId;
 
-    // Parse query parameters
+    // Parse query parameters (NaN-guarded and clamped)
     const searchParams = req.nextUrl.searchParams;
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const rawLimit = parseInt(searchParams.get('limit') || '20');
+    const rawOffset = parseInt(searchParams.get('offset') || '0');
+    const limit = Number.isNaN(rawLimit) ? 20 : Math.min(Math.max(rawLimit, 1), 100);
+    const offset = Number.isNaN(rawOffset) ? 0 : Math.max(rawOffset, 0);
 
-    // Verify campaign exists
+    // Authentication
+    const sessionToken = req.cookies.get("sessionToken")?.value;
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserFromToken(sessionToken);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
+
+    // Verify campaign exists (guardians included for the ownership check only)
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       select: {
         id: true,
         teamName: true,
         organizationName: true,
+        primaryLeaderId: true,
+        guardians: { select: { id: true } },
       }
     });
 
@@ -32,6 +62,19 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
+      );
+    }
+
+    // Authorization: campaign leader, guardian, or admin only.
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      campaign.guardians.some((g) => g.id === user.id) ||
+      user.role === "ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized" },
+        { status: 403 }
       );
     }
 
@@ -45,7 +88,6 @@ export async function GET(
         id: true,
         grossAmount: true,
         donorName: true,
-        donorEmail: true,
         donorMessage: true,
         isAnonymous: true,
         createdAt: true,
@@ -170,11 +212,9 @@ export async function GET(
 
   } catch (error) {
     console.error("Failed to fetch recent donations:", error);
+    // Never surface raw error/Prisma messages to the caller.
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch recent donations"
-      },
+      { success: false, error: "Failed to fetch recent donations" },
       { status: 500 }
     );
   }

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { checkCsrf } from "@/lib/csrf";
 
 const updateRoleSchema = z.object({
-  role: z.enum(['DONOR', 'PLAYER', 'CAMPAIGN_LEADER', 'ADMIN', 'BANK_ADMIN']),
+  role: z.enum(['DONOR', 'PLAYER', 'TEAM_MEMBER', 'CAMPAIGN_LEADER', 'GUARDIAN', 'ADMIN', 'BANK_ADMIN']),
   reason: z.string().optional(),
 });
 
@@ -17,6 +18,12 @@ export async function PUT(
   { params }: { params: { userId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -103,21 +110,39 @@ export async function PUT(
       }
     }
 
-    // Update user role
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        role: validatedData.role,
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        updatedAt: true,
-      }
+    // Update user role and evict the old sessions in one step
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          role: validatedData.role,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          updatedAt: true,
+        }
+      });
+
+      // The role is baked into the signed sessionToken, so an already-issued
+      // token keeps asserting the OLD role for its full 30 days — and
+      // rotateRefreshToken would keep minting fresh ones from it. A demotion
+      // that leaves the user's previous privileges live is not a demotion.
+      // Mirrors the mass-revoke in resetPassword (lib/auth.ts).
+      await tx.refreshToken.updateMany({
+        where: { userId, revoked: false },
+        data: {
+          revoked: true,
+          revokedAt: new Date(),
+          reason: "role_change",
+        },
+      });
+
+      return updated;
     });
 
     // Log the role change
@@ -166,7 +191,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update user role"
+        error: "Failed to update user role"
       },
       { status: 500 }
     );

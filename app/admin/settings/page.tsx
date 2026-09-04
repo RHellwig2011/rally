@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useCsrfToken } from "@/hooks/useCsrfToken";
 
 interface PlatformSettings {
   platformFeePercent: number;
@@ -27,6 +28,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { csrfToken } = useCsrfToken();
 
   useEffect(() => {
     fetchSettings();
@@ -68,6 +70,7 @@ export default function AdminSettingsPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
         },
         body: JSON.stringify(settings),
       });
@@ -98,7 +101,7 @@ export default function AdminSettingsPage() {
 
   function updateSuggestedAmount(index: number, value: number) {
     if (!settings) return;
-    const newAmounts = [...settings.suggestedAmounts];
+    const newAmounts = [...(settings.suggestedAmounts ?? [])];
     newAmounts[index] = value;
     setSettings({ ...settings, suggestedAmounts: newAmounts });
   }
@@ -108,7 +111,7 @@ export default function AdminSettingsPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-gray-600">Loading settings...</p>
+          <p className="text-muted-foreground">Loading settings...</p>
         </div>
       </div>
     );
@@ -119,8 +122,8 @@ export default function AdminSettingsPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-gray-900 font-semibold mb-2">Failed to load settings</p>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-foreground font-semibold mb-2">Failed to load settings</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Button onClick={() => fetchSettings()}>Retry</Button>
         </div>
       </div>
@@ -131,27 +134,27 @@ export default function AdminSettingsPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+        <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
           <Settings className="w-8 h-8" />
           Platform Settings
         </h1>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Configure global platform settings and preferences
         </p>
       </div>
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-green-600" />
-          <p className="text-green-800 font-medium">Settings saved successfully!</p>
+        <div className="mb-6 bg-success-light border border-success rounded-lg p-4 flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-success" />
+          <p className="text-success-dark font-medium">Settings saved successfully!</p>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
+        <div className="mb-6 bg-warning-light border border-warning rounded-lg p-4 flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-warning" />
+          <p className="text-warning-dark font-medium">{error}</p>
         </div>
       )}
 
@@ -178,12 +181,12 @@ export default function AdminSettingsPage() {
                   max="100"
                   step="0.1"
                   value={settings?.platformFeePercent || 0}
-                  onChange={(e) => updateSetting("platformFeePercent", parseFloat(e.target.value))}
+                  onChange={(e) => updateSetting("platformFeePercent", parseFloat(e.target.value) || 0)}
                   className="max-w-xs"
                 />
-                <span className="text-gray-600">%</span>
+                <span className="text-muted-foreground">%</span>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Percentage fee charged on all donations
               </p>
             </div>
@@ -196,7 +199,7 @@ export default function AdminSettingsPage() {
                   type="number"
                   min="1"
                   value={settings?.minDonationAmount || 0}
-                  onChange={(e) => updateSetting("minDonationAmount", parseInt(e.target.value))}
+                  onChange={(e) => updateSetting("minDonationAmount", parseInt(e.target.value) || 0)}
                   className="mt-1"
                 />
               </div>
@@ -208,7 +211,7 @@ export default function AdminSettingsPage() {
                   type="number"
                   min="1"
                   value={settings?.maxDonationAmount || 0}
-                  onChange={(e) => updateSetting("maxDonationAmount", parseInt(e.target.value))}
+                  onChange={(e) => updateSetting("maxDonationAmount", parseInt(e.target.value) || 0)}
                   className="mt-1"
                 />
               </div>
@@ -217,17 +220,17 @@ export default function AdminSettingsPage() {
             <div>
               <Label>Suggested Donation Amounts ($)</Label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-                {settings?.suggestedAmounts.map((amount, index) => (
+                {settings?.suggestedAmounts?.map((amount, index) => (
                   <Input
                     key={index}
                     type="number"
                     min="1"
                     value={amount}
-                    onChange={(e) => updateSuggestedAmount(index, parseInt(e.target.value))}
+                    onChange={(e) => updateSuggestedAmount(index, parseInt(e.target.value) || 0)}
                   />
                 ))}
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Quick-select amounts shown to donors
               </p>
             </div>
@@ -254,10 +257,10 @@ export default function AdminSettingsPage() {
                 min="1"
                 max="100"
                 value={settings?.maxFileUploadSize || 0}
-                onChange={(e) => updateSetting("maxFileUploadSize", parseInt(e.target.value))}
+                onChange={(e) => updateSetting("maxFileUploadSize", parseInt(e.target.value) || 0)}
                 className="mt-1 max-w-xs"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Maximum file size for uploads (images, documents, etc.)
               </p>
             </div>
@@ -354,7 +357,7 @@ export default function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-[rgba(232,163,61,.08)] border border-[rgba(232,163,61,.4)] rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -367,7 +370,7 @@ export default function AdminSettingsPage() {
                   Maintenance Mode
                 </Label>
               </div>
-              <p className="text-sm text-yellow-800 mt-2">
+              <p className="text-sm text-[#E8A33D] mt-2">
                 When enabled, the platform will show a maintenance message to all users
                 except admins. Use this for system updates or critical maintenance.
               </p>

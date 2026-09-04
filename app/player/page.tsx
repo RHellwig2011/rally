@@ -17,7 +17,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  InitialsAvatar,
+  Kicker,
+  SiteHeader,
+  statStyles,
+} from "@/components/app-chrome";
 import { formatCurrency, calculatePercentage } from "@/lib/utils";
+
+const { cell: STAT_CELL, num: STAT_NUM, label: STAT_LABEL } = statStyles;
 
 interface PlayerData {
   user: {
@@ -61,7 +69,7 @@ export default function PlayerDashboard() {
   const [data, setData] = useState<PlayerData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPlayerData();
@@ -90,16 +98,39 @@ export default function PlayerDashboard() {
     }
   };
 
-  const copyReferralLink = (code: string, slug: string) => {
-    const link = `${window.location.origin}/raise/${slug}?ref=${code}`;
-    navigator.clipboard.writeText(link);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  /**
+   * The player's own page — "Support Maya", not the team landing page. The
+   * public route resolves a team member by id or fundLinkCode, and ?ref keeps
+   * click attribution the way the public player page builds it.
+   */
+  const personalLink = (
+    slug: string,
+    teamMemberId: string,
+    code?: string | null
+  ) =>
+    `${window.location.origin}/raise/${slug}/player/${teamMemberId}${
+      code ? `?ref=${code}` : ''
+    }`;
+
+  const copyPersonalLink = (
+    teamMemberId: string,
+    slug: string,
+    code?: string | null
+  ) => {
+    navigator.clipboard.writeText(personalLink(slug, teamMemberId, code));
+    setCopiedId(teamMemberId);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const shareOnSocial = (platform: string, code: string, slug: string, teamName: string) => {
-    const link = `${window.location.origin}/raise/${slug}?ref=${code}`;
-    const message = `Help me reach my fundraising goal for ${teamName}!`;
+  const shareOnSocial = (
+    platform: string,
+    teamMemberId: string,
+    slug: string,
+    teamName: string,
+    code?: string | null
+  ) => {
+    const link = personalLink(slug, teamMemberId, code);
+    const message = `I'm raising money for ${teamName}. A gift of any size helps — thank you!`;
 
     let shareUrl = '';
     switch (platform) {
@@ -121,10 +152,10 @@ export default function PlayerDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -132,9 +163,9 @@ export default function PlayerDashboard() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'Failed to load data'}</p>
+          <p className="text-warning mb-4">{error || 'Failed to load data'}</p>
           <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
@@ -142,110 +173,107 @@ export default function PlayerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <nav className="border-b bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">R</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900">Rally</span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                {data.user.firstName} {data.user.lastName}
-              </span>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SiteHeader>
+        <span className="text-[13px] font-medium text-muted-foreground">
+          {data.user.firstName} {data.user.lastName}
+        </span>
+        <InitialsAvatar
+          initials={`${data.user.firstName?.[0] ?? ""}${data.user.lastName?.[0] ?? ""}`.toUpperCase()}
+        />
+      </SiteHeader>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {data.user.firstName}! 👋
-          </h1>
-          <p className="text-gray-600">Track your fundraising progress and share your links</p>
+      {/* BRIEF §4 screen 07: centered narrow column. */}
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        {/* Welcome Header — hero with the big personal total */}
+        <div className="mb-8 text-center">
+          <Kicker>Welcome back, {data.user.firstName}</Kicker>
+          <p className="mt-3 font-display text-[clamp(48px,14vw,72px)] font-black leading-none tracking-[-0.04em] tabular text-foreground [text-shadow:0_2px_0_rgba(200,16,46,.45),0_12px_42px_rgba(200,16,46,.35)]">
+            {formatCurrency(data.stats.totalRaised)}
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            raised so far. Share your page — that&apos;s how gifts show up.
+          </p>
         </div>
 
         {/* Overall Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Total Raised
               </CardTitle>
               <DollarSign className="w-5 h-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {formatCurrency(data.stats.totalRaised)}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Across all campaigns</p>
+              <p className="text-sm text-muted-foreground mt-1">Across all campaigns</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Donations
               </CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {data.stats.totalDonations}
               </div>
-              <p className="text-sm text-gray-500 mt-1">People supported you</p>
+              <p className="text-sm text-muted-foreground mt-1">People supported you</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                Link Clicks
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                People who opened my page
               </CardTitle>
               <MousePointer className="w-5 h-5 text-secondary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {data.stats.totalClicks}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Total engagement</p>
+              <p className="text-sm text-muted-foreground mt-1">Across all campaigns</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Active Campaigns
               </CardTitle>
               <Trophy className="w-5 h-5 text-warning" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="font-display text-3xl font-extrabold tabular text-foreground">
                 {data.stats.campaignCount}
               </div>
-              <p className="text-sm text-gray-500 mt-1">Teams you're on</p>
+              <p className="text-sm text-muted-foreground mt-1">Teams you're on</p>
             </CardContent>
           </Card>
         </div>
 
         {/* My Campaigns */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">My Campaigns</h2>
+          <h2 className="mb-4 font-display text-xl font-extrabold uppercase tracking-[0.04em] text-foreground">
+            My Campaigns
+          </h2>
 
           {data.memberships.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
                   No campaigns yet
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   You'll see your fundraising campaigns here once you're added to a team
                 </p>
               </CardContent>
@@ -268,7 +296,7 @@ export default function PlayerDashboard() {
                           <CardTitle className="text-xl mb-1">
                             {membership.campaign.organizationName} {membership.campaign.teamName}
                           </CardTitle>
-                          <p className="text-sm text-gray-600">Your role: {membership.name}</p>
+                          <p className="text-sm text-muted-foreground">Your role: {membership.name}</p>
                         </div>
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/raise/${membership.campaign.slug}`} target="_blank">
@@ -283,22 +311,23 @@ export default function PlayerDashboard() {
                         {/* Personal Progress */}
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                               Your Progress
                             </span>
-                            <span className="text-sm font-semibold text-primary">
+                            <span className="font-display text-lg font-extrabold tabular text-foreground">
                               {formatCurrency(parseInt(membership.amountRaised))}
                               {membership.personalGoal && (
-                                <span className="text-gray-600 font-normal">
+                                <span className="text-sm font-semibold text-muted-foreground">
                                   {' '}/ {formatCurrency(parseInt(membership.personalGoal))}
                                 </span>
                               )}
                             </span>
                           </div>
                           {membership.personalGoal && (
-                            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+                            /* Personal bar runs team red — BRIEF §4 screen 07 ".pbar" */
+                            <div className="mb-1 h-2 w-full overflow-hidden rounded-full border border-border bg-white/[0.06]">
                               <div
-                                className="bg-primary rounded-full h-2 transition-all"
+                                className="h-full rounded-full bg-[linear-gradient(90deg,#8E0A20,#C8102E_60%,#F0495F)] shadow-glow-team transition-all duration-700 ease-stadium"
                                 style={{ width: `${Math.min(percentage, 100)}%` }}
                               />
                             </div>
@@ -307,113 +336,102 @@ export default function PlayerDashboard() {
 
                         {/* Referral Stats */}
                         {membership.referral && (
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <div className="grid grid-cols-3 gap-4 mb-4">
-                              <div className="text-center">
-                                <p className="text-2xl font-bold text-gray-900">
-                                  {membership.referral.clickCount}
-                                </p>
-                                <p className="text-xs text-gray-600">Clicks</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-2xl font-bold text-success">
-                                  {membership.referral.donationCount}
-                                </p>
-                                <p className="text-xs text-gray-600">Donations</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-2xl font-bold text-primary">
-                                  {membership.referral.donationCount > 0
-                                    ? ((membership.referral.donationCount / membership.referral.clickCount) * 100).toFixed(1)
-                                    : 0}%
-                                </p>
-                                <p className="text-xs text-gray-600">Conversion</p>
-                              </div>
+                          /* BRIEF §3 "Stat blocks" */
+                          <div className="grid grid-cols-2 gap-3.5">
+                            <div className={STAT_CELL}>
+                              <p className={STAT_NUM}>{membership.referral.clickCount}</p>
+                              <p className={STAT_LABEL}>People who opened my page</p>
                             </div>
-
-                            {/* Share Links */}
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  readOnly
-                                  value={`${window.location.origin}/raise/${membership.campaign.slug}?ref=${membership.referral.code}`}
-                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    copyReferralLink(membership.referral!.code, membership.campaign.slug)
-                                  }
-                                >
-                                  {copiedCode === membership.referral.code ? (
-                                    <>
-                                      <Check className="w-4 h-4 mr-1" />
-                                      Copied
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-4 h-4 mr-1" />
-                                      Copy
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'facebook',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Facebook
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'twitter',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Twitter
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() =>
-                                    shareOnSocial(
-                                      'email',
-                                      membership.referral!.code,
-                                      membership.campaign.slug,
-                                      membership.campaign.teamName
-                                    )
-                                  }
-                                >
-                                  <Share2 className="w-4 h-4 mr-1" />
-                                  Email
-                                </Button>
-                              </div>
+                            <div className={STAT_CELL}>
+                              <p className={`${STAT_NUM} text-success-dark`}>
+                                {membership.referral.donationCount}
+                              </p>
+                              <p className={STAT_LABEL}>Donations</p>
                             </div>
                           </div>
                         )}
+
+                        {/* Share block. Lives outside the referral check: the
+                            player's page exists whether or not a Referral row
+                            was ever created, and sharing it is the whole job. */}
+                        <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                            My fundraising page
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={personalLink(
+                                membership.campaign.slug,
+                                membership.id,
+                                membership.referral?.code
+                              )}
+                              className="h-11 flex-1 rounded-lg border border-white/10 bg-white/[0.05] px-3 text-sm text-muted-foreground"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                copyPersonalLink(
+                                  membership.id,
+                                  membership.campaign.slug,
+                                  membership.referral?.code
+                                )
+                              }
+                            >
+                              {copiedId === membership.id ? (
+                                <>
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-4 h-4 mr-1" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          <div className="flex gap-2">
+                            {(['facebook', 'twitter', 'email'] as const).map((platform) => (
+                              <Button
+                                key={platform}
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 capitalize"
+                                onClick={() =>
+                                  shareOnSocial(
+                                    platform,
+                                    membership.id,
+                                    membership.campaign.slug,
+                                    membership.campaign.teamName,
+                                    membership.referral?.code
+                                  )
+                                }
+                              >
+                                <Share2 className="w-4 h-4 mr-1" />
+                                {platform}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* The two things a player does next */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <Button variant="outline" asChild>
+                            <Link href={`/player/outreach/${membership.id}`}>
+                              Text / email family
+                            </Link>
+                          </Button>
+                          <Button variant="outline" asChild>
+                            <Link href={`/player/profile/${membership.id}`}>
+                              Edit my page
+                            </Link>
+                          </Button>
+                        </div>
+
                       </div>
                     </CardContent>
                   </Card>

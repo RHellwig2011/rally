@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTrustedClientIp } from "./rate-limiter";
 
 /**
  * Simple in-memory rate limiter for MVP
@@ -14,7 +15,7 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Clean up expired entries every 5 minutes
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of rateLimitStore.entries()) {
     if (entry.resetTime < now) {
@@ -22,6 +23,8 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+// Housekeeping only — must not keep the process alive by itself.
+(cleanupTimer as { unref?: () => void })?.unref?.();
 
 export interface RateLimitConfig {
   maxRequests: number;
@@ -30,6 +33,7 @@ export interface RateLimitConfig {
 
 export interface RateLimitResult {
   allowed: boolean;
+  limit: number; // Maximum requests allowed in the window
   remaining: number;
   resetTime: number;
   retryAfter?: number; // Seconds until the rate limit resets
@@ -46,6 +50,19 @@ export function checkRateLimit(
   config: RateLimitConfig
 ): RateLimitResult {
   const now = Date.now();
+
+  // Skip rate limiting in development (matches the rate-limiter.ts /
+  // with-rate-limit.ts family and middleware, which all bypass in dev).
+  // NODE_ENV is 'test' under jest, so tests still exercise real limiting.
+  if (process.env.NODE_ENV === "development") {
+    return {
+      allowed: true,
+      limit: config.maxRequests,
+      remaining: config.maxRequests,
+      resetTime: now + config.windowMs,
+    };
+  }
+
   const entry = rateLimitStore.get(identifier);
 
   // If no entry exists or the window has expired, create a new entry
@@ -58,6 +75,7 @@ export function checkRateLimit(
 
     return {
       allowed: true,
+      limit: config.maxRequests,
       remaining: config.maxRequests - 1,
       resetTime,
     };
@@ -68,6 +86,7 @@ export function checkRateLimit(
     const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
     return {
       allowed: false,
+      limit: config.maxRequests,
       remaining: 0,
       resetTime: entry.resetTime,
       retryAfter,
@@ -80,6 +99,7 @@ export function checkRateLimit(
 
   return {
     allowed: true,
+    limit: config.maxRequests,
     remaining: config.maxRequests - entry.count,
     resetTime: entry.resetTime,
   };
@@ -88,6 +108,12 @@ export function checkRateLimit(
 /**
  * Extract client identifier from request
  * Uses user ID if authenticated, otherwise uses IP address
+ *
+ * Shares getTrustedClientIp with rate-limiter.ts so both limiters apply the
+ * same trusted-proxy rules. Raw x-forwarded-for / x-real-ip are never trusted:
+ * without TRUSTED_PROXY_HOPS configured, anonymous callers all collapse into
+ * the single "ip:unknown" bucket (fail closed) instead of minting a fresh
+ * bucket per spoofed header value.
  */
 export function getRateLimitIdentifier(
   req: NextRequest,
@@ -98,12 +124,7 @@ export function getRateLimitIdentifier(
     return `user:${userId}`;
   }
 
-  // Fallback to IP address
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  const realIp = req.headers.get("x-real-ip");
-  const ip = forwardedFor?.split(",")[0] || realIp || "unknown";
-
-  return `ip:${ip}`;
+  return `ip:${getTrustedClientIp(req) ?? "unknown"}`;
 }
 
 /**
@@ -154,7 +175,7 @@ export function applyRateLimitHeaders(
   headers: Headers,
   result: RateLimitResult
 ): void {
-  headers.set("X-RateLimit-Limit", result.remaining.toString());
+  headers.set("X-RateLimit-Limit", result.limit.toString());
   headers.set("X-RateLimit-Remaining", result.remaining.toString());
   headers.set("X-RateLimit-Reset", new Date(result.resetTime).toISOString());
 

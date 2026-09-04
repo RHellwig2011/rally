@@ -66,7 +66,7 @@ Copy these values to your `.env` file under:
 11. Replace `[YOUR-PASSWORD]` in the string with your actual password
 12. Add to `.env`:
     ```
-    DATABASE_URL="postgresql://postgres.xxx:your_password@xxx.supabase.co:5432/postgres"
+    DATABASE_URL="postgresql://postgres.PROJECT_REF:REDACTED@xxx.supabase.co:5432/postgres"
     ```
 
 **Next Step**: Run migrations

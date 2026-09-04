@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createConnectAccount, createAccountLink } from "@/lib/stripe";
 import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
+import { checkCsrf } from "@/lib/csrf";
 
 const onboardSchema = z.object({
   campaignId: z.string().min(1, "Campaign ID is required"),
@@ -14,6 +15,12 @@ const onboardSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Verify authentication (throws if not authenticated)
     const user = await verifyAuth(req);
 
@@ -85,6 +92,10 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure — pass it through
+    if (error instanceof NextResponse) {
+      return error;
+    }
     console.error("Failed to create onboarding link:", error);
 
     if (error instanceof z.ZodError) {
@@ -101,7 +112,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to create onboarding link",
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to create onboarding link",
       },
       { status: 500 }
     );

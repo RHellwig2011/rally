@@ -5,10 +5,12 @@ node_modules
 out/
 
 # Environment
+# Match every .env variant. The narrow list here previously missed .env.new,
+# which sat untracked in the tree holding live credentials — one `git add -A`
+# from being committed. Secrets belong only in .env.example, as placeholders.
 .env
-.env.local
-.env.production
-.env*.local
+.env.*
+!.env.example
 
 # Testing
 test-*.mjs
@@ -17,6 +19,24 @@ STRIPE_*.md
 
 # Build artifacts
 *.log
+# Incremental TypeScript build cache — rewritten on every compile, so tracking
+# it produces a spurious diff in unrelated commits.
+tsconfig.tsbuildinfo
 
-  .next/
-  boba.zip
+.next/
+boba.zip
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync/compiled/
+
+# Credential inventories / operational notes. These have held real secrets
+# (plaintext JWT_SECRET, NEXTAUTH_SECRET, and a database DSN with password)
+# and were tracked on a public remote. A repository is not a password manager.
+NEW_CREDENTIALS_TRACKER.md
+API_KEYS_AND_STATUS.csv
+*CREDENTIALS*
+*credentials*.csv
+.worktrees/

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/campaign-automation",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-donations",
+      "schedule": "15 * * * *"
+    }
+  ],
+  "functions": {
+    "app/api/cron/campaign-automation/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/reconcile-donations/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

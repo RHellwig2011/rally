@@ -5,12 +5,14 @@ import { z } from 'zod';
 import {
   generateEmailMessage,
   generateSMSMessage,
+  generateSocialPost,
   generateVideoScript,
   type MessageOptions,
 } from '@/lib/services/ai-message-generator';
+import { checkCsrf } from '@/lib/csrf';
 
 const generateMessageSchema = z.object({
-  type: z.enum(['email', 'sms', 'video']),
+  type: z.enum(['email', 'sms', 'social', 'video']),
   teamMemberId: z.string().optional(),
   tone: z.enum(['friendly', 'professional', 'enthusiastic', 'heartfelt']).optional(),
   length: z.enum(['short', 'medium', 'long']).optional(),
@@ -29,6 +31,12 @@ export async function POST(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(request);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Check if AI features are enabled
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -76,10 +84,15 @@ export async function POST(
     }
 
     // If teamMemberId is provided, get team member data
+    // (scoped to this campaign so cross-campaign data cannot be pulled)
     let teamMember = null;
     if (validatedData.teamMemberId) {
-      teamMember = await prisma.teamMember.findUnique({
-        where: { id: validatedData.teamMemberId },
+      teamMember = await prisma.teamMember.findFirst({
+        where: {
+          id: validatedData.teamMemberId,
+          campaignId,
+          deletedAt: null,
+        },
         select: {
           id: true,
           name: true,
@@ -126,12 +139,13 @@ export async function POST(
       teamName: campaign.teamName,
       organizationName: campaign.organizationName,
       description: campaign.description || 'Support our fundraising campaign',
-      goalAmount: teamMember?.personalGoal
+      // Amounts are stored in cents; the AI context expects dollars
+      goalAmount: (teamMember?.personalGoal
         ? Number(teamMember.personalGoal)
-        : Number(campaign.goalAmount),
-      currentAmount: teamMember?.amountRaised
+        : Number(campaign.goalAmount)) / 100,
+      currentAmount: (teamMember?.amountRaised
         ? Number(teamMember.amountRaised)
-        : Number(campaign.currentAmount),
+        : Number(campaign.currentAmount)) / 100,
       playerName: teamMember?.name || user.firstName || 'Team',
       playerPosition: teamMember?.position || undefined,
       playerGrade: teamMember?.grade || undefined,
@@ -163,6 +177,18 @@ export async function POST(
         };
 
         const message = await generateSMSMessage(context, options);
+        result = { message };
+        break;
+      }
+
+      case 'social': {
+        const options: MessageOptions = {
+          tone: validatedData.tone || 'friendly',
+          includeStats: validatedData.includeStats ?? true,
+          customInstructions: validatedData.customInstructions,
+        };
+
+        const message = await generateSocialPost(context, options);
         result = { message };
         break;
       }
@@ -204,8 +230,8 @@ export async function POST(
     console.error('Error generating message:', error);
     return NextResponse.json(
       {
-        error: 'Failed to generate message',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        // Detail is logged above; never leak internal error text to the client.
+        error: 'Failed to generate message'
       },
       { status: 500 }
     );

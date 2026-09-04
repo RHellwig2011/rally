@@ -8,15 +8,16 @@ export async function GET(
   try {
     const { slug } = params;
 
-    // Fetch campaign by slug with all public data
-    const campaign = await prisma.campaign.findUnique({
-      where: { slug },
+    // Fetch campaign by slug with all public data. findFirst, not findUnique:
+    // this is the unauthenticated public page, and DRAFT/PAUSED/CANCELLED
+    // campaigns must not be reachable just by knowing the slug.
+    const campaign = await prisma.campaign.findFirst({
+      where: { slug, status: { in: ['ACTIVE', 'COMPLETED'] } },
       include: {
         primaryLeader: {
           select: {
             firstName: true,
             lastName: true,
-            email: true,
           }
         },
         bankingAccount: {
@@ -66,14 +67,21 @@ export async function GET(
           }
         },
         teamMembers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              }
-            }
+          where: {
+            deletedAt: null,
+            isProfilePublic: true,
+          },
+          // Explicit select, never `include`. These rows are minors' records:
+          // an unscoped fetch pulls email, phoneNumber, parentEmail,
+          // parentPhone and invitationToken into this handler, one careless
+          // spread away from an unauthenticated response. Only the four columns
+          // the projection below actually emits are read. The user join was
+          // dropped for the same reason — nothing consumed it.
+          select: {
+            id: true,
+            name: true,
+            amountRaised: true,
+            personalGoal: true,
           },
           orderBy: { amountRaised: 'desc' }
         }
@@ -87,25 +95,27 @@ export async function GET(
       );
     }
 
-    // Calculate stats
-    const completedDonations = campaign.donations;
-    const uniqueDonorEmails = new Set(
-      await prisma.donation.findMany({
-        where: {
-          campaignId: campaign.id,
-          status: 'COMPLETED'
-        },
-        select: {
-          donorEmail: true,
-        }
-      }).then(donations => donations.map(d => d.donorEmail))
-    );
-    const donorCount = uniqueDonorEmails.size;
+    // Calculate stats. Both are aggregates over EVERY completed donation, not
+    // just the 20 most recent ones fetched above, and both are computed in the
+    // database — the donor count used to load every donor email into memory to
+    // size a Set, and the average was silently computed over only that 20-row
+    // page. Raw SQL quotes the camelCase identifiers because the schema has no
+    // @map.
+    const [donorCountRow] = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(DISTINCT "donorEmail") AS count
+      FROM "Donation"
+      WHERE "campaignId" = ${campaign.id} AND "status" = 'COMPLETED'
+    `;
+    const donorCount = Number(donorCountRow?.count ?? 0);
 
-    // Calculate average donation
-    const avgDonation = completedDonations.length > 0
-      ? completedDonations.reduce((sum, d) => sum + Number(d.grossAmount), 0) / completedDonations.length
-      : 0;
+    const donationStats = await prisma.donation.aggregate({
+      where: {
+        campaignId: campaign.id,
+        status: 'COMPLETED',
+      },
+      _avg: { grossAmount: true },
+    });
+    const avgDonation = Number(donationStats._avg.grossAmount ?? 0);
 
     // Prepare response data
     const responseData = {

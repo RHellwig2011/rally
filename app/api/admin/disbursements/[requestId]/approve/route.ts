@@ -6,12 +6,19 @@ import { checkCsrf } from "@/lib/csrf";
 
 const approveSchema = z.object({
   notes: z.string().optional(),
-  initiateTransfer: z.boolean().default(true),
 });
 
 /**
  * PUT /api/admin/disbursements/[requestId]/approve
- * Approve a disbursement request (BANK_ADMIN only)
+ * Approve a disbursement request (ADMIN or BANK_ADMIN).
+ *
+ * Approval is a decision, not a payment: it only moves the request
+ * PENDING -> APPROVED and never touches account balances. The money leaves via
+ * POST /api/stripe-connect/payout, which is the single place that talks to
+ * Stripe, and which is the only writer allowed to set status COMPLETED (it does
+ * so together with the payout transaction id). Keeping the two steps separate
+ * is what stops the ledger from claiming a team was paid when nothing was
+ * actually transferred.
  */
 export async function PUT(
   req: NextRequest,
@@ -41,19 +48,19 @@ export async function PUT(
       );
     }
 
-    // Check authorization - only BANK_ADMIN
-    if (user.role !== 'BANK_ADMIN') {
+    // Check authorization - only BANK_ADMIN or ADMIN
+    if (user.role !== 'BANK_ADMIN' && user.role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: "Only BANK_ADMIN can approve disbursements" },
+        { success: false, error: "Only banking admins can approve disbursements" },
         { status: 403 }
       );
     }
 
     const requestId = params.requestId;
 
-    // Parse request body
-    const body = await req.json();
-    const validatedData = approveSchema.parse(body);
+    // Parse request body (tolerate an empty/absent body — all fields have defaults)
+    const body = await req.json().catch(() => ({}));
+    approveSchema.parse(body);
 
     // Get disbursement request
     const disbursementRequest = await prisma.disbursementRequest.findUnique({
@@ -106,7 +113,9 @@ export async function PUT(
       );
     }
 
-    // Check if sufficient funds still available
+    // Advisory funds check so an unfundable request is not approved. The
+    // authoritative check happens inside the payout transaction, which is where
+    // the balance is actually debited.
     const availableBalance = disbursementRequest.bankingAccount.availableBalance;
     if (disbursementRequest.requestedAmount > availableBalance) {
       return NextResponse.json(
@@ -122,60 +131,36 @@ export async function PUT(
       );
     }
 
-    // Process approval in transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Update disbursement request
-      const updated = await tx.disbursementRequest.update({
-        where: { id: requestId },
-        data: {
-          status: 'APPROVED',
-          approvedBy: user.id,
-          approvedAt: new Date(),
-        }
-      });
+    if (disbursementRequest.requestedBy === user.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "The person who requested a disbursement cannot approve it",
+        },
+        { status: 403 }
+      );
+    }
 
-      // Update banking account balances
-      await tx.bankingAccount.update({
-        where: { id: disbursementRequest.bankingAccountId },
-        data: {
-          availableBalance: {
-            decrement: disbursementRequest.requestedAmount
-          },
-          disbursedTotal: {
-            increment: disbursementRequest.requestedAmount
-          },
-          pendingDisbursement: {
-            decrement: disbursementRequest.requestedAmount
-          }
-        }
-      });
-
-      // Create transaction record
-      const transaction = await tx.transaction.create({
-        data: {
-          type: 'DISBURSEMENT',
-          amount: -disbursementRequest.requestedAmount, // Negative for disbursement
-          balanceAfter: disbursementRequest.bankingAccount.availableBalance - disbursementRequest.requestedAmount,
-          description: `Disbursement: ${disbursementRequest.purpose}`,
-          disbursementId: disbursementRequest.id,
-          bankingAccountId: disbursementRequest.bankingAccountId,
-          createdBy: user.id,
-        }
-      });
-
-      // If initiating transfer, mark as completed immediately
-      // In production, this would trigger ACH transfer and update status via webhook
-      if (validatedData.initiateTransfer) {
-        await tx.disbursementRequest.update({
-          where: { id: requestId },
-          data: {
-            status: 'COMPLETED',
-          }
-        });
+    // The conditional updateMany is the concurrency guard (same pattern as
+    // lib/donations.ts completeDonation): only one caller ever transitions
+    // PENDING -> APPROVED. No balance bookkeeping happens here, so this needs no
+    // multi-statement transaction — the request keeps its reservation in
+    // pendingDisbursement until the payout route settles it.
+    const approved = await prisma.disbursementRequest.updateMany({
+      where: { id: requestId, status: 'PENDING' },
+      data: {
+        status: 'APPROVED',
+        approvedBy: user.id,
+        approvedAt: new Date(),
       }
-
-      return { updated, transaction };
     });
+
+    if (approved.count === 0) {
+      return NextResponse.json(
+        { success: false, error: "Disbursement request has already been processed" },
+        { status: 400 }
+      );
+    }
 
     // Send notification emails to campaign leader
     const campaign = disbursementRequest.bankingAccount.campaign;
@@ -187,8 +172,7 @@ export async function PUT(
         `${campaignLeader.firstName} ${campaignLeader.lastName}`,
         `${campaign.teamName} - ${campaign.organizationName}`,
         Number(disbursementRequest.requestedAmount) / 100,
-        disbursementRequest.purpose,
-        result.transaction.id
+        disbursementRequest.purpose
       );
     } catch (emailError) {
       console.error('Failed to send approval notification:', emailError);
@@ -197,18 +181,17 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      message: "Disbursement approved successfully",
+      message: "Disbursement approved. Funds move once the payout is sent.",
       disbursement: {
         id: requestId,
         amount: Number(disbursementRequest.requestedAmount) / 100,
-        status: validatedData.initiateTransfer ? 'COMPLETED' : 'APPROVED',
+        status: 'APPROVED',
         approvedBy: {
           id: user.id,
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
         },
         approvedAt: new Date(),
-        transactionId: result.transaction.id,
         campaign: {
           id: campaign.id,
           name: `${campaign.teamName} - ${campaign.organizationName}`,
@@ -233,11 +216,9 @@ export async function PUT(
       );
     }
 
+    // Generic message so raw error text is never surfaced to the caller.
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to approve disbursement"
-      },
+      { success: false, error: "Failed to approve disbursement" },
       { status: 500 }
     );
   }
@@ -249,9 +230,8 @@ async function sendDisbursementApprovedEmail(
   name: string,
   campaignName: string,
   amount: number,
-  purpose: string,
-  transactionId: string
+  purpose: string
 ): Promise<void> {
   // TODO: Implement email notification using email service
-  console.log(`Notifying ${name} (${email}) of approved disbursement for ${campaignName}: $${amount} (${purpose}) - Transaction: ${transactionId}`);
+  console.log(`Notifying ${name} (${email}) of approved disbursement for ${campaignName}: $${amount} (${purpose}) - payout pending`);
 }

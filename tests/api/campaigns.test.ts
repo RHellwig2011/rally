@@ -8,7 +8,7 @@ import { z } from "zod";
 
 describe("Campaign API Validation Tests", () => {
   // Helper function to generate valid campaign data
-  const getValidCampaignData = () => ({
+  const getValidCampaignData = (): Record<string, unknown> => ({
     organizationName: "Lincoln High School",
     teamName: "Varsity Football",
     slug: "lincoln-varsity-2024",
@@ -372,6 +372,41 @@ describe("Campaign API Validation Tests", () => {
     it("should reject threshold greater than $10,000", () => {
       const data = { ...getValidCampaignData(), approvalThreshold: 10001 };
       expect(() => createCampaignSchema.parse(data)).toThrow("Approval threshold cannot exceed $10,000");
+    });
+  });
+
+  describe("Moving goal fields", () => {
+    it("should accept valid stretch percents on create", () => {
+      const data = {
+        ...getValidCampaignData(),
+        autoStretchGoal: true,
+        stretchGoalPercent: 25,
+        stretchGoalTriggerPercent: 80,
+      };
+      const result = createCampaignSchema.parse(data);
+      expect(result.autoStretchGoal).toBe(true);
+      expect(result.stretchGoalPercent).toBe(25);
+      expect(result.stretchGoalTriggerPercent).toBe(80);
+    });
+
+    it("should reject stretch percent below 10", () => {
+      const data = { ...getValidCampaignData(), stretchGoalPercent: 9 };
+      expect(() => createCampaignSchema.parse(data)).toThrow();
+    });
+
+    it("should reject trigger percent of 100", () => {
+      const data = { ...getValidCampaignData(), stretchGoalTriggerPercent: 100 };
+      expect(() => createCampaignSchema.parse(data)).toThrow();
+    });
+
+    it("should accept stretch fields on update", () => {
+      expect(() =>
+        updateCampaignSchema.parse({
+          autoStretchGoal: false,
+          stretchGoalPercent: 10,
+          stretchGoalTriggerPercent: 50,
+        })
+      ).not.toThrow();
     });
   });
 

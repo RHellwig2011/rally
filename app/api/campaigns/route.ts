@@ -39,6 +39,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // A campaign is a publicly listed, money-collecting page created under a
+    // free-text organisation name, so the creator must have proven control of
+    // their email address first. Note this is deliberately NOT a role check:
+    // self-service campaign creation by any authenticated user is intended.
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Please verify your email address before creating a campaign. Check your inbox for the verification link.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
+        { status: 403 }
+      );
+    }
+
     // Apply rate limiting (10 campaigns per user per day)
     const rateLimitId = getRateLimitIdentifier(req, user.id);
     const rateLimitResult = checkRateLimit(rateLimitId, rateLimitConfigs.campaignCreate);
@@ -102,8 +118,16 @@ export async function POST(req: NextRequest) {
         category: validatedData.category,
         primaryColor: validatedData.primaryColor || "#6366F1",
         secondaryColor: validatedData.secondaryColor || "#F59E0B",
-        status: "ACTIVE", // Set to ACTIVE by default for MVP
+        // Created unlisted. /api/campaigns/public only ever returns
+        // ACTIVE/COMPLETED and donations require ACTIVE, so a new campaign
+        // cannot collect money or appear in the public directory until its
+        // leader explicitly launches it (DRAFT -> ACTIVE from the dashboard).
+        status: "DRAFT",
         primaryLeaderId: user.id,
+        minContactsPerPlayer: validatedData.minContactsPerPlayer ?? 0,
+        autoStretchGoal: validatedData.autoStretchGoal ?? false,
+        stretchGoalPercent: validatedData.stretchGoalPercent ?? 20,
+        stretchGoalTriggerPercent: validatedData.stretchGoalTriggerPercent ?? 90,
         // Connect guardian if found
         ...(guardianUser && {
           guardians: {
@@ -162,7 +186,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to create campaign"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to create campaign"
       },
       { status: 500 }
     );
@@ -193,14 +218,33 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+
+    // Only accept values that actually exist in the CampaignStatus enum. An
+    // unrecognised status is rejected rather than passed through to Prisma,
+    // which would throw and surface as a 500.
+    const validStatuses = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"] as const;
+    type CampaignStatusValue = (typeof validStatuses)[number];
+    const rawStatus = searchParams.get("status");
+    if (rawStatus && !validStatuses.includes(rawStatus as CampaignStatusValue)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+        },
+        { status: 400 }
+      );
+    }
+    const status = rawStatus as CampaignStatusValue | null;
+
+    const rawLimit = parseInt(searchParams.get("limit") || "50");
+    const rawOffset = parseInt(searchParams.get("offset") || "0");
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 100);
+    const offset = Number.isNaN(rawOffset) ? 0 : Math.max(rawOffset, 0);
 
     // Get campaigns where user is primary leader or guardian
     const campaigns = await prisma.campaign.findMany({
       where: {
-        ...(status ? { status: status as any } : {}),
+        ...(status ? { status } : {}),
         OR: [
           { primaryLeaderId: user.id },
           { guardians: { some: { id: user.id } } }

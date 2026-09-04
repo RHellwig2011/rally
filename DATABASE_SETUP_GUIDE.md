@@ -107,7 +107,7 @@ npx prisma studio  # Should open database browser
 
    Example:
    ```env
-   DATABASE_URL="postgresql://postgres.abc123:MySecurePass123@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+   DATABASE_URL="postgresql://postgres.PROJECT_REF:REDACTED@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
    ```
 
 4. **Save and exit**

@@ -105,7 +105,7 @@
 **Error Message:**
 ```
 FATAL: Tenant or user not found
-postgresql://postgres.nsluczmibjdsywwheden:***@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+postgresql://postgres.PROJECT_REF:REDACTED@aws-0-us-west-2.pooler.supabase.com:5432/postgres
 ```
 
 **Root Cause:**

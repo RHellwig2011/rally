@@ -4,10 +4,16 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
-const JWT_EXPIRES_IN = "15m"; // access token lifetime
+import { JWT_SECRET } from "./jwt-secret";
+
+const JWT_EXPIRES_IN = "15m";
+export const ACCESS_TOKEN_MAX_AGE_SEC = 15 * 60;
+export const REFRESH_COOKIE_MAX_AGE_SEC = 30 * 24 * 60 * 60;
 
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 30);
+
+// Loop guard for walking the replacedById chain during reuse detection.
+const REVOKE_CHAIN_MAX_DEPTH = 100;
 
 export type PublicUser = {
   id: string;
@@ -15,6 +21,7 @@ export type PublicUser = {
   firstName: string;
   lastName: string;
   role: string;
+  emailVerified: boolean;
 };
 
 function toPublicUser(user: any): PublicUser {
@@ -24,6 +31,7 @@ function toPublicUser(user: any): PublicUser {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    emailVerified: user.emailVerified === true,
   };
 }
 
@@ -34,9 +42,11 @@ export async function registerUser(data: {
   lastName: string;
   role?: string;
   phone?: string;
+  termsAccepted?: boolean;
 }) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw new Error("Email already in use");
+  if (!data.termsAccepted) throw new Error("Terms must be accepted");
 
   const passwordHash = await bcrypt.hash(data.password, 10);
 
@@ -55,6 +65,7 @@ export async function registerUser(data: {
       verificationToken,
       verificationTokenExpiry,
       emailVerified: false,
+      termsAcceptedAt: new Date(),
     },
   });
 
@@ -109,11 +120,128 @@ export async function createRefreshToken(userId: string, ip?: string) {
   return raw;
 }
 
+/**
+ * Revoke the whole user's outstanding tokens, then annotate the replacedById
+ * chain descended from `startId` with the reason.
+ *
+ * Only called once a replay is confirmed (see rotateRefreshToken): the token
+ * presented was already rotated away AND its successor has itself been used, so
+ * two different holders are minting sessions from one chain. There is no way to
+ * tell which of them is the legitimate client, so the safe response is to kill
+ * the entire family and force both back through login. Same reasoning as the
+ * mass-revoke in resetPassword.
+ *
+ * Ordering matters. The user-wide revoke runs FIRST and the chain walk is
+ * best-effort inside its own try/catch, so a dangling or corrupted
+ * replacedById link can never leave another device's token live — the previous
+ * version walked first with `update()`, which raises P2025 on a missing row and
+ * aborted family revocation entirely.
+ */
+async function revokeRefreshTokenFamily(
+  startId: string,
+  userId: string,
+  ip?: string
+) {
+  const revocation = {
+    revoked: true,
+    revokedAt: new Date(),
+    revokedByIp: ip,
+    reason: "reuse_detected",
+  };
+
+  await prisma.$transaction(async (tx) => {
+    // Everything still live for this user, including siblings the chain does
+    // not reach — a token minted by a parallel login is equally suspect once
+    // the account is known to be compromised.
+    await tx.refreshToken.updateMany({
+      where: { userId, revoked: false },
+      data: revocation,
+    });
+
+    // Then record the reason on each already-revoked link of the chain, so the
+    // audit trail shows where the replay was detected. Bounded by
+    // REVOKE_CHAIN_MAX_DEPTH: replacedById is a self-relation and a corrupted
+    // row could otherwise loop forever. updateMany + findUnique so a missing
+    // row is a no-op rather than a throw, and the whole walk is wrapped
+    // because it must never cost us the revoke above.
+    try {
+      const seen = new Set<string>();
+      let cursor: string | null = startId;
+
+      for (let depth = 0; cursor && depth < REVOKE_CHAIN_MAX_DEPTH; depth++) {
+        if (seen.has(cursor)) break;
+        seen.add(cursor);
+
+        await tx.refreshToken.updateMany({
+          where: { id: cursor },
+          data: revocation,
+        });
+
+        const link: { replacedById: string | null } | null =
+          await tx.refreshToken.findUnique({
+            where: { id: cursor },
+            select: { replacedById: true },
+          });
+
+        cursor = link?.replacedById ?? null;
+      }
+    } catch (chainError) {
+      console.error(
+        `Refresh token chain annotation failed for user ${userId}; family revoke already applied:`,
+        chainError
+      );
+    }
+  });
+}
+
 export async function rotateRefreshToken(oldRawToken: string, ip?: string) {
   const tokenHash = hashToken(oldRawToken);
   const existing = await prisma.refreshToken.findUnique({ where: { tokenHash } });
   if (!existing) throw new Error("Invalid refresh token");
-  if (existing.revoked) throw new Error("Refresh token revoked");
+
+  if (existing.revoked) {
+    // Reuse detection. An expired-and-revoked token is just an old token aging
+    // out normally, so only an unexpired one is worth examining.
+    if (existing.expiresAt > new Date()) {
+      // A revoked-but-unexpired token is not automatically theft. The common
+      // case is a lost response: the server committed the rotation, the reply
+      // never reached the client (timeout, dropped connection, double-submit),
+      // and the client retries with the token it still holds. Revoking the
+      // family there logs a legitimate user out of every device on a flaky
+      // network.
+      //
+      // The distinguishing signal is the successor. If it is still unused, at
+      // most one holder has ever rotated this chain, so this is a retry: fail
+      // the request only. If the successor has itself been used — it is
+      // revoked, or it already points at a successor of its own — then two
+      // different holders are rotating the same chain, which is the real reuse
+      // signal, and the family goes.
+      //
+      // Refresh tokens are stored as hashes (see hashToken), so the successor's
+      // raw value cannot be recovered and the retry cannot be answered
+      // idempotently with the token pair it lost. The client gets a 401 and
+      // logs in again — but keeps its other sessions.
+      const successor = existing.replacedById
+        ? await prisma.refreshToken.findUnique({
+            where: { id: existing.replacedById },
+            select: { revoked: true, replacedById: true },
+          })
+        : null;
+
+      const successorWasUsed =
+        !existing.replacedById || // rotated away with no successor recorded
+        !successor || // successor row is gone; cannot vouch for the chain
+        successor.revoked ||
+        successor.replacedById !== null;
+
+      if (successorWasUsed) {
+        await revokeRefreshTokenFamily(existing.id, existing.userId, ip);
+        throw new Error("Refresh token reuse detected");
+      }
+    }
+    throw new Error("Refresh token revoked");
+  }
+
   if (existing.expiresAt <= new Date()) throw new Error("Refresh token expired");
 
   // create a new refresh token
@@ -231,13 +359,38 @@ export async function resetPassword(token: string, newPassword: string) {
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash,
-      passwordResetToken: null,
-      passwordResetTokenExpiry: null,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Consume the reset token as part of the same conditional write, so two
+    // concurrent submissions of the same token cannot both succeed.
+    const consumed = await tx.user.updateMany({
+      where: {
+        id: user.id,
+        passwordResetToken: token,
+        passwordResetTokenExpiry: { gte: new Date() },
+      },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetTokenExpiry: null,
+      },
+    });
+
+    if (consumed.count === 0) {
+      throw new Error("Invalid or expired password reset token");
+    }
+
+    // A password reset exists to evict whoever compromised the account, so
+    // every outstanding refresh token dies with the old password. Without
+    // this, a stolen refresh token keeps minting fresh 30-day sessions
+    // indefinitely via rotateRefreshToken.
+    await tx.refreshToken.updateMany({
+      where: { userId: user.id, revoked: false },
+      data: {
+        revoked: true,
+        revokedAt: new Date(),
+        reason: "password_reset",
+      },
+    });
   });
 
   return toPublicUser(user);

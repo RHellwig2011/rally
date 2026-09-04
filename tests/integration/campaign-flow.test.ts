@@ -97,8 +97,8 @@ describe('Campaign Lifecycle Integration Tests', () => {
     });
 
     it('should require future end date for ACTIVE status', () => {
-      const endDate = new Date('2025-12-31');
       const now = new Date();
+      const endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
       const canActivate = endDate > now;
       expect(canActivate).toBe(true);

@@ -3,6 +3,8 @@ import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { sendCampaignStatusChangeNotification } from "@/lib/email";
+import { checkCsrf } from "@/lib/csrf";
+import { leaderMayActivateCampaign } from "@/lib/org-verification";
 
 // Campaign status enum matching Prisma schema
 const CampaignStatus = {
@@ -38,6 +40,12 @@ export async function PUT(
   { params }: { params: { campaignId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Authentication check
     const sessionToken = req.cookies.get("sessionToken")?.value;
     if (!sessionToken) {
@@ -72,6 +80,7 @@ export async function PUT(
         endDate: true,
         completedAt: true,
         archivedAt: true,
+        organizationVerifiedAt: true,
         primaryLeader: {
           select: { id: true, email: true, firstName: true }
         },
@@ -160,6 +169,22 @@ export async function PUT(
           { status: 400 }
         );
       }
+
+      if (
+        !leaderMayActivateCampaign({
+          role: user.role,
+          organizationVerifiedAt: campaign.organizationVerifiedAt,
+        })
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Organization must be verified by platform staff before this campaign can go live",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // COMPLETED campaigns should have end date in past or donations
@@ -192,6 +217,11 @@ export async function PUT(
           ...(newStatus === 'ARCHIVED' && !campaign.archivedAt && {
             archivedAt: now
           }),
+          ...(newStatus === 'ACTIVE' &&
+            !campaign.organizationVerifiedAt && {
+              organizationVerifiedAt: now,
+              organizationVerifiedById: user.id,
+            }),
           updatedAt: now,
         },
         select: {
@@ -353,7 +383,8 @@ export async function PUT(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update campaign status"
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to update campaign status"
       },
       { status: 500 }
     );

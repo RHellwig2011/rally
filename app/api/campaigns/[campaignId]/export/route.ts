@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { toCsvRow } from "@/lib/utils/export";
 
 /**
  * GET /api/campaigns/[campaignId]/export?type=donations|team
@@ -78,18 +79,28 @@ export async function GET(
         `$${(Number(d.grossAmount) / 100).toFixed(2)}`,
         `$${(Number(d.platformFee) / 100).toFixed(2)}`,
         `$${(Number(d.netAmount) / 100).toFixed(2)}`,
-        d.donorMessage ? `"${d.donorMessage.replace(/"/g, '""')}"` : "",
+        d.donorMessage || "",
         d.status,
       ]);
 
-      csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+      csv = [toCsvRow(headers), ...rows.map(toCsvRow)].join("\n");
       filename = `${campaign.slug}-donations-${new Date().toISOString().split('T')[0]}.csv`;
 
     } else if (exportType === "team") {
       // Export team members
+      // Exclude soft-deleted members: a player removed through the app must not
+      // reappear in an export that gets forwarded off-platform.
       const teamMembers = await prisma.teamMember.findMany({
-        where: { campaignId },
-        include: {
+        where: { campaignId, deletedAt: null },
+        select: {
+          name: true,
+          // The player's own address. The optional `user` relation is only
+          // populated if the member ever claimed an account, so it is the
+          // fallback, not the source of truth.
+          email: true,
+          personalGoal: true,
+          amountRaised: true,
+          createdAt: true,
           user: {
             select: { email: true }
           }
@@ -100,13 +111,13 @@ export async function GET(
       const headers = ["Name", "Email", "Personal Goal", "Amount Raised", "Joined Date"];
       const rows = teamMembers.map(tm => [
         tm.name,
-        tm.user?.email || "",
+        tm.email || tm.user?.email || "",
         tm.personalGoal ? `$${(Number(tm.personalGoal) / 100).toFixed(2)}` : "",
         `$${(Number(tm.amountRaised) / 100).toFixed(2)}`,
         new Date(tm.createdAt).toLocaleDateString(),
       ]);
 
-      csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+      csv = [toCsvRow(headers), ...rows.map(toCsvRow)].join("\n");
       filename = `${campaign.slug}-team-${new Date().toISOString().split('T')[0]}.csv`;
 
     } else {

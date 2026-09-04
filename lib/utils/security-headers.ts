@@ -11,16 +11,47 @@ export const SECURITY_HEADERS = {
   // Content Security Policy - Prevents XSS attacks
   "Content-Security-Policy": [
     "default-src 'self'",
-    // Scripts: Allow Stripe and eval in dev mode only
-    `script-src 'self' ${isDevelopment ? "'unsafe-eval'" : ""} 'unsafe-inline' https://js.stripe.com https://maps.googleapis.com`,
+    // Scripts: Allow Stripe and eval in dev mode only.
+    //
+    // KNOWN WEAKNESS: 'unsafe-inline' ships to production and largely nullifies
+    // this CSP as an XSS control. It is currently LOAD-BEARING — the Next.js App
+    // Router emits inline hydration scripts (self.__next_f.push) on every page
+    // and there is no nonce infrastructure in the app. Removing the token
+    // without replacing it breaks hydration site-wide.
+    //
+    // FOLLOW-UP (tracked, not done here): generate a per-request nonce in
+    // middleware.ts, forward it to the render, and serve
+    //   script-src 'self' 'nonce-<value>' 'strict-dynamic'
+    // dropping 'unsafe-inline' entirely. Mitigating factor today: the codebase
+    // has no XSS sink (no dangerouslySetInnerHTML / innerHTML / document.write),
+    // so this is a defense-in-depth gap rather than an exploitable hole.
+    [
+      "script-src 'self'",
+      ...(isDevelopment ? ["'unsafe-eval'"] : []),
+      "'unsafe-inline'",
+      "https://js.stripe.com",
+      "https://maps.googleapis.com",
+    ].join(" "),
     // Styles: Allow inline styles for Tailwind and Google Fonts
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    // Images: Allow self, data URIs, and HTTPS
-    "img-src 'self' data: https: blob: https://*.stripe.com",
+    // Images: Allow self, data URIs, blobs and any HTTPS host.
+    //
+    // The blanket `https:` is load-bearing: campaign logos/banners and player
+    // profile photos are operator- and guardian-supplied absolute URLs on
+    // arbitrary hosts, rendered with plain <img> (see app/raise/[slug]/page.tsx
+    // and app/player/profile/[teamMemberId]/page.tsx). Narrowing this requires
+    // first moving those uploads behind a first-party host; until then a
+    // tighter list would break real campaign pages.
+    "img-src 'self' data: blob: https:",
     // Fonts: Allow self and Google Fonts
     "font-src 'self' data: https://fonts.gstatic.com",
     // Connect: Allow self and Stripe API
-    `connect-src 'self' https://api.stripe.com https://*.stripe.com ${isDevelopment ? "ws://localhost:* http://localhost:*" : ""}`,
+    [
+      "connect-src 'self'",
+      "https://api.stripe.com",
+      "https://*.stripe.com",
+      ...(isDevelopment ? ["ws://localhost:*", "http://localhost:*"] : []),
+    ].join(" "),
     // Frames: Only Stripe for payment forms
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
     // Objects: Disallow plugins

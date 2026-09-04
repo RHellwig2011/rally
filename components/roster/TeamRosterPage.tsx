@@ -4,11 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamMemberCard } from './TeamMemberCard';
 import { AddTeamMemberModal } from './AddTeamMemberModal';
-import { CSVImportModal } from './CSVImportModal';
 import { RosterFilters } from './RosterFilters';
 import { EmptyRosterState } from './EmptyRosterState';
 import { RosterStats } from './RosterStats';
 import { toast } from 'react-hot-toast';
+import { useCsrfToken } from '@/hooks/useCsrfToken';
 
 interface TeamMember {
   id: string;
@@ -21,6 +21,7 @@ interface TeamMember {
   profilePhotoUrl?: string | null;
   fundLinkCode: string;
   invitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REMOVED' | 'EMAIL_FAILED';
+  onboardingLink?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,13 +40,13 @@ export function TeamRosterPage({
   isGuardian
 }: TeamRosterPageProps) {
   const router = useRouter();
+  const { csrfToken } = useCsrfToken();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'amountRaised' | 'name' | 'date'>('amountRaised');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   const canManage = isLeader || isGuardian;
@@ -60,13 +61,25 @@ export function TeamRosterPage({
       });
 
       const response = await fetch(`/api/campaigns/${campaignId}/team-members?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch team members');
-
       const data = await response.json();
-      setMembers(data.members || []);
+
+      // Gate on the payload, not just the HTTP status, and read the key the
+      // endpoint actually returns (`teamMembers`). Reading a missing key and
+      // defaulting to [] renders a full roster as an empty one with no error —
+      // silence is the worst possible failure mode here.
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch team members');
+      }
+      if (!Array.isArray(data.teamMembers)) {
+        throw new Error('Unexpected response from the team members endpoint');
+      }
+
+      setMembers(data.teamMembers);
     } catch (error) {
       console.error('Failed to fetch team members:', error);
-      toast.error('Failed to load team members');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to load team members'
+      );
     } finally {
       setLoading(false);
     }
@@ -80,18 +93,24 @@ export function TeamRosterPage({
   const handleUpdateMember = async (memberId: string, updates: Partial<TeamMember>) => {
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify(updates),
       });
 
-      if (!response.ok) throw new Error('Failed to update member');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update member');
+      }
 
       toast.success('Team member updated successfully');
       fetchMembers();
     } catch (error) {
       console.error('Failed to update member:', error);
-      toast.error('Failed to update team member');
+      toast.error(error instanceof Error ? error.message : 'Failed to update team member');
     }
   };
 
@@ -104,6 +123,7 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}`, {
         method: 'DELETE',
+        headers: { 'x-csrf-token': csrfToken },
       });
 
       if (!response.ok) throw new Error('Failed to remove member');
@@ -121,6 +141,7 @@ export function TeamRosterPage({
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members/${memberId}/resend-invite`, {
         method: 'POST',
+        headers: { 'x-csrf-token': csrfToken },
       });
 
       const data = await response.json();
@@ -142,12 +163,31 @@ export function TeamRosterPage({
     }
   };
 
+  // H7: copy the onboarding link so the coach can hand it to the player
+  // directly (text, team chat, printed sheet) instead of relying on email.
+  const handleCopyInviteLink = async (member: TeamMember) => {
+    if (!member.onboardingLink) {
+      toast.error('No invite link available for this player');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(member.onboardingLink);
+      toast.success(`Invite link copied for ${member.name}`);
+    } catch (error) {
+      console.error('Failed to copy invite link:', error);
+      toast.error('Could not copy the link — copy it manually instead');
+    }
+  };
+
   // Handle adding a new member
   const handleAddMember = async (memberData: any) => {
     try {
       const response = await fetch(`/api/campaigns/${campaignId}/team-members`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
         body: JSON.stringify(memberData),
       });
 
@@ -171,11 +211,8 @@ export function TeamRosterPage({
     }
   };
 
-  // Handle CSV import completion
-  const handleImportComplete = () => {
-    setShowImportModal(false);
-    fetchMembers();
-    toast.success('Team members imported successfully');
+  const goToImport = () => {
+    router.push(`/dashboard/${campaignId}/roster/import`);
   };
 
   // Calculate statistics
@@ -215,7 +252,7 @@ export function TeamRosterPage({
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -236,20 +273,20 @@ export function TeamRosterPage({
         <div className="flex flex-wrap gap-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all"
           >
             Add Team Member
           </button>
           <button
-            onClick={() => setShowImportModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={goToImport}
+            className="px-4 py-2 bg-success text-success-foreground rounded-lg hover:brightness-110 transition-all"
           >
-            Import from CSV
+            Import roster
           </button>
           <a
             href={`/api/campaigns/${campaignId}/import-roster`}
             download="team_roster_template.csv"
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
           >
             Download CSV Template
           </a>
@@ -274,7 +311,7 @@ export function TeamRosterPage({
           statusFilter={statusFilter}
           canManage={canManage}
           onAddMember={() => setShowAddModal(true)}
-          onImportCSV={() => setShowImportModal(true)}
+          onImportCSV={goToImport}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -287,6 +324,9 @@ export function TeamRosterPage({
               onEdit={(member) => setSelectedMember(member as TeamMember)}
               onDelete={handleDeleteMember}
               onResendInvite={handleResendInvitation}
+              onCopyInviteLink={(m) => {
+                void handleCopyInviteLink(m as unknown as TeamMember);
+              }}
             />
           ))}
         </div>
@@ -297,14 +337,6 @@ export function TeamRosterPage({
         <AddTeamMemberModal
           onClose={() => setShowAddModal(false)}
           onSave={handleAddMember}
-        />
-      )}
-
-      {showImportModal && (
-        <CSVImportModal
-          campaignId={campaignId}
-          onClose={() => setShowImportModal(false)}
-          onComplete={handleImportComplete}
         />
       )}
 

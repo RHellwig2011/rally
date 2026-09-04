@@ -37,6 +37,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Ownership check: only the campaign's primary leader (or platform/bank
+    // admins) may view the campaign's Stripe Connect status.
+    const isAuthorized =
+      campaign.primaryLeaderId === user.id ||
+      user.role === "ADMIN" ||
+      user.role === "BANK_ADMIN";
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: "Not authorized to view this campaign's payout account status" },
+        { status: 403 }
+      );
+    }
+
     if (!campaign.bankingAccount?.stripeConnectAccountId) {
       return NextResponse.json(
         {
@@ -66,11 +80,16 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure — pass it through
+    if (error instanceof NextResponse) {
+      return error;
+    }
     console.error("Failed to get account status:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to get account status",
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to get account status",
       },
       { status: 500 }
     );

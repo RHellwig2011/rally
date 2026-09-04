@@ -2,9 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { processDonation } from "@/lib/banking";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { checkRouteRateLimit } from "@/lib/utils/with-rate-limit";
-import { RATE_LIMITS } from "@/lib/utils/rate-limiter";
+import {
+  checkDonationSourceRateLimit,
+  checkDonationEmailRateLimit,
+} from "@/lib/utils/rate-limiter";
 import { checkCsrf } from "@/lib/csrf";
+import {
+  decideTeamMemberAttribution,
+  teamMemberAttributionWhere,
+} from "@/lib/donation-attribution";
+import { isPubliclyListableCampaign } from "@/lib/public-campaign";
+
+// Hard ceiling applied at parse time, before PlatformSettings is consulted.
+// Also the fallback max when no settings row exists.
+const MAX_DONATION_DOLLARS_CEILING = 1_000_000; // $1,000,000
+
+// Fallback bounds in cents, used when the singleton PlatformSettings row is
+// missing or leaves a limit unset. These mirror the schema defaults on
+// PlatformSettings.min/maxDonationAmountCents.
+const FALLBACK_MIN_DONATION_CENTS = BigInt(100); // $1
+const FALLBACK_MAX_DONATION_CENTS = BigInt(MAX_DONATION_DOLLARS_CEILING * 100);
 
 // Validation schema for donations
 const createDonationSchema = z.object({
@@ -14,8 +31,13 @@ const createDonationSchema = z.object({
   donorName: z.string().optional(),
   donorPhone: z.string().optional(),
   message: z.string().optional(),
-  amount: z.number().positive("Amount must be greater than 0"),
+  // Structural bounds only — the authoritative limits come from
+  // PlatformSettings below. `.finite()` matters: without it Infinity and NaN
+  // pass z.number(), and Math.round(Infinity * 100) reaches BigInt() as a
+  // non-integer and throws a 500 instead of a validation error.
+  amount: z.number().finite().positive().max(MAX_DONATION_DOLLARS_CEILING, "Donation amount is too large"),
   isAnonymous: z.boolean().optional().default(false),
+  coverFees: z.boolean().optional().default(false),
   referralCode: z.string().optional(),
 });
 
@@ -31,15 +53,24 @@ export async function POST(req: NextRequest) {
       return csrfCheck.response!;
     }
 
-    // Apply payment-specific rate limiting
-    const rateLimitCheck = checkRouteRateLimit(req, RATE_LIMITS.DONATION);
-    if (rateLimitCheck.limited) {
-      return rateLimitCheck.response!;
+    // Source-level throttle first: this runs before any parsing so a flood of
+    // junk bodies is cheap to reject.
+    const ipRateLimit = checkDonationSourceRateLimit(req);
+    if (ipRateLimit.limited) {
+      return ipRateLimit.response!;
     }
 
     // Parse and validate request body
     const body = await req.json();
     const validatedData = createDonationSchema.parse(body);
+
+    // Now that a donor email is known, apply the per-email bucket too. This is
+    // the one that keeps biting during card testing from rotating addresses,
+    // where the IP bucket alone would not.
+    const donorRateLimit = checkDonationEmailRateLimit(validatedData.donorEmail);
+    if (donorRateLimit.limited) {
+      return donorRateLimit.response!;
+    }
 
     // Verify campaign exists and is active
     const campaign = await prisma.campaign.findUnique({
@@ -70,16 +101,101 @@ export async function POST(req: NextRequest) {
     // Convert dollar amount to cents
     const grossAmountInCents = Math.round(validatedData.amount * 100);
 
+    // Enforce the platform's configured donation limits. The settings row is a
+    // singleton; if an install has not created it yet, fall back to the same
+    // bounds the schema defaults to rather than accepting any amount.
+    const settings = await prisma.platformSettings.findFirst({
+      select: { minDonationAmountCents: true, maxDonationAmountCents: true },
+    });
+    const minDonationCents =
+      settings?.minDonationAmountCents ?? FALLBACK_MIN_DONATION_CENTS;
+    const maxDonationCents =
+      settings?.maxDonationAmountCents ?? FALLBACK_MAX_DONATION_CENTS;
+
+    if (BigInt(grossAmountInCents) < minDonationCents) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Minimum donation is $${Number(minDonationCents) / 100}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (BigInt(grossAmountInCents) > maxDonationCents) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Maximum donation is $${Number(maxDonationCents) / 100}`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Calculate fees
     const platformFeePercent = campaign.platformFeePercent || 10;
     const platformFee = Math.round((grossAmountInCents * platformFeePercent) / 100);
     const processingFee = Math.round(grossAmountInCents * 0.029) + 30; // Stripe: 2.9% + $0.30
-    const netAmount = grossAmountInCents - platformFee - processingFee;
+    // When the donor covers processing fees, they are charged gross + processing
+    // and the campaign keeps gross - platformFee.
+    const coverFees = validatedData.coverFees;
+    const chargedAmountInCents = coverFees
+      ? grossAmountInCents + processingFee
+      : grossAmountInCents;
+    const netAmount = coverFees
+      ? grossAmountInCents - platformFee
+      : grossAmountInCents - platformFee - processingFee;
+
+    // If a team member is being supported, they must resolve on this campaign.
+    // Athlete URLs carry fundLinkCode, not the cuid — look up either. A miss
+    // is 400: silently dropping attribution would credit the campaign while
+    // the donor still sees the player's page.
+    let teamMemberId: string | undefined;
+    if (validatedData.teamMemberId?.trim()) {
+      const teamMember = await prisma.teamMember.findFirst({
+        where: teamMemberAttributionWhere(
+          validatedData.campaignId,
+          validatedData.teamMemberId.trim()
+        ),
+        select: { id: true },
+      });
+      const decision = decideTeamMemberAttribution(
+        validatedData.teamMemberId,
+        teamMember?.id
+      );
+      if (decision.status === "reject") {
+        return NextResponse.json(
+          { success: false, error: "Team member not found" },
+          { status: 400 }
+        );
+      }
+      if (decision.status === "use") {
+        teamMemberId = decision.teamMemberId;
+      }
+    }
+
+    // referralCode is caller-supplied on this unauthenticated endpoint, so it is
+    // only persisted once it resolves to a real Referral belonging to THIS
+    // campaign. Storing an arbitrary string here would let a donor point the
+    // attribution logic at a record of their choosing; unknown or foreign codes
+    // are dropped and the donation is still accepted.
+    let referralCode: string | undefined;
+    if (validatedData.referralCode) {
+      const referral = await prisma.referral.findFirst({
+        where: {
+          referralCode: validatedData.referralCode,
+          campaignId: validatedData.campaignId,
+        },
+        select: { referralCode: true },
+      });
+      referralCode = referral?.referralCode;
+    }
 
     // Create donation record in PENDING status
     const donation = await prisma.donation.create({
       data: {
         campaignId: validatedData.campaignId,
+        teamMemberId,
         donorEmail: validatedData.donorEmail,
         donorName: validatedData.donorName,
         donorMessage: validatedData.message,
@@ -88,7 +204,7 @@ export async function POST(req: NextRequest) {
         processingFee: BigInt(processingFee),
         netAmount: BigInt(netAmount),
         isAnonymous: validatedData.isAnonymous,
-        referralCode: validatedData.teamMemberId || validatedData.referralCode,
+        referralCode,
         status: "PENDING",
         paymentProvider: "STRIPE",
       },
@@ -97,14 +213,20 @@ export async function POST(req: NextRequest) {
     // Create Stripe payment intent
     const { createPaymentIntent } = await import('@/lib/stripe');
     const paymentIntent = await createPaymentIntent({
-      amount: grossAmountInCents,
+      amount: chargedAmountInCents,
       campaignId: validatedData.campaignId,
       donorEmail: validatedData.donorEmail,
+      // The PENDING donation row created just above is the natural key: exactly
+      // one intent belongs to it, so a retried request reuses that intent.
+      idempotencyKey: `donation-${donation.id}`,
       metadata: {
         donationId: donation.id,
         campaignName: `${campaign.organizationName} ${campaign.teamName}`,
+        grossAmount: String(grossAmountInCents),
+        ...(coverFees && { coverFees: "true" }),
         ...(validatedData.donorName && { donorName: validatedData.donorName }),
-        ...(validatedData.referralCode && { referralCode: validatedData.referralCode }),
+        ...(referralCode && { referralCode }),
+        ...(teamMemberId && { teamMemberId }),
       },
     });
 
@@ -122,6 +244,7 @@ export async function POST(req: NextRequest) {
         donation: {
           id: donation.id,
           amount: validatedData.amount,
+          totalCharged: chargedAmountInCents / 100,
           campaignId: donation.campaignId,
         },
         clientSecret: paymentIntent.client_secret,
@@ -151,7 +274,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to create donation",
+        // Detail is logged above; never leak internal error text to the client.
+        error: "Failed to create donation",
       },
       { status: 500 }
     );
@@ -166,8 +290,10 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const campaignId = searchParams.get("campaignId");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const rawLimit = parseInt(searchParams.get("limit") || "20");
+    const rawOffset = parseInt(searchParams.get("offset") || "0");
+    const limit = Number.isNaN(rawLimit) ? 20 : Math.min(Math.max(rawLimit, 1), 100);
+    const offset = Number.isNaN(rawOffset) ? 0 : Math.max(rawOffset, 0);
 
     if (!campaignId) {
       return NextResponse.json(
@@ -176,12 +302,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { status: true },
+    });
+    if (!campaign || !isPubliclyListableCampaign(campaign.status)) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
 
-    try {
+    {
+      const where = { campaignId, status: "COMPLETED" as const };
       const donations = await prisma.donation.findMany({
-        where: { campaignId },
+        where,
         take: limit,
         skip: offset,
         orderBy: { createdAt: "desc" },
@@ -196,13 +331,12 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      const total = await prisma.donation.count({
-        where: { campaignId },
-      });
+      const total = await prisma.donation.count({ where });
 
-      // Convert BigInt to string for JSON
+      // Serialize BigInt and hide the identity of anonymous donors
       const serializedDonations = donations.map((d) => ({
         ...d,
+        donorName: d.isAnonymous ? null : d.donorName,
         grossAmount: d.grossAmount.toString(),
       }));
 
@@ -215,8 +349,6 @@ export async function GET(req: NextRequest) {
         },
         { status: 200 }
       );
-    } finally {
-      await prisma.$disconnect();
     }
   } catch (error) {
     console.error("Failed to fetch donations:", error);

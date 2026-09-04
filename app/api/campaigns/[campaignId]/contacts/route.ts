@@ -1,6 +1,152 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getUserFromToken } from "@/lib/auth";
+import { checkCsrf } from "@/lib/csrf";
+import { z } from "zod";
 
+/**
+ * Contacts for a campaign. Contact rows belong to a TeamMember, so
+ * "campaign contacts" are the contacts of the campaign's team members.
+ */
+
+const createContactSchema = z.object({
+  teamMemberId: z.string().min(1, "teamMemberId is required"),
+  name: z.string().trim().max(200).optional(),
+  firstName: z.string().trim().max(100).optional(),
+  lastName: z.string().trim().max(100).optional(),
+  email: z.preprocess(
+    (val) => (typeof val === "string" ? val.trim().toLowerCase() : val),
+    z.string().email("Invalid email format").optional()
+  ),
+  phone: z.string().trim().max(30).optional(),
+  notes: z.string().max(2000).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  source: z.enum(["MANUAL_IMPORT", "CSV_UPLOAD", "ROSTER_INVITE", "DONATION"]).optional(),
+});
+
+type AuthResult =
+  | { ok: true; user: NonNullable<Awaited<ReturnType<typeof getUserFromToken>>> }
+  | { ok: false; response: NextResponse };
+
+async function authorizeCampaignAccess(
+  req: NextRequest,
+  campaignId: string
+): Promise<AuthResult> {
+  const sessionToken = req.cookies.get("sessionToken")?.value;
+  if (!sessionToken) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: "Not authenticated" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const user = await getUserFromToken(sessionToken);
+  if (!user) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: "Invalid or expired token" },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    include: {
+      guardians: {
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!campaign) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      ),
+    };
+  }
+
+  const isAuthorized =
+    campaign.primaryLeaderId === user.id ||
+    campaign.guardians.some((g) => g.id === user.id) ||
+    user.role === "ADMIN";
+
+  if (!isAuthorized) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: "Not authorized to manage this campaign" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { ok: true, user };
+}
+
+function formatContact(contact: {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  source: string;
+  notes: string | null;
+  tags: string[];
+  emailsSent: number;
+  smsSent: number;
+  lastContactedAt: Date | null;
+  donated: boolean;
+  donationAmount: bigint | null;
+  createdAt: Date;
+  teamMemberId: string;
+  teamMember?: { id: string; name: string } | null;
+}) {
+  return {
+    id: contact.id,
+    name: [contact.firstName, contact.lastName].filter(Boolean).join(" ") || null,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email,
+    phone: contact.phone,
+    source: contact.source,
+    notes: contact.notes,
+    tags: contact.tags,
+    emailsSent: contact.emailsSent,
+    smsSent: contact.smsSent,
+    lastContactedAt: contact.lastContactedAt,
+    donated: contact.donated,
+    donationAmount:
+      contact.donationAmount != null ? Number(contact.donationAmount) / 100 : null,
+    teamMemberId: contact.teamMemberId,
+    teamMember: contact.teamMember
+      ? { id: contact.teamMember.id, name: contact.teamMember.name }
+      : null,
+    createdAt: contact.createdAt,
+  };
+}
+
+/**
+ * Page size for the contact list. Deliberately large: the outreach page fetches
+ * this endpoint with no query parameters and builds its recipient picker from
+ * the result, so a small default would silently shrink a coach's send list. 500
+ * matches the per-request recipient cap the send-outreach routes enforce.
+ */
+const DEFAULT_LIST_LIMIT = 500;
+const MAX_LIST_LIMIT = 1000;
+
+/**
+ * GET /api/campaigns/[campaignId]/contacts
+ * List all contacts belonging to the campaign's team members.
+ * Supports ?limit=&offset= query parameters.
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
@@ -8,33 +154,52 @@ export async function GET(
   try {
     const { campaignId } = params;
 
-    // For now, return mock contacts
-    // In production, this would fetch from a contacts table
-    const mockContacts = [
-      {
-        id: "1",
-        name: "John Doe",
-        email: "john@example.com",
-        phone: "+15555551234",
+    const auth = await authorizeCampaignAccess(req, campaignId);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    // Clamped pagination, mirroring app/api/admin/transactions.
+    const searchParams = req.nextUrl.searchParams;
+    const parsedLimit = parseInt(searchParams.get("limit") || String(DEFAULT_LIST_LIMIT), 10);
+    const limit = Number.isNaN(parsedLimit)
+      ? DEFAULT_LIST_LIMIT
+      : Math.min(Math.max(parsedLimit, 1), MAX_LIST_LIMIT);
+    const parsedOffset = parseInt(searchParams.get("offset") || "0", 10);
+    const offset = Number.isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+    const where = {
+      teamMember: {
+        campaignId,
+        deletedAt: null,
       },
-      {
-        id: "2",
-        name: "Jane Smith",
-        email: "jane@example.com",
-        phone: "+15555555678",
-      },
-      {
-        id: "3",
-        name: "Bob Johnson",
-        email: "bob@example.com",
-        phone: "+15555559012",
-      },
-    ];
+    };
+
+    const [contacts, total] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        include: {
+          teamMember: {
+            select: { id: true, name: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.contact.count({ where }),
+    ]);
 
     return NextResponse.json(
       {
         success: true,
-        contacts: mockContacts,
+        contacts: contacts.map(formatContact),
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + contacts.length < total,
+        },
       },
       { status: 200 }
     );
@@ -47,39 +212,128 @@ export async function GET(
   }
 }
 
+/**
+ * POST /api/campaigns/[campaignId]/contacts
+ * Create a contact for one of the campaign's team members
+ */
 export async function POST(
   req: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
   try {
-    const { campaignId } = params;
-    const body = await req.json();
-    const { name, email, phone } = body;
+    // CSRF check (state-changing route)
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
 
-    if (!name || (!email && !phone)) {
+    const { campaignId } = params;
+
+    const auth = await authorizeCampaignAccess(req, campaignId);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const body = await req.json();
+    const validated = createContactSchema.parse(body);
+
+    if (!validated.email && !validated.phone) {
       return NextResponse.json(
-        { success: false, error: "Name and email or phone required" },
+        { success: false, error: "Either email or phone is required" },
         { status: 400 }
       );
     }
 
-    // In production, this would save to database
-    // For now, just return success
+    // The team member the contact belongs to must be part of this campaign
+    const teamMember = await prisma.teamMember.findFirst({
+      where: {
+        id: validated.teamMemberId,
+        campaignId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (!teamMember) {
+      return NextResponse.json(
+        { success: false, error: "Team member not found in this campaign" },
+        { status: 404 }
+      );
+    }
+
+    // Dedupe by email within the campaign
+    if (validated.email) {
+      const existing = await prisma.contact.findFirst({
+        where: {
+          email: validated.email,
+          teamMember: { campaignId },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A contact with this email already exists in the campaign",
+            contactId: existing.id,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Derive first/last name from a single "name" field if provided
+    let firstName = validated.firstName;
+    let lastName = validated.lastName;
+    if (!firstName && !lastName && validated.name) {
+      const parts = validated.name.split(/\s+/);
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ") || undefined;
+    }
+
+    const contact = await prisma.contact.create({
+      data: {
+        teamMemberId: teamMember.id,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        email: validated.email || null,
+        phone: validated.phone || null,
+        notes: validated.notes || null,
+        tags: validated.tags || [],
+        source: validated.source || "MANUAL_IMPORT",
+      },
+      include: {
+        teamMember: {
+          select: { id: true, name: true },
+        },
+      },
+    });
 
     return NextResponse.json(
       {
         success: true,
-        contact: {
-          id: Date.now().toString(),
-          name,
-          email,
-          phone,
-        },
+        contact: formatContact(contact),
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Contact creation error:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Validation failed",
+          details: error.errors.map((e) => ({
+            field: e.path.join("."),
+            message: e.message,
+          })),
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { success: false, error: "Failed to create contact" },
       { status: 500 }

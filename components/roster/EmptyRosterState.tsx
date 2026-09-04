@@ -24,7 +24,7 @@ export function EmptyRosterState({
     return (
       <div className="text-center py-12">
         <svg
-          className="mx-auto h-12 w-12 text-gray-400 mb-4"
+          className="mx-auto h-12 w-12 text-muted-foreground mb-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -36,8 +36,8 @@ export function EmptyRosterState({
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No team members found</h3>
-        <p className="text-gray-600">
+        <h3 className="text-lg font-medium text-foreground mb-2">No team members found</h3>
+        <p className="text-muted-foreground">
           Try adjusting your search or filter criteria
         </p>
       </div>
@@ -45,9 +45,9 @@ export function EmptyRosterState({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-12 text-center">
+    <div className="rounded-card border border-white/10 bg-card shadow-card p-12 text-center">
       <svg
-        className="mx-auto h-16 w-16 text-gray-400 mb-4"
+        className="mx-auto h-16 w-16 text-muted-foreground mb-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -59,10 +59,10 @@ export function EmptyRosterState({
           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
         />
       </svg>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+      <h3 className="text-xl font-semibold text-foreground mb-2">
         No team members yet
       </h3>
-      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
         Get started by adding team members one by one or importing multiple members from a CSV file.
       </p>
 
@@ -70,7 +70,7 @@ export function EmptyRosterState({
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={onAddMember}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             <svg
               className="inline-block w-5 h-5 mr-2"
@@ -89,7 +89,7 @@ export function EmptyRosterState({
           </button>
           <button
             onClick={onImportCSV}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="px-6 py-3 bg-success text-success-foreground rounded-lg hover:bg-success/90 transition-colors"
           >
             <svg
               className="inline-block w-5 h-5 mr-2"
@@ -104,13 +104,13 @@ export function EmptyRosterState({
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            Import from CSV
+            Import roster
           </button>
         </div>
       )}
 
       {!canManage && (
-        <p className="text-sm text-gray-500 mt-4">
+        <p className="text-sm text-muted-foreground mt-4">
           Contact your campaign leader to add team members.
         </p>
       )}

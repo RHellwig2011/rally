@@ -90,7 +90,28 @@ export const createCampaignSchema = z.object({
     .min(50, "Approval threshold must be at least $50")
     .max(10000, "Approval threshold cannot exceed $10,000")
     .optional()
-    .default(500), // Default $500 as per original code
+    .default(500),
+
+  minContactsPerPlayer: z.number()
+    .int()
+    .min(0)
+    .max(50)
+    .optional()
+    .default(0),
+
+  autoStretchGoal: z.boolean().optional().default(false),
+  stretchGoalPercent: z.number()
+    .int("Stretch percent must be a whole number")
+    .min(10, "Stretch percent must be at least 10")
+    .max(100, "Stretch percent cannot exceed 100")
+    .optional()
+    .default(20),
+  stretchGoalTriggerPercent: z.number()
+    .int("Trigger percent must be a whole number")
+    .min(50, "Trigger percent must be at least 50")
+    .max(99, "Trigger percent cannot exceed 99")
+    .optional()
+    .default(90),
 }).refine((data) => {
   // Validate that end date is after start date
   if (data.endDate) {
@@ -153,6 +174,41 @@ export const updateCampaignSchema = z.object({
 
   secondaryColor: z.string()
     .regex(hexColorRegex, "Secondary color must be a valid hex color")
+    .optional(),
+
+  // Link this campaign to the Program it is a season of. Alumni and
+  // year-over-year roster data hang off Program, so a campaign with no
+  // programId can never contribute to either. Pass null to unlink.
+  programId: z.string()
+    .cuid("Invalid program id")
+    .nullable()
+    .optional(),
+
+  // Which season this campaign covers. Used to order seasons within a program
+  // and to identify alumni by graduation year.
+  seasonYear: z.number()
+    .int("Season year must be a whole number")
+    .min(1900, "Season year must be 1900 or later")
+    .max(2200, "Season year cannot exceed 2200")
+    .nullable()
+    .optional(),
+
+  minContactsPerPlayer: z.number()
+    .int()
+    .min(0)
+    .max(50)
+    .optional(),
+
+  autoStretchGoal: z.boolean().optional(),
+  stretchGoalPercent: z.number()
+    .int("Stretch percent must be a whole number")
+    .min(10, "Stretch percent must be at least 10")
+    .max(100, "Stretch percent cannot exceed 100")
+    .optional(),
+  stretchGoalTriggerPercent: z.number()
+    .int("Trigger percent must be a whole number")
+    .min(50, "Trigger percent must be at least 50")
+    .max(99, "Trigger percent cannot exceed 99")
     .optional(),
 });
 

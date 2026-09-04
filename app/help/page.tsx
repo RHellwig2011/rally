@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Send, Bot, User as UserIcon, Loader2, HelpCircle, MessageSquare } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -114,21 +114,21 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Navigation />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-primary-100 text-primary px-4 py-2 rounded-full mb-4">
-            <HelpCircle className="w-5 h-5" />
-            <span className="font-semibold">Help Center</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            How Can We Help You?
+        <div className="mb-12">
+          <p className="font-display text-[13px] font-semibold uppercase tracking-[0.16em] text-secondary">
+            Help center
+          </p>
+          <h1 className="mt-3 font-display text-[clamp(34px,5vw,60px)] font-semibold leading-[1.02] tracking-[-0.02em] text-primary">
+            How can we help?
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Ask our AI assistant anything about Rally. Get instant answers 24/7.
+          <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+            Ask the assistant anything about running a campaign — instant answers,
+            any time of day.
           </p>
         </div>
 
@@ -136,16 +136,16 @@ export default function HelpPage() {
           {/* Quick Links Sidebar */}
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-20">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="font-display text-lg font-semibold text-primary-300 mb-4 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-primary" />
-                Quick Questions
+                Quick questions
               </h3>
               <div className="space-y-2">
                 {quickQuestions.map((question, index) => (
                   <button
                     key={index}
                     onClick={() => handleQuickQuestion(question)}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary rounded-lg transition-colors"
+                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-white/10 hover:text-primary rounded-lg transition-colors"
                   >
                     {question}
                   </button>
@@ -153,8 +153,8 @@ export default function HelpPage() {
               </div>
 
               <div className="mt-6 pt-6 border-t">
-                <h4 className="font-semibold text-gray-900 mb-2">Still Need Help?</h4>
-                <p className="text-sm text-gray-600 mb-3">
+                <h4 className="font-semibold text-foreground mb-2">Still Need Help?</h4>
+                <p className="text-sm text-muted-foreground mb-3">
                   Contact our support team directly
                 </p>
                 <Button variant="outline" size="sm" className="w-full" asChild>
@@ -167,7 +167,7 @@ export default function HelpPage() {
               <div className="mt-4">
                 <Button variant="outline" size="sm" className="w-full" asChild>
                   <Link href="/about">
-                    About Rally
+                    About Bleacher Backers
                   </Link>
                 </Button>
               </div>
@@ -178,20 +178,20 @@ export default function HelpPage() {
           <div className="lg:col-span-2">
             <Card className="h-[600px] flex flex-col">
               {/* Chat Header */}
-              <div className="p-4 border-b bg-gradient-to-r from-primary-600 to-purple-700 text-white rounded-t-lg">
+              <div className="p-4 border-b bg-primary text-white rounded-t-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
                     <Bot className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Rally AI Assistant</h3>
-                    <p className="text-sm text-indigo-100">Always here to help</p>
+                    <h3 className="font-semibold">Bleacher Backers Assistant</h3>
+                    <p className="text-sm text-primary-100">Always here to help</p>
                   </div>
                 </div>
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted">
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -204,7 +204,7 @@ export default function HelpPage() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         message.role === "user"
                           ? "bg-primary text-white"
-                          : "bg-gradient-to-br from-primary-600 to-purple-700 text-white"
+                          : "bg-primary text-white"
                       }`}
                     >
                       {message.role === "user" ? (
@@ -219,7 +219,7 @@ export default function HelpPage() {
                       className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                         message.role === "user"
                           ? "bg-primary text-white"
-                          : "bg-white border border-gray-200 text-gray-900"
+                          : "bg-card border border-border text-foreground"
                       }`}
                     >
                       <div className="whitespace-pre-wrap break-words">
@@ -229,7 +229,7 @@ export default function HelpPage() {
                         className={`text-xs mt-1 ${
                           message.role === "user"
                             ? "text-primary-100"
-                            : "text-gray-500"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {message.timestamp.toLocaleTimeString([], {
@@ -244,14 +244,14 @@ export default function HelpPage() {
                 {/* Typing Indicator */}
                 {isLoading && (
                   <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-purple-700 text-white flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
                       <Bot className="w-5 h-5" />
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+                    <div className="bg-card border border-border rounded-2xl px-4 py-3">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                        <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                        <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                        <div className="w-2 h-2 bg-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
                       </div>
                     </div>
                   </div>
@@ -261,14 +261,14 @@ export default function HelpPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-4 border-t bg-white rounded-b-lg">
+              <div className="p-4 border-t bg-card rounded-b-lg">
                 <div className="flex gap-2">
                   <Input
                     ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Ask me anything about Rally..."
+                    placeholder="Ask me anything about your campaign..."
                     disabled={isLoading}
                     className="flex-1"
                   />
@@ -284,7 +284,7 @@ export default function HelpPage() {
                     )}
                   </Button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Press Enter to send • AI responses may take a few seconds
                 </p>
               </div>
@@ -295,8 +295,8 @@ export default function HelpPage() {
         {/* Additional Help Resources */}
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-gray-900 mb-2">Getting Started</h3>
-            <p className="text-gray-600 text-sm mb-4">
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">Getting Started</h3>
+            <p className="text-muted-foreground text-sm mb-4">
               Learn how to create your first campaign and start raising money
             </p>
             <Button variant="outline" size="sm" asChild>
@@ -305,9 +305,9 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-gray-900 mb-2">Browse Campaigns</h3>
-            <p className="text-gray-600 text-sm mb-4">
-              See how other teams are using Rally to reach their goals
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">Browse Campaigns</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              See how other teams are using Bleacher Backers to reach their goals
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link href="/campaigns">View Campaigns</Link>
@@ -315,9 +315,9 @@ export default function HelpPage() {
           </Card>
 
           <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="font-bold text-gray-900 mb-2">About Rally</h3>
-            <p className="text-gray-600 text-sm mb-4">
-              Learn more about our mission and what makes Rally different
+            <h3 className="font-display text-lg font-semibold text-primary-300 mb-2">About Bleacher Backers</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Learn more about our mission and what makes Bleacher Backers different
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link href="/about">Learn More</Link>
@@ -327,10 +327,10 @@ export default function HelpPage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-12">
+      <footer className="border-t border-border bg-card mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-sm text-gray-600">
-            <p>&copy; {new Date().getFullYear()} Rally. All rights reserved.</p>
+          <div className="text-center text-sm text-muted-foreground">
+            <p>&copy; {new Date().getFullYear()} Bleacher Backers. All rights reserved.</p>
           </div>
         </div>
       </footer>

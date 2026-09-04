@@ -16,13 +16,30 @@ import {
 import { User, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 
 export function Navigation() {
-  const { user, isAuthenticated, checkAuth, logout } = useAuthStore();
+  const { user, isAuthenticated, hasHydrated, checkAuth, logout } = useAuthStore();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // False during SSR and the first client render; flips after mount. Combined
+  // with hasHydrated below so the first client render always matches the
+  // server-rendered (logged-out) markup — no React hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    // Fallback: if persist's onRehydrateStorage never fired (e.g. storage
+    // unavailable), unblock auth-dependent UI once we're mounted.
+    if (!useAuthStore.getState().hasHydrated) {
+      useAuthStore.getState().setHasHydrated(true);
+    }
+  }, []);
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Render the logged-out variant until the store has rehydrated and the
+  // component has mounted on the client.
+  const showAuthenticated = mounted && hasHydrated && isAuthenticated;
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -53,32 +70,32 @@ export function Navigation() {
   };
 
   return (
-    <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+    <nav className="border-b border-border bg-[rgba(10,13,20,.86)] backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-sm">BB</span>
             </div>
-            <span className="text-2xl font-bold text-gray-900">Bleacher Backers</span>
+            <span className="font-display text-xl font-bold tracking-[-0.01em] text-foreground">Bleacher Backers</span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
-            <Link href="#features" className="text-gray-600 hover:text-gray-900">
+            <Link href="#features" className="text-muted-foreground hover:text-foreground">
               Features
             </Link>
-            <Link href="/campaigns" className="text-gray-600 hover:text-gray-900">
+            <Link href="/campaigns" className="text-muted-foreground hover:text-foreground">
               Browse Campaigns
             </Link>
-            <Link href="#pricing" className="text-gray-600 hover:text-gray-900">
+            <Link href="#pricing" className="text-muted-foreground hover:text-foreground">
               Pricing
             </Link>
 
-            {isAuthenticated && user ? (
+            {showAuthenticated && user ? (
               <>
                 <Link
                   href="/create-campaign"
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   Create Campaign
                 </Link>
@@ -96,7 +113,7 @@ export function Navigation() {
                         <span className="font-semibold">
                           {user.firstName} {user.lastName}
                         </span>
-                        <span className="text-xs text-gray-500 font-normal">
+                        <span className="text-xs text-muted-foreground font-normal">
                           {user.email}
                         </span>
                       </div>
@@ -129,7 +146,7 @@ export function Navigation() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={handleLogout}
-                      className="cursor-pointer text-red-600"
+                      className="cursor-pointer text-warning"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
@@ -139,7 +156,7 @@ export function Navigation() {
               </>
             ) : (
               <>
-                <Link href="/login" className="text-gray-600 hover:text-gray-900">
+                <Link href="/login" className="text-muted-foreground hover:text-foreground">
                   Login
                 </Link>
                 <Link
@@ -182,49 +199,49 @@ export function Navigation() {
           />
 
           {/* Mobile Menu Panel */}
-          <div className="fixed top-16 inset-x-0 bottom-0 bg-white z-40 md:hidden overflow-y-auto">
+          <div className="fixed top-16 inset-x-0 bottom-0 bg-background z-40 md:hidden overflow-y-auto">
             <div className="px-4 py-6 space-y-1">
               {/* Navigation Links */}
               <Link
                 href="#features"
                 onClick={closeMobileMenu}
-                className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
               >
                 Features
               </Link>
               <Link
                 href="/campaigns"
                 onClick={closeMobileMenu}
-                className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
               >
                 Browse Campaigns
               </Link>
               <Link
                 href="#pricing"
                 onClick={closeMobileMenu}
-                className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
               >
                 Pricing
               </Link>
 
-              {isAuthenticated && user ? (
+              {showAuthenticated && user ? (
                 <>
-                  <div className="border-t border-gray-200 my-4" />
+                  <div className="border-t border-border my-4" />
 
                   <Link
                     href="/create-campaign"
                     onClick={closeMobileMenu}
-                    className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                    className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
                   >
                     Create Campaign
                   </Link>
 
                   {/* User Info Section */}
-                  <div className="px-4 py-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-semibold text-gray-900">
+                  <div className="px-4 py-3 bg-muted rounded-lg">
+                    <p className="text-sm font-semibold text-foreground">
                       {user.firstName} {user.lastName}
                     </p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
 
                   {/* Dashboard Links */}
@@ -232,7 +249,7 @@ export function Navigation() {
                     <Link
                       href="/dashboard"
                       onClick={closeMobileMenu}
-                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                      className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
                     >
                       <LayoutDashboard className="w-5 h-5 mr-3" />
                       My Campaigns
@@ -242,7 +259,7 @@ export function Navigation() {
                     <Link
                       href="/player"
                       onClick={closeMobileMenu}
-                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                      className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
                     >
                       <LayoutDashboard className="w-5 h-5 mr-3" />
                       My Dashboard
@@ -252,19 +269,19 @@ export function Navigation() {
                     <Link
                       href="/admin"
                       onClick={closeMobileMenu}
-                      className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                      className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
                     >
                       <LayoutDashboard className="w-5 h-5 mr-3" />
                       Admin Panel
                     </Link>
                   )}
 
-                  <div className="border-t border-gray-200 my-4" />
+                  <div className="border-t border-border my-4" />
 
                   {/* Logout Button */}
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-3 text-base font-medium text-red-600 hover:bg-red-50 rounded-lg min-h-[48px] flex items-center"
+                    className="w-full text-left px-4 py-3 text-base font-medium text-warning hover:bg-warning-light rounded-lg min-h-[48px] flex items-center"
                   >
                     <LogOut className="w-5 h-5 mr-3" />
                     Logout
@@ -272,12 +289,12 @@ export function Navigation() {
                 </>
               ) : (
                 <>
-                  <div className="border-t border-gray-200 my-4" />
+                  <div className="border-t border-border my-4" />
 
                   <Link
                     href="/login"
                     onClick={closeMobileMenu}
-                    className="block px-4 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-lg min-h-[48px] flex items-center"
+                    className="block px-4 py-3 text-base font-medium text-foreground hover:bg-muted hover:text-foreground rounded-lg min-h-[48px] flex items-center"
                   >
                     Login
                   </Link>

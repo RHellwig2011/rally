@@ -3,6 +3,53 @@
  */
 
 /**
+ * Leading characters that spreadsheet applications (Excel, Google Sheets,
+ * LibreOffice) interpret as the start of a formula. A roster value such as
+ * `=HYPERLINK("http://evil.test","CLICK")` becomes a live, clickable formula
+ * the moment a coach opens the downloaded .csv, so any value starting with one
+ * of these is prefixed with an apostrophe to force it to be read as text
+ * (CSV injection / CWE-1236).
+ */
+const FORMULA_TRIGGER_CHARS = ['=', '+', '-', '@', '\t', '\r'];
+
+/** Plain numbers must stay numbers — `-12.50` is data, not a formula. */
+const NUMERIC_LITERAL = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+
+/**
+ * Escape a single CSV field. This is the ONE place CSV quoting/neutralising
+ * happens — every CSV producer in the app routes through it.
+ *
+ * - Doubles inner double quotes and always wraps the field in quotes, so
+ *   commas, quotes and newlines can never terminate a field early and shift
+ *   every subsequent column (RFC 4180).
+ * - Neutralises spreadsheet formula triggers as described above.
+ */
+export function escapeCsvField(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '""';
+  }
+
+  let stringValue = String(value);
+
+  if (
+    stringValue.length > 0 &&
+    FORMULA_TRIGGER_CHARS.includes(stringValue[0]) &&
+    !NUMERIC_LITERAL.test(stringValue)
+  ) {
+    stringValue = `'${stringValue}`;
+  }
+
+  return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+/**
+ * Escape and join a full row of CSV fields.
+ */
+export function toCsvRow(fields: unknown[]): string {
+  return fields.map(escapeCsvField).join(',');
+}
+
+/**
  * Convert data to CSV format
  */
 export function convertToCSV(data: any[], headers: string[]): string {
@@ -17,24 +64,7 @@ export function convertToCSV(data: any[], headers: string[]): string {
 
   // Add data rows
   for (const row of data) {
-    const values = headers.map(header => {
-      const value = row[header];
-
-      // Handle special cases
-      if (value === null || value === undefined) {
-        return '';
-      }
-
-      // Escape quotes and wrap in quotes if needed
-      const stringValue = String(value);
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      }
-
-      return stringValue;
-    });
-
-    csvRows.push(values.join(','));
+    csvRows.push(toCsvRow(headers.map(header => row[header])));
   }
 
   return csvRows.join('\n');

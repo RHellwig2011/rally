@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwt } from "./lib/auth";
-import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from "./lib/utils/rate-limiter";
+import { verifyJwtEdge } from "./lib/auth/edge";
+import { getClientIdentifier, RATE_LIMITS } from "./lib/utils/rate-limiter";
+import { checkSharedRateLimit } from "./lib/utils/rate-limit-store";
 import { applySecurityHeaders } from "./lib/utils/security-headers";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Apply global rate limiting to API routes (skip in development for load testing)
@@ -12,12 +13,15 @@ export function middleware(request: NextRequest) {
     let userId: string | undefined;
 
     if (sessionToken) {
-      const decoded = verifyJwt(sessionToken);
+      const decoded = await verifyJwtEdge(sessionToken);
       userId = decoded?.id;
     }
 
     const identifier = getClientIdentifier(request, userId);
-    const { limited, info } = checkRateLimit(identifier, RATE_LIMITS.GLOBAL);
+    // Shared (Redis-backed) counter so the global budget is per-deployment,
+    // not per-instance; falls back to the in-memory limiter when Redis is
+    // unconfigured or unreachable.
+    const { limited, info } = await checkSharedRateLimit(identifier, RATE_LIMITS.GLOBAL);
 
     if (limited) {
       return NextResponse.json(
@@ -39,33 +43,71 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Public routes that don't need authentication
-  const publicRoutes = [
+  // Public routes that don't need authentication (exact match)
+  const publicExactRoutes = [
     "/",
+    "/about",
+    "/help",
+    "/campaigns",
     "/login",
     "/signup",
+    "/terms",
+    "/privacy",
+    "/forgot-password",
+    // The create-campaign wizard is a public page that gates in-page (it
+    // checks /api/auth/me and renders a sign-in card for anonymous visitors).
+    // The mutation it drives, POST /api/campaigns, still requires auth +
+    // verified email inside the handler.
+    "/create-campaign",
     "/auth/verify-email",
     "/auth/reset-password",
-    "/api/auth/login",
-    "/api/auth/signup",
-    "/api/auth/register",
-        "/api/auth/verify-email",
-
-        
-    "/api/auth/forgot-password",
-    "/api/auth/reset-password",
-    "/api/auth/resend-verification",
+    ...(process.env.NODE_ENV !== "production" ? ["/test-donation"] : []),
+    "/api/csrf-token",
+    // Uptime monitors and deploy smoke tests call this with no credentials.
+    "/api/health",
+    "/api/campaigns/public",
+    "/api/campaigns/check-slug",
     "/api/donations",
+    "/api/referrals/track",
+    "/api/help/chat",
     "/api/webhooks/stripe",
+    // Resend open/click webhooks authenticate by Svix signature inside the
+    // handler (RESEND_WEBHOOK_SECRET). Same convention as Stripe.
+    "/api/webhooks/resend",
+    // RFC 8058 one-click unsubscribe: mailbox providers GET/POST here with no
+    // cookies. The HMAC token in the query string is the authorization.
+    "/api/unsubscribe",
   ];
 
-  // Allow all /raise/* pages (public fundraising pages)
-  if (pathname.startsWith("/raise/")) {
-    return NextResponse.next();
-  }
+  // Public route prefixes (must end with "/" so "/api/auth/" can't match "/api/authors")
+  const publicRoutePrefixes = [
+    "/raise/", // public fundraising pages
+    "/player/onboard/", // token-based player onboarding from invitation emails
+    "/api/auth/", // login, signup, register, verify, reset, refresh, logout
+    "/api/campaigns/slug/", // public campaign pages
+    "/api/donations/", // donation verification for public donors
+    "/api/webhooks/", // webhooks authenticate via signatures
+    "/api/cron/", // cron routes authenticate via CRON_SECRET bearer token
+    "/contribute/", // token-based supporter-contact collection page (players + guardians)
+    "/api/contact-invite/", // GET/POST the invite token anonymously; the token IS the authorization
+    "/coach-invite/", // assistant-coach invite landing; page links unsigned visitors to login
+  ];
 
-  // Check if current path is public
-  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route));
+  const isPublicRoute =
+    publicExactRoutes.includes(pathname) ||
+    publicRoutePrefixes.some((prefix) => pathname.startsWith(prefix)) ||
+    // Public team member profile + token-based onboarding endpoints only
+    (pathname.startsWith("/api/team-members/") &&
+      (pathname.endsWith("/public") || pathname.endsWith("/onboard"))) ||
+    // Cheer wall: public visitors POST messages; GET/PATCH/DELETE enforce
+    // campaign-leader auth inside the route handlers
+    (pathname.startsWith("/api/campaigns/") && pathname.includes("/cheer-messages")) ||
+    // Leaderboard: scope=public is anonymous; scope=staff re-checks the session
+    // and campaign ownership inside the route handler (401/403).
+    (pathname.startsWith("/api/campaigns/") && pathname.endsWith("/leaderboard")) ||
+    // Coach-invite preview is token-authenticated. POST .../accept stays
+    // cookie-gated here; the handler still re-checks session + CSRF.
+    (pathname.startsWith("/api/coach-invites/") && !pathname.endsWith("/accept"));
 
   const sessionToken = request.cookies.get("sessionToken")?.value;
 
@@ -78,14 +120,32 @@ export function middleware(request: NextRequest) {
   }
 
   if (sessionToken) {
-    const decoded = verifyJwt(sessionToken);
-    if (!decoded) {
-      // Token is invalid or expired - only redirect if not on public route
-      if (!isPublicRoute) {
-        const response = NextResponse.redirect(new URL("/login", request.url));
+    const decoded = await verifyJwtEdge(sessionToken);
+    if (!decoded && !isPublicRoute) {
+      // Token is invalid or expired
+      if (pathname.startsWith("/api/")) {
+        const response = NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
         response.cookies.delete("sessionToken");
         return response;
       }
+      const response = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.delete("sessionToken");
+      return response;
+    }
+
+    // Admin pages require ADMIN or BANK_ADMIN role. API routes under
+    // /api/admin already enforce this server-side (403); this closes the
+    // UI-only hole where any logged-in user could load /admin page shells.
+    if (
+      decoded &&
+      (pathname === "/admin" || pathname.startsWith("/admin/")) &&
+      decoded.role !== "ADMIN" &&
+      decoded.role !== "BANK_ADMIN"
+    ) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 

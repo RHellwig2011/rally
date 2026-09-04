@@ -9,7 +9,7 @@ import { z } from "zod";
 
 describe("Team Member API Validation Tests", () => {
   // Helper function to generate valid team member data
-  const getValidTeamMemberData = () => ({
+  const getValidTeamMemberData = (): Record<string, unknown> => ({
     name: "John Doe",
     email: "john.doe@example.com",
     personalGoal: 500,
@@ -194,12 +194,11 @@ describe("Team Member API Validation Tests", () => {
       expect(() => updateTeamMemberSchema.parse(data)).not.toThrow();
     });
 
-    it("should not allow email updates", () => {
-      const schema = updateTeamMemberSchema;
-      const data = { email: "newemail@example.com" };
-      // Email field should not be in the update schema
-      const parsed = schema.parse(data);
-      expect(parsed.email).toBeUndefined();
+    it("should allow in-place email updates and normalize the address", () => {
+      const parsed = updateTeamMemberSchema.parse({
+        email: "NewEmail@Example.com",
+      });
+      expect(parsed.email).toBe("newemail@example.com");
     });
 
     it("should validate updated fields", () => {

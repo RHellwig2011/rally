@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/requireAuth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { checkCsrf } from "@/lib/csrf";
 
 const updateProfileSchema = z.object({
   profilePhotoUrl: z.string().url().optional().or(z.literal("")),
@@ -27,8 +28,8 @@ export async function GET(
 
     const { teamMemberId } = params;
 
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: teamMemberId },
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { id: teamMemberId, deletedAt: null },
       include: {
         campaign: {
           select: {
@@ -73,6 +74,11 @@ export async function GET(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure - return it as-is
+    if (error instanceof NextResponse) {
+      return error;
+    }
+
     console.error("Failed to fetch team member:", error);
     return NextResponse.json(
       { error: "Failed to fetch team member" },
@@ -90,14 +96,20 @@ export async function PATCH(
   { params }: { params: { teamMemberId: string } }
 ) {
   try {
+    // Check CSRF token
+    const csrfCheck = checkCsrf(req);
+    if (!csrfCheck.valid) {
+      return csrfCheck.response!;
+    }
+
     // Verify authentication (throws if not authenticated)
     const user = await verifyAuth(req);
 
     const { teamMemberId } = params;
 
     // Get team member
-    const teamMember = await prisma.teamMember.findUnique({
-      where: { id: teamMemberId },
+    const teamMember = await prisma.teamMember.findFirst({
+      where: { id: teamMemberId, deletedAt: null },
     });
 
     if (!teamMember) {
@@ -141,6 +153,11 @@ export async function PATCH(
       { status: 200 }
     );
   } catch (error) {
+    // verifyAuth throws a NextResponse (401) on auth failure - return it as-is
+    if (error instanceof NextResponse) {
+      return error;
+    }
+
     console.error("Failed to update team member:", error);
 
     if (error instanceof z.ZodError) {

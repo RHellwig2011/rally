@@ -105,7 +105,7 @@ export async function sendTeamMemberInvitation(
 ): Promise<boolean> {
   try {
     // Import email service
-    const { sendTeamMemberInvitationEmail } = await import('@/lib/services/email');
+    const { sendTeamMemberInvitationEmail } = await import('@/lib/email');
 
     // Extract team name from campaign name (if formatted as "Team - Organization")
     const teamName = campaignName.split(' - ')[0] || campaignName;
