@@ -173,6 +173,12 @@ export async function GET(
         totalRaised,
         currentAmount: Number(campaign.currentAmount) / 100,
         progress: Math.min(100, Math.round(progress * 100) / 100), // Cap at 100%
+        autoStretchGoal: campaign.autoStretchGoal,
+        stretchGoalPercent: campaign.stretchGoalPercent,
+        stretchGoalTriggerPercent: campaign.stretchGoalTriggerPercent,
+        originalGoalAmount: campaign.originalGoalAmount
+          ? Number(campaign.originalGoalAmount) / 100
+          : null,
 
         // Statistics
         statistics: {
@@ -321,6 +327,15 @@ export async function PUT(
     if (validatedData.primaryColor) updateData.primaryColor = validatedData.primaryColor;
     if (validatedData.secondaryColor) updateData.secondaryColor = validatedData.secondaryColor;
     if (validatedData.seasonYear !== undefined) updateData.seasonYear = validatedData.seasonYear;
+    if (validatedData.autoStretchGoal !== undefined) {
+      updateData.autoStretchGoal = validatedData.autoStretchGoal;
+    }
+    if (validatedData.stretchGoalPercent !== undefined) {
+      updateData.stretchGoalPercent = validatedData.stretchGoalPercent;
+    }
+    if (validatedData.stretchGoalTriggerPercent !== undefined) {
+      updateData.stretchGoalTriggerPercent = validatedData.stretchGoalTriggerPercent;
+    }
 
     // Linking a campaign to a program is a privilege change, not cosmetics.
     // GET /api/programs/[programId]/alumni grants access to anyone who leads a
@@ -395,6 +410,9 @@ export async function PUT(
         status: updatedCampaign.status,
         programId: updatedCampaign.programId,
         seasonYear: updatedCampaign.seasonYear,
+        autoStretchGoal: updatedCampaign.autoStretchGoal,
+        stretchGoalPercent: updatedCampaign.stretchGoalPercent,
+        stretchGoalTriggerPercent: updatedCampaign.stretchGoalTriggerPercent,
         updatedAt: updatedCampaign.updatedAt,
       }
     });

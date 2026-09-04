@@ -104,6 +104,7 @@ model User {
   outreachCampaigns         OutreachCampaign[]
   scheduledStatusChanges    ScheduledStatusChange[]   @relation("ScheduledStatusChangeCreator")
   createdCampaignTemplates  CampaignTemplate[]        @relation("CampaignTemplateCreator")
+  coachInvitesSent          CoachInvite[]             @relation("CoachInviteInviter")
 
   @@index([email])
 }
@@ -199,6 +200,11 @@ model Campaign {
   description       String           @db.Text
   goalAmount        BigInt           // In cents
   currentAmount     BigInt           @default(0) // In cents
+  // Moving goal: stretch goalAmount when currentAmount nears the trigger.
+  autoStretchGoal            Boolean          @default(false)
+  stretchGoalPercent         Int              @default(20)  // raise amount, %
+  stretchGoalTriggerPercent  Int              @default(90)  // how close before it moves
+  originalGoalAmount         BigInt?          // stamped on first stretch; 4x cap
   platformFeePercent Float           @default(10.0)
 
   // Customization
@@ -240,6 +246,7 @@ model Campaign {
   teamMembers            TeamMember[]
   outreachCampaigns      OutreachCampaign[]
   scheduledStatusChanges ScheduledStatusChange[]
+  coachInvites           CoachInvite[]
   clonedFrom             Campaign?           @relation("CampaignClones", fields: [clonedFromId], references: [id])
   clonedFromId           String?
   clones                 Campaign[]          @relation("CampaignClones")
@@ -248,6 +255,24 @@ model Campaign {
   @@index([status])
   @@index([primaryLeaderId])
   @@index([clonedFromId])
+}
+
+// Pending invitation for an assistant coach (Campaign.guardians).
+model CoachInvite {
+  id          String    @id @default(cuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email       String
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String
+  invitedBy   User      @relation("CoachInviteInviter", fields: [invitedById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([campaignId])
+  @@index([email])
+  @@index([invitedById])
 }
 
 // Scheduled status changes for campaigns

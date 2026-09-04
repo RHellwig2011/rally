@@ -90,6 +90,7 @@ export async function middleware(request: NextRequest) {
     "/api/cron/", // cron routes authenticate via CRON_SECRET bearer token
     "/contribute/", // token-based supporter-contact collection page (players + guardians)
     "/api/contact-invite/", // GET/POST the invite token anonymously; the token IS the authorization
+    "/coach-invite/", // assistant-coach invite landing; page links unsigned visitors to login
   ];
 
   const isPublicRoute =
@@ -103,7 +104,10 @@ export async function middleware(request: NextRequest) {
     (pathname.startsWith("/api/campaigns/") && pathname.includes("/cheer-messages")) ||
     // Leaderboard: scope=public is anonymous; scope=staff re-checks the session
     // and campaign ownership inside the route handler (401/403).
-    (pathname.startsWith("/api/campaigns/") && pathname.endsWith("/leaderboard"));
+    (pathname.startsWith("/api/campaigns/") && pathname.endsWith("/leaderboard")) ||
+    // Coach-invite preview is token-authenticated. POST .../accept stays
+    // cookie-gated here; the handler still re-checks session + CSRF.
+    (pathname.startsWith("/api/coach-invites/") && !pathname.endsWith("/accept"));
 
   const sessionToken = request.cookies.get("sessionToken")?.value;
 

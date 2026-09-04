@@ -37,9 +37,9 @@ function isSameSitePath(redirect: string) {
 }
 
 /**
- * Where a signed-in user lands. `?redirect=` wins when it is a same-site path;
- * otherwise route by role. CAMPAIGN_LEADERs and everyone else go to /campaigns,
- * which is reachable whether or not they run a campaign yet.
+ * Where a signed-in user lands. `?redirect=` (or `?next=`) wins when it is a
+ * same-site path; otherwise route by role. CAMPAIGN_LEADERs and everyone else
+ * go to /campaigns, which is reachable whether or not they run a campaign yet.
  */
 function destinationFor(role: string | undefined, redirect: string | null) {
   if (redirect && isSameSitePath(redirect)) {
@@ -92,7 +92,7 @@ function LoginForm() {
         setUser(data.user);
       }
 
-      router.push(destinationFor(data.user?.role, searchParams?.get("redirect") ?? null));
+      router.push(destinationFor(data.user?.role, searchParams?.get("redirect") ?? searchParams?.get("next") ?? null));
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
@@ -183,7 +183,7 @@ function LoginForm() {
               {loading ? "Signing in..." : "Sign in"}
             </Button>
 
-            <OAuthButtons redirect={searchParams?.get("redirect")} />
+            <OAuthButtons redirect={searchParams?.get("redirect") ?? searchParams?.get("next") ?? undefined} />
 
             <div className="my-4 flex items-center gap-3 text-sm">
               <div className="h-px flex-1 bg-border" />

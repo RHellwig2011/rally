@@ -98,6 +98,20 @@ export const createCampaignSchema = z.object({
     .max(50)
     .optional()
     .default(0),
+
+  autoStretchGoal: z.boolean().optional().default(false),
+  stretchGoalPercent: z.number()
+    .int("Stretch percent must be a whole number")
+    .min(10, "Stretch percent must be at least 10")
+    .max(100, "Stretch percent cannot exceed 100")
+    .optional()
+    .default(20),
+  stretchGoalTriggerPercent: z.number()
+    .int("Trigger percent must be a whole number")
+    .min(50, "Trigger percent must be at least 50")
+    .max(99, "Trigger percent cannot exceed 99")
+    .optional()
+    .default(90),
 }).refine((data) => {
   // Validate that end date is after start date
   if (data.endDate) {
@@ -183,6 +197,18 @@ export const updateCampaignSchema = z.object({
     .int()
     .min(0)
     .max(50)
+    .optional(),
+
+  autoStretchGoal: z.boolean().optional(),
+  stretchGoalPercent: z.number()
+    .int("Stretch percent must be a whole number")
+    .min(10, "Stretch percent must be at least 10")
+    .max(100, "Stretch percent cannot exceed 100")
+    .optional(),
+  stretchGoalTriggerPercent: z.number()
+    .int("Trigger percent must be a whole number")
+    .min(50, "Trigger percent must be at least 50")
+    .max(99, "Trigger percent cannot exceed 99")
     .optional(),
 });
 
