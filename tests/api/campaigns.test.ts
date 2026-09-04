@@ -375,6 +375,41 @@ describe("Campaign API Validation Tests", () => {
     });
   });
 
+  describe("Moving goal fields", () => {
+    it("should accept valid stretch percents on create", () => {
+      const data = {
+        ...getValidCampaignData(),
+        autoStretchGoal: true,
+        stretchGoalPercent: 25,
+        stretchGoalTriggerPercent: 80,
+      };
+      const result = createCampaignSchema.parse(data);
+      expect(result.autoStretchGoal).toBe(true);
+      expect(result.stretchGoalPercent).toBe(25);
+      expect(result.stretchGoalTriggerPercent).toBe(80);
+    });
+
+    it("should reject stretch percent below 10", () => {
+      const data = { ...getValidCampaignData(), stretchGoalPercent: 9 };
+      expect(() => createCampaignSchema.parse(data)).toThrow();
+    });
+
+    it("should reject trigger percent of 100", () => {
+      const data = { ...getValidCampaignData(), stretchGoalTriggerPercent: 100 };
+      expect(() => createCampaignSchema.parse(data)).toThrow();
+    });
+
+    it("should accept stretch fields on update", () => {
+      expect(() =>
+        updateCampaignSchema.parse({
+          autoStretchGoal: false,
+          stretchGoalPercent: 10,
+          stretchGoalTriggerPercent: 50,
+        })
+      ).not.toThrow();
+    });
+  });
+
   describe("Update Campaign Schema", () => {
     it("should accept partial updates", () => {
       const data = { teamName: "Updated Team Name" };

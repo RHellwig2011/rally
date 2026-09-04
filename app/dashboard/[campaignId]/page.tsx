@@ -66,6 +66,8 @@ import {
   TeamChip,
 } from "@/components/app-chrome";
 import { useCsrfToken } from "@/hooks/useCsrfToken";
+import { MovingGoalCard } from "@/components/dashboard/moving-goal-card";
+import { AssistantCoachesCard } from "@/components/dashboard/assistant-coaches-card";
 
 // The campaign/disbursement/donation APIs return DOLLAR values;
 // formatCurrency expects cents, so convert before formatting.
@@ -1270,6 +1272,21 @@ export default function DashboardPage({
               <p className="text-sm text-muted-foreground mt-1">Total paid out</p>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <MovingGoalCard
+            campaignId={params.campaignId}
+            csrfToken={csrfToken}
+            autoStretchGoal={!!data.campaign.autoStretchGoal}
+            stretchGoalPercent={data.campaign.stretchGoalPercent ?? 20}
+            stretchGoalTriggerPercent={data.campaign.stretchGoalTriggerPercent ?? 90}
+            onSaved={fetchDashboardData}
+          />
+          <AssistantCoachesCard
+            campaignId={params.campaignId}
+            csrfToken={csrfToken}
+          />
         </div>
 
         {/* Main Content Grid */}

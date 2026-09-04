@@ -97,6 +97,7 @@ async function handleCronRequest(req: NextRequest, method: 'GET' | 'POST') {
         outreachClaimed: results.outreachClaimed,
         outreachSent: results.outreachSent,
         outreachFailed: results.outreachFailed,
+        goalsStretched: results.goalsStretched,
       },
     });
   } catch (error) {

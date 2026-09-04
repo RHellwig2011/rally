@@ -1308,3 +1308,101 @@ Rally Fundraising Platform
 
   return result.success;
 }
+
+
+/**
+ * Invite an assistant coach who does not yet have an account.
+ * Transactional — invitations are exempt from the suppression list.
+ */
+export async function sendCoachInviteEmail(params: {
+  toEmail: string;
+  campaignName: string;
+  inviterName: string;
+  inviteLink: string;
+}) {
+  const { toEmail, campaignName, inviterName, inviteLink } = params;
+  const subject = `You're invited to help coach ${campaignName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h1>You're invited as an assistant coach</h1>
+    <p><strong>${inviterName}</strong> invited you to help run <strong>${campaignName}</strong> on Rally.</p>
+    <p>As an assistant coach you'll be able to manage the roster, outreach, and campaign settings alongside the head coach.</p>
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${inviteLink}" style="display: inline-block; background: #6366F1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept invitation</a>
+    </p>
+    <p>Or copy this link: ${inviteLink}</p>
+    <p>This invitation expires in 14 days. You'll need to be signed in to accept.</p>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `${inviterName} invited you to help coach ${campaignName} on Rally.
+
+Accept the invitation:
+${inviteLink}
+
+This invitation expires in 14 days. You'll need to be signed in to accept.
+`;
+
+  await sendEmail({
+    to: toEmail,
+    subject,
+    html,
+    text,
+    // Invitations are transactional — a coach adding an assistant must reach them.
+    transactional: true,
+  });
+}
+
+/**
+ * Notify an existing user that they were added as an assistant coach.
+ * Transactional — same exemption as team-member invitations.
+ */
+export async function sendAssistantCoachAddedEmail(params: {
+  toEmail: string;
+  toName: string;
+  campaignName: string;
+  inviterName: string;
+  dashboardUrl: string;
+}) {
+  const { toEmail, toName, campaignName, inviterName, dashboardUrl } = params;
+  const subject = `You've been added as an assistant coach on ${campaignName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h1>You're an assistant coach</h1>
+    <p>Hi ${toName},</p>
+    <p><strong>${inviterName}</strong> added you as an assistant coach for <strong>${campaignName}</strong>.</p>
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${dashboardUrl}" style="display: inline-block; background: #6366F1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Open dashboard</a>
+    </p>
+  </div>
+</body>
+</html>
+  `;
+
+  const text = `Hi ${toName},
+
+${inviterName} added you as an assistant coach for ${campaignName}.
+
+Open the dashboard: ${dashboardUrl}
+`;
+
+  await sendEmail({
+    to: toEmail,
+    subject,
+    html,
+    text,
+    transactional: true,
+  });
+}

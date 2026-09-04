@@ -125,6 +125,9 @@ export async function POST(req: NextRequest) {
         status: "DRAFT",
         primaryLeaderId: user.id,
         minContactsPerPlayer: validatedData.minContactsPerPlayer ?? 0,
+        autoStretchGoal: validatedData.autoStretchGoal ?? false,
+        stretchGoalPercent: validatedData.stretchGoalPercent ?? 20,
+        stretchGoalTriggerPercent: validatedData.stretchGoalTriggerPercent ?? 90,
         // Connect guardian if found
         ...(guardianUser && {
           guardians: {
